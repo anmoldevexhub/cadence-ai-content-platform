@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add website · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="add"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Add website" style="max-width:880px">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Add website</span></div>
+
+        <!-- Stepper -->
+        <div class="stepper" id="stepper">
+          <div class="step is-active" data-s="1"><span class="sdot">1</span> Details</div>
+          <div class="step-line"></div>
+          <div class="step" data-s="2"><span class="sdot">2</span> Crawl</div>
+          <div class="step-line"></div>
+          <div class="step" data-s="3"><span class="sdot">3</span> Confirm</div>
+        </div>
+
+        <!-- STEP 1: FORM -->
+        <section id="panel-1">
+          <div class="page-head"><div class="ph-text">
+            <h1 class="page-title">Add a website</h1>
+            <p class="page-sub">Tell Cadence about the site. We'll crawl it for brand-aware context, then you can start generating content.</p>
+          </div></div>
+
+          <form id="siteForm" novalidate>
+            <div class="card card-pad mb5">
+              <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Website basics</h3>
+              <div class="grid grid-2">
+                <div class="field" id="f-url">
+                  <label class="label" for="url">Website URL <span class="req">*</span></label>
+                  <div class="input-prefix">
+                    <span class="pfx">https://</span>
+                    <input class="input" id="url" type="text" placeholder="acmecoffee.com" value="acmecoffee.com" />
+                  </div>
+                  <div class="err-msg hide"><i data-lucide="alert-circle"></i> Enter a valid domain</div>
+                </div>
+                <div class="field" id="f-name">
+                  <label class="label" for="name">Display name <span class="req">*</span></label>
+                  <input class="input" id="name" type="text" placeholder="Acme Coffee" value="Acme Coffee" />
+                  <div class="err-msg hide"><i data-lucide="alert-circle"></i> Give the website a name</div>
+                </div>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label class="label" for="desc">Description <span class="opt">(optional)</span></label>
+                <textarea class="textarea" id="desc" placeholder="A specialty coffee roaster focused on single-origin beans and at-home brewing education."></textarea>
+              </div>
+            </div>
+
+            <div class="card card-pad mb5">
+              <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Brand &amp; audience</h3>
+              <div class="grid grid-2">
+                <div class="field">
+                  <label class="label" for="industry">Industry</label>
+                  <select class="select" id="industry">
+                    <option>Food &amp; Beverage</option><option>Health &amp; Fitness</option><option>Home &amp; Garden</option>
+                    <option>Fintech / SaaS</option><option>Travel</option><option>Beauty</option><option>E-commerce</option><option>Other</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="label" for="tone">Brand tone / voice</label>
+                  <select class="select" id="tone">
+                    <option>Warm &amp; artisanal</option><option>Energetic &amp; motivating</option><option>Calm &amp; informative</option>
+                    <option>Authoritative &amp; clear</option><option>Playful &amp; bold</option><option>Friendly &amp; science-led</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label" for="audience">Target audience</label>
+                <input class="input" id="audience" type="text" placeholder="Home brewing enthusiasts, 25–45, design-conscious" value="Home brewing enthusiasts, 25–45, design-conscious" />
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label class="label">Keywords <span class="opt">(press Enter to add)</span></label>
+                <div class="chip-input" id="kwInput">
+                  <span class="chip">pour-over <button type="button" aria-label="remove"><i data-lucide="x"></i></button></span>
+                  <span class="chip">single-origin <button type="button" aria-label="remove"><i data-lucide="x"></i></button></span>
+                  <span class="chip">sustainability <button type="button" aria-label="remove"><i data-lucide="x"></i></button></span>
+                  <input type="text" placeholder="Add keyword…" id="kwField" />
+                </div>
+              </div>
+            </div>
+
+            <div class="card card-pad mb6">
+              <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Social handles <span class="opt" style="font-size:var(--fs-sm)">(optional)</span></h3>
+              <p class="muted tsm mb4">Connect channels so Cadence can publish there directly.</p>
+              <div class="grid grid-3">
+                <div class="field" style="margin-bottom:0">
+                  <label class="label"><span class="row gap2"><span class="icon-tile tile-linkedin" style="width:24px;height:24px;border-radius:6px"></span> LinkedIn</span></label>
+                  <div class="input-prefix"><span class="pfx">in/</span><input class="input" type="text" placeholder="company" /></div>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label class="label"><span class="row gap2"><span class="icon-tile tile-youtube" style="width:24px;height:24px;border-radius:6px"></span> YouTube</span></label>
+                  <div class="input-prefix"><span class="pfx">@</span><input class="input" type="text" placeholder="channel" /></div>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label class="label"><span class="row gap2"><span class="icon-tile tile-instagram" style="width:24px;height:24px;border-radius:6px"></span> Instagram</span></label>
+                  <div class="input-prefix"><span class="pfx">@</span><input class="input" type="text" placeholder="handle" /></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="row-between">
+              <a class="btn btn-ghost" href="dashboard.html"><i data-lucide="arrow-left"></i> Cancel</a>
+              <button class="btn btn-primary btn-lg" type="submit"><i data-lucide="radar"></i> Crawl &amp; continue</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- STEP 2: CRAWLING -->
+        <section id="panel-2" class="hide">
+          <div class="crawl-stage card card-pad">
+            <div class="crawl-orb"><span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+              <span class="crawl-core"><i data-lucide="radar"></i></span>
+            </div>
+            <h2 style="font-size:var(--fs-2xl);margin-top:var(--s6)">Crawling <span id="crawlDomain" style="color:var(--primary)">acmecoffee.com</span>…</h2>
+            <p class="muted" style="max-width:46ch;margin:8px auto 0">Cadence is reading your pages to understand your brand, topics, and voice. This usually takes a few moments.</p>
+            <div class="progress mt6" style="max-width:420px;margin-left:auto;margin-right:auto"><i id="crawlBar" style="width:4%"></i></div>
+            <div class="crawl-log" id="crawlLog"></div>
+          </div>
+        </section>
+
+        <!-- STEP 3: RESULTS -->
+        <section id="panel-3" class="hide">
+          <div class="page-head"><div class="ph-text">
+            <span class="badge badge-success mb3"><i data-lucide="check"></i> Crawl complete</span>
+            <h1 class="page-title">Here's what we found</h1>
+            <p class="page-sub">Review the detected context. You can edit any of this later in the website's settings.</p>
+          </div></div>
+
+          <div class="grid grid-4 mb5">
+            <div class="stat"><div class="stat-top"><span class="stat-label">Pages crawled</span><span class="stat-ic icon-tile tile-blog"><i data-lucide="files"></i></span></div><div class="stat-val mono">38</div></div>
+            <div class="stat"><div class="stat-top"><span class="stat-label">Topics found</span><span class="stat-ic icon-tile tile-linkedin"><i data-lucide="tags"></i></span></div><div class="stat-val mono">12</div></div>
+            <div class="stat"><div class="stat-top"><span class="stat-label">Avg. read time</span><span class="stat-ic icon-tile tile-youtube"><i data-lucide="clock"></i></span></div><div class="stat-val mono">4.2m</div></div>
+            <div class="stat"><div class="stat-top"><span class="stat-label">Brand colors</span><span class="stat-ic icon-tile tile-instagram"><i data-lucide="palette"></i></span></div><div class="stat-val mono">5</div></div>
+          </div>
+
+          <div class="grid grid-2 mb5" style="align-items:start">
+            <div class="card">
+              <div class="card__header"><h3>Detected topics</h3></div>
+              <div class="card__body"><div class="chips" id="topicsOut"></div></div>
+            </div>
+            <div class="card">
+              <div class="card__header"><h3>Brand palette</h3><div class="sub" style="margin-left:auto">extracted from CSS</div></div>
+              <div class="card__body"><div class="palette" id="paletteOut"></div></div>
+            </div>
+          </div>
+
+          <div class="card mb5">
+            <div class="card__header"><h3>Detected pages</h3><div class="spacer"></div><span class="badge badge-neutral">Top 5 of 38</span></div>
+            <div class="table-wrap" style="border:none;border-radius:0">
+              <table class="tbl">
+                <thead><tr><th>Page</th><th>Type</th><th>Words</th><th>Last updated</th></tr></thead>
+                <tbody id="pagesOut"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card card-pad mb6">
+            <div class="row gap3 mb4"><span class="icon-tile tile-blog"><i data-lucide="quote"></i></span><div><h3 style="font-size:var(--fs-lg)">Sample extracted content</h3><div class="muted tsm">A representative paragraph Cadence will learn your voice from</div></div></div>
+            <blockquote class="extract">“At Northwind, every batch is roasted in small lots within 48 hours of shipping. We believe great coffee starts long before the grinder — with farmers we know by name and beans we'd happily drink black. Our brewing guides exist to demystify the craft, not gatekeep it.”</blockquote>
+          </div>
+
+          <div class="row-between">
+            <button class="btn btn-ghost" id="recrawl"><i data-lucide="rotate-cw"></i> Re-crawl</button>
+            <button class="btn btn-primary btn-lg" id="confirmSite"><i data-lucide="check"></i> Confirm &amp; add website</button>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK;
+    let domain = "acmecoffee.com", siteName = "Acme Coffee";
+
+    // keyword chips
+    const kwField = document.getElementById("kwField");
+    kwField.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && kwField.value.trim()) {
+        e.preventDefault();
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.innerHTML = kwField.value.trim() + ' <button type="button" aria-label="remove"><i data-lucide="x"></i></button>';
+        kwField.before(chip); kwField.value = ""; lucide.createIcons();
+      }
+    });
+    document.getElementById("kwInput").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (b) b.closest(".chip").remove();
+    });
+
+    function setStep(n) {
+      document.querySelectorAll(".step").forEach(s => {
+        const sn = +s.dataset.s;
+        s.classList.toggle("is-active", sn === n);
+        s.classList.toggle("is-done", sn < n);
+      });
+      [1,2,3].forEach(i => document.getElementById("panel-"+i).classList.toggle("hide", i !== n));
+      window.scrollTo({ top: 0 });
+    }
+
+    let createdSiteId = null;
+
+    function addLogMessage(text, iconName, spin = false, color = "var(--text)") {
+      const log = document.getElementById("crawlLog");
+      const activeRows = log.querySelectorAll(".log-row:not(.done)");
+      activeRows.forEach(row => {
+        const icon = row.querySelector("i, svg");
+        if (icon) {
+          icon.outerHTML = '<i data-lucide="check-circle-2" style="color:var(--success)"></i>';
+        }
+        row.classList.add("done");
+      });
+
+      const row = document.createElement("div");
+      row.className = "log-row";
+      if (spin) {
+        row.innerHTML = `<i data-lucide="${iconName}" class="spin" style="color:${color}"></i><span style="color:${color}">${text}</span>`;
+      } else {
+        row.innerHTML = `<i data-lucide="${iconName}" style="color:${color}"></i><span style="color:${color}">${text}</span>`;
+      }
+      log.appendChild(row);
+      lucide.createIcons();
+    }
+
+    let pollInterval = null;
+    function runCrawlPolling(siteId) {
+      const bar = document.getElementById("crawlBar");
+      bar.style.width = "10%";
+      let progress = 10;
+      
+      pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await CadenceAPI.getCrawlStatus(siteId);
+          const status = statusRes.status;
+          
+          if (progress < 90) {
+            progress += 15;
+            bar.style.width = progress + "%";
+          }
+          
+          if (status === "crawling") {
+            addLogMessage("Reading webpages & style references...", "loader-circle", true);
+          } else if (status === "done") {
+            clearInterval(pollInterval);
+            bar.style.width = "100%";
+            addLogMessage("Extraction complete! Summarizing content tone...", "check-circle-2", false, "var(--success)");
+            setTimeout(async () => {
+              await fillRealResults(siteId);
+              setStep(3);
+            }, 600);
+          } else if (status === "failed") {
+            clearInterval(pollInterval);
+            addLogMessage("Crawl failed. Please check the website URL.", "x-circle", false, "var(--danger)");
+            C.toast({ type: "error", title: "Crawl Failed", desc: "The scraper was unable to parse the website." });
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
+        }
+      }, 1500);
+    }
+
+    async function fillRealResults(siteId) {
+      try {
+        const websites = await CadenceAPI.getWebsites();
+        const site = websites.find(w => String(w.id) === String(siteId));
+        if (!site) return;
+        
+        const pages = await CadenceAPI.getWebsitePages(siteId);
+        
+        document.querySelector(".grid-4").innerHTML = `
+          <div class="stat"><div class="stat-top"><span class="stat-label">Pages crawled</span><span class="stat-ic icon-tile tile-blog"><i data-lucide="files"></i></span></div><div class="stat-val mono">${pages.length}</div></div>
+          <div class="stat"><div class="stat-top"><span class="stat-label">Topics found</span><span class="stat-ic icon-tile tile-linkedin"><i data-lucide="tags"></i></span></div><div class="stat-val mono">${site.topics.length}</div></div>
+          <div class="stat"><div class="stat-top"><span class="stat-label">Avg. read time</span><span class="stat-ic icon-tile tile-youtube"><i data-lucide="clock"></i></span></div><div class="stat-val mono">${site.avg_read_time || '3.5m'}</div></div>
+          <div class="stat"><div class="stat-top"><span class="stat-label">Brand colors</span><span class="stat-ic icon-tile tile-instagram"><i data-lucide="palette"></i></span></div><div class="stat-val mono">${site.brand_colors.length}</div></div>
+        `;
+        
+        const topics = site.topics.length ? site.topics : ["General"];
+        document.getElementById("topicsOut").innerHTML = topics.map(t => `<span class="chip" style="background:var(--bg-subtle);color:var(--text-secondary)">${t}</span>`).join("");
+        
+        const palette = site.brand_colors.length ? site.brand_colors : ["#6366f1","#4f46e5","#f5f3ff","#1f2937","#a5b4fc"];
+        document.getElementById("paletteOut").innerHTML = palette.map(c => `<div class="sw"><span style="background:${c}"></span><code>${c}</code></div>`).join("");
+        
+        const topPages = pages.slice(0, 5);
+        if (topPages.length > 0) {
+          document.getElementById("pagesOut").innerHTML = topPages.map(p => {
+            const date = new Date(p.crawled_at);
+            const dateStr = date.toLocaleDateString();
+            const wordCount = p.raw_text.split(/\s+/).length;
+            let type = "Page";
+            if (p.page_url.endsWith('/') && p.page_url.split('/').length <= 4) type = "Landing";
+            else if (p.page_url.includes('about')) type = "About";
+            else if (p.page_url.includes('blog') || p.page_url.includes('news')) type = "Blog hub";
+            else if (p.page_url.includes('shop') || p.page_url.includes('product')) type = "Product";
+            
+            return `<tr>
+              <td class="cell-strong" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.page_title || p.page_url}</td>
+              <td><span class="badge badge-neutral">${type}</span></td>
+              <td class="cell-muted mono">${wordCount}</td>
+              <td class="cell-muted">${dateStr}</td>
+            </tr>`;
+          }).join("");
+        } else {
+          document.getElementById("pagesOut").innerHTML = `<tr><td colspan="4" class="cell-muted" style="text-align:center">No pages crawled successfully.</td></tr>`;
+        }
+        
+        if (pages.length > 0) {
+          const excerpt = pages[0].raw_text.substring(0, 320) + "...";
+          document.querySelector("blockquote.extract").textContent = `“${excerpt}”`;
+        } else {
+          document.querySelector("blockquote.extract").textContent = "“No text content could be extracted.”";
+        }
+        
+        lucide.createIcons();
+      } catch (err) {
+        console.error("Failed to render real crawl results", err);
+      }
+    }
+
+    // STEP 1 submit
+    document.getElementById("siteForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const url = document.getElementById("url");
+      const name = document.getElementById("name");
+      let ok = true;
+      [["f-url", url, /.+\..+/], ["f-name", name, /.+/]].forEach(([id, el, re]) => {
+        const f = document.getElementById(id);
+        const bad = !re.test(el.value.trim());
+        f.classList.toggle("has-error", bad);
+        f.querySelector(".err-msg").classList.toggle("hide", !bad);
+        if (bad) ok = false;
+      });
+      if (!ok) { C.toast({ type: "error", title: "Please complete the required fields" }); return; }
+      domain = url.value.trim().replace(/^https?:\/\//, "");
+      siteName = name.value.trim();
+      document.getElementById("crawlDomain").textContent = domain;
+      setStep(2); 
+
+      try {
+        const log = document.getElementById("crawlLog");
+        log.innerHTML = "";
+        addLogMessage("Creating website draft record...", "loader-circle", true);
+        const urlStr = url.value.trim().startsWith('http') ? url.value.trim() : 'https://' + url.value.trim();
+        const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, "General", "Professional", []);
+        createdSiteId = site.id;
+        
+        addLogMessage("Website record created. Initiating crawler...", "check-circle-2", false, "var(--success)");
+        await CadenceAPI.triggerCrawl(site.id);
+        addLogMessage("Crawl request dispatched. Running page crawler...", "loader-circle", true);
+        runCrawlPolling(site.id);
+      } catch (err) {
+        console.error("Onboarding setup failed:", err);
+        addLogMessage("Onboarding setup failed: " + err.message, "x-circle", false, "var(--danger)");
+        C.toast({ type: "error", title: "Failed to initiate crawl", desc: err.message });
+      }
+    });
+
+    document.getElementById("recrawl").addEventListener("click", async () => {
+      if (!createdSiteId) return;
+      setStep(2);
+      try {
+        const log = document.getElementById("crawlLog");
+        log.innerHTML = "";
+        addLogMessage("Initiating re-crawl...", "loader-circle", true);
+        await CadenceAPI.triggerCrawl(createdSiteId);
+        runCrawlPolling(createdSiteId);
+      } catch (err) {
+        console.error("Re-crawl trigger failed:", err);
+        addLogMessage("Re-crawl failed: " + err.message, "x-circle", false, "var(--danger)");
+      }
+    });
+
+    document.getElementById("confirmSite").addEventListener("click", async () => {
+      if (!createdSiteId) return;
+      try {
+        await CadenceAPI.updateWebsite(createdSiteId, {
+          status: 'active'
+        });
+        
+        await M.syncMockData();
+        
+        C.toast({ type: "success", title: `${siteName} added`, desc: "Opening the workspace…" });
+        setTimeout(() => location.href = `website-workspace.html?site=${createdSiteId}`, 1100);
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Failed to add website", desc: err.message });
+      }
+    });
+
+    C.refreshIcons();
+  })();
+  </script>
+
+  <style>
+    .stepper { display:flex; align-items:center; gap:var(--s3); margin-bottom:var(--s7); }
+    .step { display:flex; align-items:center; gap:8px; font-weight:600; font-size:var(--fs-md); color:var(--text-muted); }
+    .step .sdot { width:26px; height:26px; border-radius:99px; display:grid; place-items:center; border:1.5px solid var(--border-strong); font-size:var(--fs-sm); background:var(--surface); }
+    .step.is-active { color:var(--text); }
+    .step.is-active .sdot { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .step.is-done .sdot { background:var(--success); border-color:var(--success); color:#fff; }
+    .step-line { flex:1; height:1.5px; background:var(--border); max-width:80px; }
+
+    .crawl-stage { text-align:center; padding:var(--s10) var(--s6); }
+    .crawl-orb { position:relative; width:120px; height:120px; margin:0 auto; }
+    .crawl-orb .ring { position:absolute; inset:0; border-radius:99px; border:1.5px solid var(--primary); opacity:0; animation:crawlPulse 2.4s ease-out infinite; }
+    .crawl-orb .r2 { animation-delay:.8s; } .crawl-orb .r3 { animation-delay:1.6s; }
+    .crawl-core { position:absolute; inset:30px; border-radius:99px; background:linear-gradient(140deg,var(--primary),#9333ea); display:grid; place-items:center; color:#fff; box-shadow:var(--sh-lg); }
+    .crawl-core svg { width:28px; height:28px; animation:spin 3s linear infinite; }
+    @keyframes crawlPulse { 0%{transform:scale(.5);opacity:.7;} 100%{transform:scale(1.25);opacity:0;} }
+    .crawl-log { max-width:420px; margin:var(--s6) auto 0; text-align:left; display:flex; flex-direction:column; gap:10px; }
+    .log-row { display:flex; align-items:center; gap:10px; font-size:var(--fs-md); color:var(--text-secondary); }
+    .log-row svg { width:16px; height:16px; }
+    .log-row.done { color:var(--text); }
+
+    .palette { display:flex; flex-wrap:wrap; gap:var(--s4); }
+    .palette .sw { text-align:center; }
+    .palette .sw span { display:block; width:48px; height:48px; border-radius:10px; border:1px solid var(--border); box-shadow:var(--sh-xs); }
+    .palette .sw code { display:block; font-size:11px; color:var(--text-muted); margin-top:6px; }
+    .extract { font-size:var(--fs-lg); line-height:1.7; color:var(--text-secondary); border-left:3px solid var(--primary); padding-left:var(--s5); font-style:italic; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

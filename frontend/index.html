@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadence · AI Content Dashboard</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body style="background:var(--bg-subtle)">
+  <div class="ix-wrap">
+    <header class="ix-head">
+      <div class="row gap3" style="align-items:center">
+        <span class="brand-mark" style="width:38px;height:38px"><i data-lucide="audio-waveform" style="width:22px;height:22px"></i></span>
+        <div><div class="brand-name" style="font-size:18px">Cadence</div><div class="muted tsm">AI Content Generation Dashboard</div></div>
+      </div>
+      <div class="row gap2">
+        <div class="segmented" id="ixRole"><button data-role="admin">Admin</button><button data-role="super">Super Admin</button></div>
+        <button class="icon-btn btn-secondary" data-action="toggle-theme" style="border:1px solid var(--border-strong)"><i data-lucide="sun-moon"></i></button>
+        <a class="btn btn-primary" href="login.html"><i data-lucide="arrow-right"></i> Launch app</a>
+      </div>
+    </header>
+
+    <section class="ix-hero">
+      <span class="badge badge-primary mb4"><i data-lucide="sparkles"></i> Design prototype · UI only · mock data</span>
+      <h1>The AI content engine for multi-site teams.</h1>
+      <p>Cadence crawls each client website, drafts blogs, LinkedIn, YouTube &amp; Instagram posts, then auto-publishes a full week of approved content. This is the complete front-end — every screen, two roles, light &amp; dark.</p>
+      <div class="row gap3 wrap mt5">
+        <a class="btn btn-primary btn-lg" href="dashboard.html"><i data-lucide="layout-dashboard"></i> Open dashboard</a>
+        <a class="btn btn-secondary btn-lg" href="website-workspace.html?site=northwind"><i data-lucide="sparkles"></i> Try content generation</a>
+      </div>
+      <div class="ix-tips">
+        <span><i data-lucide="repeat"></i> Toggle <b>Admin / Super Admin</b> in the top bar of any page</span>
+        <span><i data-lucide="moon"></i> Toggle <b>light / dark</b> with the theme button</span>
+      </div>
+    </section>
+
+    <h2 class="ix-section">Pages</h2>
+    <div class="ix-grid" id="pages"></div>
+
+    <h2 class="ix-section">Built with</h2>
+    <div class="ix-stack">
+      <span class="ix-pill"><i data-lucide="code"></i> Plain HTML5 + CSS3</span>
+      <span class="ix-pill"><i data-lucide="braces"></i> Vanilla JavaScript</span>
+      <span class="ix-pill"><i data-lucide="palette"></i> CSS custom-property theming</span>
+      <span class="ix-pill"><i data-lucide="bar-chart-3"></i> Chart.js</span>
+      <span class="ix-pill"><i data-lucide="feather"></i> Lucide icons</span>
+      <span class="ix-pill"><i data-lucide="type"></i> Inter (Google Fonts)</span>
+    </div>
+
+    <footer class="ix-foot">
+      <span class="muted tsm">Cadence — design prototype. All data is mock. No backend.</span>
+      <span class="muted tsm">Shared files: <code>styles.css</code> · <code>app.js</code> · <code>mock-data.js</code></span>
+    </footer>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, I = C.icon;
+    // reflect current role in the index toggle (uses shared handlers via app.js? app.js wires [data-role] only in shell). Wire here:
+    function syncRole(){ document.querySelectorAll("#ixRole button").forEach(b=>b.classList.toggle("active", b.dataset.role===C.store.role)); }
+    document.querySelectorAll("#ixRole button").forEach(b=>b.addEventListener("click",()=>{ C.store.role=b.dataset.role; syncRole(); C.toast({type:"info",title:b.dataset.role==="super"?"Previewing as Super Admin":"Previewing as Admin"}); }));
+    syncRole();
+
+    const pages = [
+      { t:"Login", d:"Branded split sign-in with social placeholders", href:"login.html", icon:"log-in", tile:"blog", tag:"Auth" },
+      { t:"Sign up", d:"Create-account flow with validation", href:"signup.html", icon:"user-plus", tile:"blog", tag:"Auth" },
+      { t:"Forgot password", d:"Reset-link request with success state", href:"forgot-password.html", icon:"key-round", tile:"blog", tag:"Auth" },
+      { t:"Dashboard", d:"Stats, weekly schedule, activity, output chart", href:"dashboard.html", icon:"layout-dashboard", tile:"linkedin", tag:"Core" },
+      { t:"Add website", d:"Form → live crawl animation → results", href:"add-website.html", icon:"globe", tile:"linkedin", tag:"Core" },
+      { t:"Website workspace", d:"Generate, draft cards & platform previews", href:"website-workspace.html?site=northwind", icon:"sparkles", tile:"linkedin", tag:"Core" },
+      { t:"Content calendar", d:"Weekly board, drag-to-reschedule, auto-schedule", href:"calendar.html", icon:"calendar-days", tile:"youtube", tag:"Core" },
+      { t:"Approvals queue", d:"Master/detail review with bulk actions", href:"approvals.html", icon:"check-check", tile:"youtube", tag:"Core" },
+      { t:"Analytics", d:"Volume, platform mix, approval & engagement", href:"analytics.html", icon:"bar-chart-3", tile:"youtube", tag:"Core" },
+      { t:"Settings", d:"Profile, scheduler, connections, billing", href:"settings.html", icon:"settings", tile:"instagram", tag:"Core" },
+      { t:"Admins & roles", d:"Manage admins + permission matrix", href:"admins.html", icon:"users", tile:"instagram", tag:"Super Admin" },
+      { t:"All websites", d:"Every site with owner & content stats", href:"all-websites.html", icon:"layout-grid", tile:"instagram", tag:"Super Admin" },
+    ];
+    document.getElementById("pages").innerHTML = pages.map((p,i)=>`
+      <a class="ix-card" href="${p.href}">
+        <div class="row-between"><span class="icon-tile tile-${p.tile}">${I(p.icon)}</span><span class="badge badge-neutral">${p.tag}</span></div>
+        <div class="ix-num">${String(i+1).padStart(2,"0")}</div>
+        <div class="ix-t">${p.t}</div>
+        <div class="ix-d">${p.d}</div>
+        <div class="ix-go">Open ${I("arrow-right","style='width:14px;height:14px'")}</div>
+      </a>`).join("");
+    C.refreshIcons();
+  })();
+  </script>
+  <style>
+    .ix-wrap { max-width:1080px; margin:0 auto; padding:var(--s6) var(--s5) var(--s9); }
+    .ix-head { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s3) 0 var(--s7); flex-wrap:wrap; }
+    .ix-head .segmented button.active { background:var(--surface); color:var(--text); box-shadow:var(--sh-xs); }
+    .ix-hero { text-align:center; padding:var(--s7) 0 var(--s8); max-width:720px; margin:0 auto; }
+    .ix-hero h1 { font-size:clamp(30px,5vw,46px); letter-spacing:-0.035em; line-height:1.08; margin:var(--s4) 0; }
+    .ix-hero p { font-size:var(--fs-lg); color:var(--text-secondary); line-height:1.6; max-width:60ch; margin:0 auto; }
+    .ix-tips { display:flex; gap:var(--s5); justify-content:center; flex-wrap:wrap; margin-top:var(--s6); }
+    .ix-tips span { display:flex; align-items:center; gap:8px; font-size:var(--fs-sm); color:var(--text-muted); }
+    .ix-tips svg { width:15px; height:15px; }
+    .ix-section { font-size:var(--fs-xl); margin:var(--s8) 0 var(--s5); }
+    .ix-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s4); }
+    @media (max-width:880px){ .ix-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:560px){ .ix-grid { grid-template-columns:1fr; } }
+    .ix-card { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s5); box-shadow:var(--sh-xs); transition:.15s; overflow:hidden; }
+    .ix-card:hover { box-shadow:var(--sh-md); transform:translateY(-2px); border-color:var(--border-strong); }
+    .ix-num { position:absolute; top:var(--s4); right:var(--s5); font-size:40px; font-weight:800; color:var(--bg-subtle); letter-spacing:-.04em; z-index:0; }
+    [data-theme="dark"] .ix-num { color:var(--surface-2); }
+    .ix-t { font-weight:650; font-size:var(--fs-lg); margin-top:var(--s4); position:relative; }
+    .ix-d { color:var(--text-muted); font-size:var(--fs-sm); margin-top:4px; line-height:1.5; }
+    .ix-go { display:flex; align-items:center; gap:6px; color:var(--primary); font-weight:600; font-size:var(--fs-sm); margin-top:var(--s4); }
+    .ix-stack { display:flex; flex-wrap:wrap; gap:var(--s2); }
+    .ix-pill { display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-full); font-weight:550; font-size:var(--fs-md); }
+    .ix-pill svg { width:16px; height:16px; color:var(--text-muted); }
+    .ix-foot { display:flex; justify-content:space-between; gap:var(--s4); flex-wrap:wrap; margin-top:var(--s8); padding-top:var(--s5); border-top:1px solid var(--border); }
+    .ix-foot code { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:11px; }
+  </style>
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" rx="22" fill="#6366f1"/><path d="M22 50h10l6-16 12 32 6-16h20" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </template>
+</body>
+</html>

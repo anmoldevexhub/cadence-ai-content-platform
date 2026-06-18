@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+.DS_Store
+*.pid
+*.pid.lock
+
+# Environment Variables
+.env
+.env.local
+.env.production
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.pyproject
+
+# Frontend (if generated)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Local settings
+local_settings.py
+
+# Coverage
+coverage/
+htmlcov/
+.tox/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Frontend Media (generated images)
+frontend/media/*.svg
+frontend/media/*.png
+frontend/media/*.jpg
+!frontest/media/.gitkeep

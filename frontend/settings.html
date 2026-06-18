@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="settings"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Settings" style="max-width:1180px">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Settings</span></div>
+        <div class="page-head"><div class="ph-text"><h1 class="page-title">Settings</h1><p class="page-sub">Manage your profile, connections, scheduling and plan.</p></div></div>
+
+        <div class="set-layout">
+          <!-- Settings nav -->
+          <nav class="set-nav" id="setNav">
+            <button class="set-link active" data-s="profile"><i data-lucide="user"></i> Profile</button>
+            <button class="set-link" data-s="notifications"><i data-lucide="bell"></i> Notifications</button>
+            <button class="set-link" data-s="scheduler"><i data-lucide="calendar-clock"></i> Scheduler</button>
+            <button class="set-link" data-s="connections"><i data-lucide="link"></i> Connections</button>
+            <button class="set-link super-only" data-s="billing"><i data-lucide="credit-card"></i> Billing &amp; plan</button>
+          </nav>
+
+          <div class="set-content">
+            <!-- PROFILE -->
+            <section class="set-panel active" data-panel="profile">
+              <div class="card card-pad mb5">
+                <h3 class="set-h">Profile</h3>
+                <div class="row gap4 mb5" style="align-items:center">
+                  <span class="avatar avatar-xl" id="profAv"></span>
+                  <div><button class="btn btn-secondary btn-sm"><i data-lucide="upload"></i> Upload photo</button><div class="muted tsm mt2">JPG or PNG, max 2MB</div></div>
+                </div>
+                <div class="grid grid-2">
+                  <div class="field"><label class="label">Full name</label><input class="input" id="pName"/></div>
+                  <div class="field"><label class="label">Email</label><input class="input" id="pEmail" type="email"/></div>
+                  <div class="field"><label class="label">Job title</label><input class="input" value="Content Manager"/></div>
+                  <div class="field"><label class="label">Timezone</label><select class="select"><option>(GMT-08:00) Pacific Time</option><option selected>(GMT+00:00) London</option><option>(GMT+01:00) Berlin</option></select></div>
+                </div>
+                <div class="field" style="margin-bottom:0"><label class="label">Bio</label><textarea class="textarea">Managing content for specialty brands at Cadence.</textarea></div>
+              </div>
+              <div class="card card-pad">
+                <h3 class="set-h">Appearance</h3>
+                <label class="set-row"><div><div class="fw6">Theme</div><div class="muted tsm">Switch between light and dark mode</div></div>
+                  <div class="seg-pills"><button class="active" id="themeLight">Light</button><button id="themeDark">Dark</button></div></label>
+              </div>
+            </section>
+
+            <!-- NOTIFICATIONS -->
+            <section class="set-panel" data-panel="notifications">
+              <div class="card card-pad">
+                <h3 class="set-h">Notification preferences</h3>
+                <div id="notifList"></div>
+              </div>
+            </section>
+
+            <!-- SCHEDULER -->
+            <section class="set-panel" data-panel="scheduler">
+              <div class="card card-pad mb5">
+                <h3 class="set-h">Weekly run</h3>
+                <p class="muted tsm" style="margin-top:-8px;margin-bottom:var(--s5)">Cadence drafts the week's content on a schedule. You review, approve, and it publishes daily.</p>
+                <div class="grid grid-2">
+                  <div class="field"><label class="label">Run day</label><select class="select"><option selected>Monday</option><option>Sunday</option><option>Friday</option></select></div>
+                  <div class="field"><label class="label">Run time</label><input class="input" type="time" value="09:00"/></div>
+                </div>
+                <label class="set-row" style="border-top:1px solid var(--border);padding-top:var(--s4)"><div><div class="fw6">Auto-generate drafts</div><div class="muted tsm">Create drafts from your idea queue automatically</div></div><span class="switch"><input type="checkbox" checked/><span class="track"></span></span></label>
+                <label class="set-row"><div><div class="fw6">Auto-publish approved content</div><div class="muted tsm">Post on the scheduled slot without manual send</div></div><span class="switch"><input type="checkbox" checked/><span class="track"></span></span></label>
+              </div>
+              <div class="card card-pad">
+                <h3 class="set-h">Posting times per platform</h3>
+                <div id="postTimes" class="col gap3"></div>
+              </div>
+            </section>
+
+            <!-- CONNECTIONS -->
+            <section class="set-panel" data-panel="connections">
+              <div class="card card-pad">
+                <h3 class="set-h">Social platform connections</h3>
+                <p class="muted tsm" style="margin-top:-8px;margin-bottom:var(--s5)">Connect channels so Cadence can publish directly.</p>
+                <div id="connList" class="col gap3"></div>
+              </div>
+            </section>
+
+            <!-- BILLING -->
+            <section class="set-panel" data-panel="billing">
+              <div class="card mb5" style="overflow:hidden">
+                <div class="plan-banner">
+                  <div><div class="badge" style="background:rgba(255,255,255,.2);color:#fff;margin-bottom:8px">Current plan</div>
+                    <h3 style="font-size:var(--fs-2xl);color:#fff">Scale</h3>
+                    <p style="color:rgba(255,255,255,.85);margin-top:4px">Unlimited websites · 8 admins · 10k AI generations/mo</p></div>
+                  <div style="text-align:right"><div style="font-size:34px;font-weight:800;color:#fff;letter-spacing:-.03em">$149<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span></div>
+                    <button class="btn btn-sm mt2" style="background:#fff;color:var(--primary)">Manage plan</button></div>
+                </div>
+                <div class="card__body">
+                  <div class="row-between mb2"><span class="fw6">AI generations this month</span><span class="muted tsm mono">6,420 / 10,000</span></div>
+                  <div class="progress"><i style="width:64%"></i></div>
+                  <div class="grid grid-3 mt5">
+                    <div><div class="muted tsm">Websites</div><div class="fw7 mono" style="font-size:var(--fs-lg)">6 / ∞</div></div>
+                    <div><div class="muted tsm">Admin seats</div><div class="fw7 mono" style="font-size:var(--fs-lg)">4 / 8</div></div>
+                    <div><div class="muted tsm">Next invoice</div><div class="fw7" style="font-size:var(--fs-lg)">Jul 1, 2026</div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="card card-pad mb5">
+                <h3 class="set-h">Payment method</h3>
+                <div class="chan-conn"><span class="icon-tile tile-blog"><i data-lucide="credit-card"></i></span>
+                  <div style="flex:1"><div class="fw6">Visa ending 4242</div><div class="muted tsm">Expires 09 / 2028</div></div>
+                  <button class="btn btn-secondary btn-sm">Update</button></div>
+              </div>
+              <div class="card">
+                <div class="card__header"><h3>Billing history</h3></div>
+                <div class="table-wrap" style="border:none;border-radius:0">
+                  <table class="tbl"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody id="invBody"></tbody></table>
+                </div>
+              </div>
+            </section>
+
+            <div class="set-actions">
+              <button class="btn btn-ghost">Cancel</button>
+              <button class="btn btn-primary" id="saveSettings"><i data-lucide="check"></i> Save changes</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    const u = C.store.role === "super" ? M.users.super : M.users.admin;
+
+    document.getElementById("profAv").textContent = u.initials;
+    document.getElementById("profAv").style.background = u.color;
+    document.getElementById("pName").value = u.name;
+    document.getElementById("pEmail").value = u.email;
+
+    function applyRole() { document.querySelectorAll(".super-only").forEach(e => e.classList.toggle("hide", C.store.role !== "super")); }
+    applyRole();
+    window.addEventListener("rolechange", () => { applyRole(); if (C.store.role !== "super" && document.querySelector('.set-link[data-s=billing]').classList.contains('active')) switchTo("profile"); });
+
+    // settings nav
+    function switchTo(s) {
+      document.querySelectorAll(".set-link").forEach(l => l.classList.toggle("active", l.dataset.s === s));
+      document.querySelectorAll(".set-panel").forEach(p => p.classList.toggle("active", p.dataset.panel === s));
+    }
+    document.querySelectorAll(".set-link").forEach(l => l.addEventListener("click", () => switchTo(l.dataset.s)));
+
+    // notifications
+    const notifs = [
+      ["Draft ready for approval","When AI finishes generating drafts",true,true],
+      ["Content published","When a post goes live on a channel",true,false],
+      ["Weekly run summary","A Monday recap of what was generated",true,true],
+      ["Approval reminders","If drafts sit unreviewed for 24h",true,false],
+      ["Mentions &amp; comments","When someone @mentions you",false,true],
+      ["Product updates","New features and tips from Cadence",false,true],
+    ];
+    document.getElementById("notifList").innerHTML = `
+      <div class="notif-head"><span>Notification</span><span class="ctr">Email</span><span class="ctr">In-app</span></div>` +
+      notifs.map(([t,d,em,ip])=>`<div class="notif-row"><div><div class="fw6">${t}</div><div class="muted tsm">${d}</div></div>
+        <span class="ctr"><label class="switch"><input type="checkbox" ${em?'checked':''}/><span class="track"></span></label></span>
+        <span class="ctr"><label class="switch"><input type="checkbox" ${ip?'checked':''}/><span class="track"></span></label></span></div>`).join("");
+
+    // posting times
+    const times = [["Blog","blog","08:00"],["LinkedIn","linkedin","08:30"],["YouTube","youtube","17:00"],["Instagram","instagram","12:30"]];
+    document.getElementById("postTimes").innerHTML = times.map(([n,t,tm])=>`
+      <div class="chan-conn"><span class="icon-tile tile-${t}">${I(M.platMeta(n).icon)}</span>
+        <div style="flex:1"><div class="fw6">${n}</div><div class="muted tsm">Default daily posting time</div></div>
+        <input class="input" type="time" value="${tm}" style="width:130px"/></div>`).join("");
+
+    // connections
+    const conns = [["LinkedIn","linkedin","Connected as Northwind Coffee",true],["YouTube","youtube","Connected as @northwind",true],["Instagram","instagram","Not connected",false],["X / Twitter","blog","Not connected",false]];
+    document.getElementById("connList").innerHTML = conns.map(([n,t,st,on])=>`
+      <div class="chan-conn"><span class="icon-tile tile-${t}">${I(M.platMeta(n==="X / Twitter"?"Blog":n).icon)}</span>
+        <div class="cc-meta"><div class="cc-nm">${n}</div><div class="cc-st">${st}</div></div>
+        ${on?`<button class="btn btn-secondary btn-sm" onclick="this.closest('.chan-conn').querySelector('.cc-st').textContent='Not connected';Cadence.toast({type:'info',title:'${n} disconnected'})">Disconnect</button>`
+            :`<button class="btn btn-primary btn-sm" onclick="this.closest('.chan-conn').querySelector('.cc-st').textContent='Connected';Cadence.toast({type:'success',title:'${n} connected'})">Connect</button>`}</div>`).join("");
+
+    // invoices
+    const inv = [["Jun 1, 2026","Scale plan — monthly","$149.00"],["May 1, 2026","Scale plan — monthly","$149.00"],["Apr 1, 2026","Scale plan — monthly","$149.00"]];
+    document.getElementById("invBody").innerHTML = inv.map(([d,desc,a])=>`<tr><td class="cell-muted">${d}</td><td class="cell-strong">${desc}</td><td class="mono">${a}</td><td><span class="badge badge-success">Paid</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm">${I("download")}</button></td></tr>`).join("");
+
+    // theme buttons
+    document.getElementById("themeLight").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","light"); C.store.theme="light"; syncTheme(); });
+    document.getElementById("themeDark").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","dark"); C.store.theme="dark"; syncTheme(); });
+    function syncTheme(){ const d=C.store.theme==="dark"; document.getElementById("themeDark").classList.toggle("active",d); document.getElementById("themeLight").classList.toggle("active",!d); window.dispatchEvent(new CustomEvent("themechange")); }
+    syncTheme();
+
+    document.getElementById("saveSettings").addEventListener("click", async () => {
+      const name = document.getElementById("pName").value.trim();
+      const email = document.getElementById("pEmail").value.trim();
+      
+      const nameParts = name.split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      try {
+        await CadenceAPI.request('/auth/me/', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            email: email
+          })
+        });
+        
+        // Sync local storage user and refresh mock data
+        await CadenceAPI.getMe();
+        await M.syncMockData();
+        
+        // Update avatar display
+        const me = CadenceAPI.getUser();
+        if (me) {
+          const initials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || me.username.substring(0,2).toUpperCase();
+          document.getElementById("profAv").textContent = initials;
+        }
+
+        C.toast({ type:"success", title:"Profile updated successfully" });
+      } catch (err) {
+        console.error(err);
+        C.toast({ type:"error", title:"Update failed", desc: err.message });
+      }
+    });
+
+    C.refreshIcons();
+  })();
+  </script>
+  <style>
+    .set-layout { display:grid; grid-template-columns:220px 1fr; gap:var(--s6); align-items:start; }
+    @media (max-width:880px){ .set-layout { grid-template-columns:1fr; } .set-nav { flex-direction:row !important; overflow-x:auto; position:static !important; } }
+    .set-nav { display:flex; flex-direction:column; gap:2px; position:sticky; top:84px; }
+    .set-link { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--r-sm); font-weight:550; font-size:var(--fs-md); color:var(--text-secondary); white-space:nowrap; transition:.12s; }
+    .set-link svg { width:17px; height:17px; color:var(--text-muted); }
+    .set-link:hover { background:var(--bg-subtle); color:var(--text); }
+    .set-link.active { background:var(--primary-soft); color:var(--primary); font-weight:600; }
+    .set-link.active svg { color:var(--primary); }
+    .set-panel { display:none; }
+    .set-panel.active { display:block; animation:fadeIn .2s ease; }
+    .set-h { font-size:var(--fs-lg); margin-bottom:var(--s5); }
+    .set-row { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s4) 0; cursor:pointer; }
+    .set-row:not(:last-child) { border-bottom:1px solid var(--border); }
+    .set-actions { display:flex; justify-content:flex-end; gap:var(--s2); margin-top:var(--s5); }
+    .notif-head, .notif-row { display:grid; grid-template-columns:1fr 80px 80px; align-items:center; gap:var(--s3); }
+    .notif-head { font-size:var(--fs-sm); color:var(--text-muted); font-weight:600; padding-bottom:var(--s3); border-bottom:1px solid var(--border); }
+    .notif-row { padding:var(--s4) 0; border-bottom:1px solid var(--border); }
+    .notif-row:last-child { border-bottom:none; }
+    .ctr { text-align:center; }
+    .notif-head .ctr { justify-self:center; }
+    .notif-row .ctr { display:flex; justify-content:center; }
+    .plan-banner { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s6); background:linear-gradient(120deg,var(--primary),#9333ea); flex-wrap:wrap; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

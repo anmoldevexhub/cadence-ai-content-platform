@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approvals · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="approvals"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Approvals" style="max-width:1480px">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Approvals</span></div>
+        <div class="page-head">
+          <div class="ph-text"><h1 class="page-title">Approvals queue</h1><p class="page-sub">AI-generated drafts waiting for review across all your websites.</p></div>
+          <div class="ph-actions">
+            <div class="seg-pills" id="apFilter"><button class="active" data-p="all">All</button><button data-p="Blog">Blog</button><button data-p="LinkedIn">LinkedIn</button><button data-p="YouTube">YouTube</button><button data-p="Instagram">Instagram</button></div>
+          </div>
+        </div>
+
+        <!-- Bulk bar -->
+        <div class="bulk-bar" id="bulkBar">
+          <label class="check"><input type="checkbox" id="selectAll" /><span class="box"><i data-lucide="check"></i></span></label>
+          <span id="bulkLabel" class="fw6">Select all</span>
+          <div class="spacer" style="margin-left:auto"></div>
+          <div class="bulk-actions hide" id="bulkActions">
+            <span class="muted tsm" id="selCount">0 selected</span>
+            <button class="btn btn-secondary btn-sm" id="bulkReject"><i data-lucide="x"></i> Reject</button>
+            <button class="btn btn-success btn-sm" id="bulkApprove"><i data-lucide="check"></i> Approve selected</button>
+          </div>
+        </div>
+
+        <div class="ap-layout">
+          <!-- List -->
+          <div class="ap-list" id="apList"></div>
+
+          <!-- Preview -->
+          <div class="ap-preview card" id="apPreview"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    let queue = M.approvals.map(a => ({ ...a }));
+    let platFilter = "all", selected = new Set(), activeId = queue[0]?.id;
+
+    const SAMPLE = {
+      Blog: "Pour-over coffee rewards patience. The method looks simple — hot water, ground coffee, a paper filter — but three variables quietly decide whether your cup is bright and aromatic or flat and bitter.\n\nThe first is grind size. Too fine and water struggles through, over-extracting into bitterness; too coarse and it rushes past, leaving a thin, sour brew.\n\nThe second is the bloom. Pour just enough water to saturate the grounds, then wait thirty seconds as trapped CO₂ escapes.",
+      LinkedIn: "Motivation is a terrible training partner.\n\nIt shows up when conditions are perfect and ghosts you in February. Progressive overload doesn't care how you feel — it just asks for slightly more than last week.\n\nThe people who get strong aren't more motivated. They're more consistent with something small.",
+      YouTube: "We roasted the same Ethiopian beans three ways so you don't have to guess. Here's what changes in the cup at each roast level — and which one we'd actually brew on a Tuesday morning.",
+      Instagram: "Stale beans? Here's how to tell 👇 Flat aroma · no bloom · oily surface · dull color · sour finish.\n\n#specialtycoffee #pourover #freshroast",
+    };
+
+    function visible(c) { return platFilter === "all" || c.platform === platFilter; }
+
+    function rowHTML(c) {
+      const p = M.platMeta(c.platform);
+      return `<div class="ap-row ${c.id===activeId?'active':''}" data-id="${c.id}">
+        <label class="check" onclick="event.stopPropagation()"><input type="checkbox" data-sel="${c.id}" ${selected.has(c.id)?'checked':''} /><span class="box"><i data-lucide="check"></i></span></label>
+        <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+        <div class="ap-row-meta">
+          <div class="ap-row-title">${c.title}</div>
+          <div class="ap-row-sub"><span class="favicon" style="width:15px;height:15px;border-radius:4px;font-size:9px;background:${c.siteColor}">${c.siteShort}</span> ${c.siteName} · ${c.platform} · ${c.words}w</div>
+        </div>
+        <span class="badge badge-draft">Pending</span>
+      </div>`;
+    }
+
+    function renderList() {
+      const list = queue.filter(visible);
+      const el = document.getElementById("apList");
+      if (!list.length) { el.innerHTML = `<div class="empty card" style="padding:var(--s9)"><div class="empty-art">${I("check-check")}</div><h3>Queue is clear</h3><p>Every draft has been reviewed. New AI drafts will appear here.</p></div>`; document.getElementById("apPreview").innerHTML = ""; C.refreshIcons(); return; }
+      if (!list.find(c => c.id === activeId)) activeId = list[0].id;
+      el.innerHTML = list.map(rowHTML).join("");
+      C.refreshIcons();
+      el.querySelectorAll(".ap-row").forEach(r => r.addEventListener("click", () => { activeId = r.dataset.id; renderList(); renderPreview(); }));
+      el.querySelectorAll("[data-sel]").forEach(cb => cb.addEventListener("change", () => {
+        cb.checked ? selected.add(cb.dataset.sel) : selected.delete(cb.dataset.sel); updateBulk();
+      }));
+      updateBulk();
+    }
+
+    function platPreview(c) {
+      const p = M.platMeta(c.platform), body = SAMPLE[c.platform] || c.excerpt;
+      const site = (window.MOCK?.websites || []).find(s => String(s.id) === String(c.site)) || {};
+      const guide = site.style_guide || {};
+      const primaryFont = guide.primary_font ? guide.primary_font : 'inherit';
+      const headingFont = guide.heading_font ? guide.heading_font : primaryFont;
+      const headingColor = guide.heading_color ? guide.heading_color : 'inherit';
+      const textColor = guide.text_color ? guide.text_color : 'inherit';
+
+      const isColorLight = (colorStr) => {
+        if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
+        const col = colorStr.trim().toLowerCase();
+        if (['white', 'yellow', 'cyan', 'lightgray', 'lightblue', 'lightgreen', 'lime', '#fff', '#ffffff'].includes(col)) return true;
+        if (['black', 'navy', 'darkblue', 'darkgray', 'maroon', 'purple', 'green'].includes(col)) return false;
+        if (col.startsWith('#')) {
+          let hex = col.substring(1);
+          if (hex.length === 3 || hex.length === 4) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+          if (hex.length >= 6) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            return Math.sqrt(0.299*r*r + 0.587*g*g + 0.114*b*b) > 170;
+          }
+        }
+        const rgb = col.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgb) {
+          const r = parseInt(rgb[1], 10), g = parseInt(rgb[2], 10), b = parseInt(rgb[3], 10);
+          return Math.sqrt(0.299*r*r + 0.587*g*g + 0.114*b*b) > 170;
+        }
+        return false;
+      };
+
+      const isColorDark = (colorStr) => {
+        if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
+        const col = colorStr.trim().toLowerCase();
+        if (['black', 'navy', 'darkblue', 'darkgray', 'maroon', 'purple', 'green', 'indigo', 'slate', '#000', '#000000'].includes(col)) return true;
+        if (['white', 'yellow', 'cyan', 'lightgray', 'lightblue', 'lightgreen', 'lime'].includes(col)) return false;
+        if (col.startsWith('#')) {
+          let hex = col.substring(1);
+          if (hex.length === 3 || hex.length === 4) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+          if (hex.length >= 6) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            return Math.sqrt(0.299*r*r + 0.587*g*g + 0.114*b*b) < 100;
+          }
+        }
+        const rgb = col.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgb) {
+          const r = parseInt(rgb[1], 10), g = parseInt(rgb[2], 10), b = parseInt(rgb[3], 10);
+          return Math.sqrt(0.299*r*r + 0.587*g*g + 0.114*b*b) < 100;
+        }
+        return false;
+      };
+      
+      const styleId = `style-preview-${c.site}`;
+      let styleTag = document.getElementById(styleId);
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = styleId;
+        document.head.appendChild(styleTag);
+      }
+      styleTag.textContent = `
+        .preview-wrapper-${c.site} {
+          font-family: ${primaryFont}, sans-serif !important;
+        }
+        .preview-wrapper-${c.site} h2, 
+        .preview-wrapper-${c.site} h3, 
+        .preview-wrapper-${c.site} h4 {
+          font-family: ${headingFont}, sans-serif !important;
+        }
+
+        /* Light Theme overrides */
+        html[data-theme="light"] .preview-wrapper-${c.site},
+        [data-theme="light"] .preview-wrapper-${c.site} {
+          color: ${isColorLight(textColor) ? 'var(--text)' : textColor} !important;
+        }
+        html[data-theme="light"] .preview-wrapper-${c.site} h2,
+        html[data-theme="light"] .preview-wrapper-${c.site} h3,
+        html[data-theme="light"] .preview-wrapper-${c.site} h4,
+        [data-theme="light"] .preview-wrapper-${c.site} h2,
+        [data-theme="light"] .preview-wrapper-${c.site} h3,
+        [data-theme="light"] .preview-wrapper-${c.site} h4 {
+          color: ${isColorLight(headingColor) ? 'var(--text)' : headingColor} !important;
+        }
+        html[data-theme="light"] .preview-wrapper-${c.site} p,
+        html[data-theme="light"] .preview-wrapper-${c.site} li,
+        [data-theme="light"] .preview-wrapper-${c.site} p,
+        [data-theme="light"] .preview-wrapper-${c.site} li {
+          color: ${isColorLight(textColor) ? 'var(--text-secondary)' : textColor} !important;
+        }
+
+        /* Dark Theme overrides */
+        html[data-theme="dark"] .preview-wrapper-${c.site},
+        [data-theme="dark"] .preview-wrapper-${c.site} {
+          color: ${isColorDark(textColor) ? 'var(--text)' : textColor} !important;
+        }
+        html[data-theme="dark"] .preview-wrapper-${c.site} h2,
+        html[data-theme="dark"] .preview-wrapper-${c.site} h3,
+        html[data-theme="dark"] .preview-wrapper-${c.site} h4,
+        [data-theme="dark"] .preview-wrapper-${c.site} h2,
+        [data-theme="dark"] .preview-wrapper-${c.site} h3,
+        [data-theme="dark"] .preview-wrapper-${c.site} h4 {
+          color: ${isColorDark(headingColor) ? 'var(--text)' : headingColor} !important;
+        }
+        html[data-theme="dark"] .preview-wrapper-${c.site} p,
+        html[data-theme="dark"] .preview-wrapper-${c.site} li,
+        [data-theme="dark"] .preview-wrapper-${c.site} p,
+        [data-theme="dark"] .preview-wrapper-${c.site} li {
+          color: ${isColorDark(textColor) ? 'var(--text-secondary)' : textColor} !important;
+        }
+      `;
+
+      if (c.platform === "Blog") {
+        return `<div class="bp preview-wrapper-${c.site}"><div class="bp-kicker" style="color:var(--primary);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">${c.siteName}</div>
+          <h2 style="font-size:24px;margin:8px 0 12px;letter-spacing:-.02em">${c.title}</h2>
+          <div style="height:140px;border-radius:9px;background:linear-gradient(135deg,${c.siteColor},#1c1917);display:grid;place-items:center;color:rgba(255,255,255,.5);margin-bottom:16px">${I("image","style='width:28px;height:28px'")}</div>
+          ${body.split("\n\n").map(t=>`<p style="line-height:1.7;margin-bottom:12px">${t}</p>`).join("")}</div>`;
+      }
+      if (c.platform === "Instagram") {
+        return `<div style="max-width:320px;margin:0 auto;border:1px solid var(--border);border-radius:13px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:9px;padding:10px 12px"><span class="favicon" style="background:${c.siteColor}">${c.siteShort}</span><b style="font-size:13px">${c.siteName}</b></div>
+          <div style="aspect-ratio:1;background:linear-gradient(135deg,#fde68a,${c.siteColor});display:grid;place-items:center;color:rgba(255,255,255,.55)">${I("image","style='width:32px;height:32px'")}</div>
+          <div style="display:flex;gap:14px;padding:10px 12px">${I("heart")}${I("message-circle")}${I("send")}</div>
+          <div style="padding:0 12px 12px;font-size:13px;line-height:1.5"><b>${c.siteName}</b> ${body}</div></div>`;
+      }
+      if (c.platform === "LinkedIn") {
+        return `<div style="max-width:460px;margin:0 auto;border:1px solid var(--border);border-radius:13px;padding:16px">
+          <div style="display:flex;gap:10px;margin-bottom:12px"><span class="avatar avatar-lg" style="background:${c.siteColor}">${c.siteShort}</span><div><div style="font-weight:650">${c.siteName}</div><div class="muted tsm">Just now</div></div></div>
+          <div style="white-space:pre-line;line-height:1.6">${body}</div></div>`;
+      }
+      return `<div style="max-width:440px;margin:0 auto"><div style="aspect-ratio:16/9;border-radius:10px;background:linear-gradient(135deg,#7f1d1d,#1c1917);display:grid;place-items:center"><span style="width:54px;height:54px;border-radius:99px;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff">${I("play","style='width:24px;height:24px'")}</span></div>
+        <div style="display:flex;gap:10px;margin-top:10px"><span class="avatar" style="background:${c.siteColor}">${c.siteShort}</span><div><div style="font-weight:650">${c.title}</div><div class="muted tsm">${c.siteName}</div></div></div>
+        <p style="color:var(--text-secondary);line-height:1.6;margin-top:12px">${body}</p></div>`;
+    }
+
+    function renderPreview() {
+      const c = queue.find(x => x.id === activeId);
+      const el = document.getElementById("apPreview");
+      if (!c) { el.innerHTML = ""; return; }
+      const p = M.platMeta(c.platform);
+      el.innerHTML = `
+        <div class="card__header"><span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+          <div style="flex:1;min-width:0"><h3 style="font-size:var(--fs-md)">${c.platform} draft</h3><div class="sub">${c.siteName} · scheduled ${c.day} ${c.time}</div></div>
+          <button class="icon-btn" id="editToggle" title="Inline edit">${I("pencil")}</button></div>
+        <div class="card__body" id="prevBody" style="max-height:440px;overflow-y:auto">${platPreview(c)}</div>
+        <div class="card__footer" style="justify-content:space-between">
+          <button class="btn btn-ghost" id="rejectOne">${I("x")} Reject</button>
+          <div class="row gap2"><button class="btn btn-secondary" id="regenOne">${I("rotate-cw")} Regenerate</button>
+          <button class="btn btn-success" id="approveOne">${I("check")} Approve</button></div></div>`;
+      document.getElementById("approveOne").addEventListener("click", () => decide(c.id, "approve"));
+      document.getElementById("rejectOne").addEventListener("click", () => decide(c.id, "reject"));
+      document.getElementById("regenOne").addEventListener("click", async () => {
+        const b = document.getElementById("prevBody");
+        b.style.opacity = ".4"; C.toast({ type: "info", title: "Regenerating…" });
+        try {
+          await CadenceAPI.regenerateDraft(c.id);
+          await M.syncMockData();
+          queue = M.approvals;
+          c = queue.find(x => x.id === c.id) || queue[0];
+          b.style.opacity = "1";
+          renderList(); renderPreview();
+          C.toast({ type: "success", title: "Fresh draft generated" });
+        } catch (err) {
+          b.style.opacity = "1";
+          C.toast({ type: "error", title: "Regeneration failed", desc: err.message });
+        }
+      });
+      document.getElementById("editToggle").addEventListener("click", () => {
+        const body = document.getElementById("prevBody");
+        body.innerHTML = `<div class="field"><label class="label">Title</label><input class="input" value="${c.title.replace(/"/g,'&quot;')}" id="ieTitle"/></div>
+          <div class="field" style="margin-bottom:0"><label class="label">Content</label><textarea class="textarea" id="ieBody" style="min-height:240px">${c.body || c.excerpt}</textarea></div>
+          <div class="row gap2 mt4"><button class="btn btn-primary btn-sm" id="ieSave">${I("check")} Save</button><button class="btn btn-ghost btn-sm" id="ieCancel">Cancel</button></div>`;
+        C.refreshIcons();
+        document.getElementById("ieSave").addEventListener("click", async () => {
+          const newTitle = document.getElementById("ieTitle").value;
+          const newBody = document.getElementById("ieBody").value;
+          try {
+            await CadenceAPI.updateDraft(c.id, { title: newTitle, body: newBody });
+            c.title = newTitle;
+            c.body = newBody;
+            c.excerpt = newBody.substring(0, 150) + "...";
+            await M.syncMockData();
+            renderList(); renderPreview(); C.toast({type:"success",title:"Draft updated"});
+          } catch (err) {
+            C.toast({ type: "error", title: "Save failed", desc: err.message });
+          }
+        });
+        document.getElementById("ieCancel").addEventListener("click", renderPreview);
+      });
+    }
+
+    async function decide(id, action) {
+      try {
+        if (action === "approve") {
+          await CadenceAPI.approveDraft(id);
+        } else {
+          await CadenceAPI.rejectDraft(id, "Rejected via approvals queue");
+        }
+        queue = queue.filter(c => c.id !== id);
+        selected.delete(id);
+        C.toast({ type: action === "approve" ? "success" : "info", title: action === "approve" ? "Draft approved" : "Draft rejected" });
+        await M.syncMockData();
+        renderList(); renderPreview();
+      } catch (err) {
+        C.toast({ type: "error", title: "Operation failed", desc: err.message });
+      }
+    }
+
+    function updateBulk() {
+      const list = queue.filter(visible);
+      const has = selected.size > 0;
+      document.getElementById("bulkActions").classList.toggle("hide", !has);
+      document.getElementById("bulkLabel").textContent = has ? "" : "Select all";
+      document.getElementById("selCount").textContent = `${selected.size} selected`;
+      const sa = document.getElementById("selectAll");
+      sa.checked = list.length && selected.size === list.length;
+    }
+
+    document.getElementById("selectAll").addEventListener("change", function () {
+      const list = queue.filter(visible);
+      if (this.checked) list.forEach(c => selected.add(c.id)); else selected.clear();
+      renderList();
+    });
+    document.getElementById("bulkApprove").addEventListener("click", async () => {
+      const ids = Array.from(selected);
+      try {
+        for (const id of ids) {
+          await CadenceAPI.approveDraft(id);
+          queue = queue.filter(c => !ids.includes(c.id));
+        }
+        selected.clear();
+        await M.syncMockData();
+        renderList(); renderPreview(); C.toast({ type: "success", title: `${ids.length} drafts approved`, desc: "Ready to schedule" });
+      } catch (err) {
+        C.toast({ type: "error", title: "Bulk approval failed", desc: err.message });
+      }
+    });
+    document.getElementById("bulkReject").addEventListener("click", async () => {
+      const ids = Array.from(selected);
+      try {
+        for (const id of ids) {
+          await CadenceAPI.rejectDraft(id, "Bulk rejected via approvals queue");
+          queue = queue.filter(c => !ids.includes(c.id));
+        }
+        selected.clear();
+        await M.syncMockData();
+        renderList(); renderPreview(); C.toast({ type: "info", title: `${ids.length} drafts rejected` });
+      } catch (err) {
+        C.toast({ type: "error", title: "Bulk rejection failed", desc: err.message });
+      }
+    });
+    document.querySelectorAll("#apFilter button").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll("#apFilter button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); platFilter = b.dataset.p; selected.clear(); renderList();
+    }));
+
+    renderList(); renderPreview();
+    C.refreshIcons();
+  })();
+  </script>
+
+  <style>
+    .bulk-bar { display:flex; align-items:center; gap:var(--s3); padding:10px var(--s4); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); margin-bottom:var(--s4); }
+    .bulk-actions { display:flex; align-items:center; gap:var(--s3); }
+    .ap-layout { display:grid; grid-template-columns:1fr 1.1fr; gap:var(--s5); align-items:start; }
+    @media (max-width:1080px){ .ap-layout { grid-template-columns:1fr; } .ap-preview { position:static !important; } }
+    .ap-list { display:flex; flex-direction:column; gap:var(--s2); }
+    .ap-row { display:flex; align-items:center; gap:var(--s3); padding:12px var(--s4); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); cursor:pointer; transition:.12s; }
+    .ap-row:hover { border-color:var(--border-strong); box-shadow:var(--sh-xs); }
+    .ap-row.active { border-color:var(--primary); box-shadow:0 0 0 1px var(--primary); }
+    .ap-row-meta { flex:1; min-width:0; }
+    .ap-row-title { font-weight:600; font-size:var(--fs-md); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ap-row-sub { display:flex; align-items:center; gap:6px; font-size:var(--fs-sm); color:var(--text-muted); margin-top:2px; }
+    .ap-preview { position:sticky; top:84px; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

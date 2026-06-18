@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admins &amp; Roles · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="admins"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Admins and roles">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Admins &amp; Roles</span></div>
+        <div class="page-head">
+          <div class="ph-text"><h1 class="page-title">Admins &amp; roles</h1><p class="page-sub">Manage who can access Cadence and which websites they control.</p></div>
+          <div class="ph-actions"><button class="btn btn-primary" onclick="Cadence.openModal('inviteModal')"><i data-lucide="user-plus"></i> Invite admin</button></div>
+        </div>
+
+        <!-- super-admin notice for admin role -->
+        <div id="roleGate" class="hide">
+          <div class="card card-pad" style="text-align:center;padding:var(--s9)">
+            <span class="icon-tile" style="width:56px;height:56px;border-radius:16px;background:var(--warning-soft);color:var(--warning);margin:0 auto var(--s4)"><i data-lucide="lock" style="width:26px;height:26px"></i></span>
+            <h3 style="font-size:var(--fs-xl)">Super admin only</h3>
+            <p class="muted" style="max-width:380px;margin:8px auto 0">Admin management is restricted. Switch to <b>Super Admin</b> in the top bar to preview these screens.</p>
+          </div>
+        </div>
+
+        <div id="superContent">
+          <div class="tabs" data-tabs data-tabs-scope="admPanels" style="margin-bottom:var(--s6)">
+            <button class="tab active" data-tab="people"><i data-lucide="users"></i> People <span class="count" id="cntPeople"></span></button>
+            <button class="tab" data-tab="roles"><i data-lucide="shield-check"></i> Roles &amp; permissions</button>
+            <button class="tab" data-tab="logs"><i data-lucide="history"></i> Activity logs</button>
+          </div>
+
+          <div id="admPanels">
+            <!-- PEOPLE -->
+            <div class="tab-panel active" data-panel="people">
+              <div class="grid grid-4 mb5" id="admStats"></div>
+              <div class="card">
+                <div class="card__header"><h3>All admins</h3><div class="spacer"></div>
+                  <label class="topbar__search" style="max-width:240px"><i data-lucide="search"></i><input placeholder="Search admins…" id="admSearch"/></label></div>
+                <div class="table-wrap" style="border:none;border-radius:0">
+                  <table class="tbl">
+                    <thead><tr><th>Name</th><th>Role</th><th>Assigned websites</th><th>Status</th><th>Last active</th><th></th></tr></thead>
+                    <tbody id="admBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- ROLES -->
+            <div class="tab-panel" data-panel="roles">
+              <div class="grid grid-3 mb5" id="roleCards"></div>
+              <div class="card">
+                <div class="card__header"><h3>Permission matrix</h3><div class="sub">What each role can do</div></div>
+                <div class="table-wrap" style="border:none;border-radius:0">
+                  <table class="tbl perm-tbl">
+                    <thead><tr><th>Capability</th><th class="ctr">Super Admin</th><th class="ctr">Admin</th><th class="ctr">Editor</th></tr></thead>
+                    <tbody id="permBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- LOGS -->
+            <div class="tab-panel" data-panel="logs">
+              <div class="card">
+                <div class="card__header">
+                  <h3>Activity history</h3>
+                  <div class="sub">System-wide audit trail of changes</div>
+                  <div class="spacer"></div>
+                  <label class="topbar__search" style="max-width:240px"><i data-lucide="search"></i><input placeholder="Search logs…" id="logSearch"/></label>
+                </div>
+                <div class="table-wrap" style="border:none;border-radius:0">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>IP Address</th>
+                        <th>Changes Made</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody id="logBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Invite modal -->
+  <div class="modal-overlay" id="inviteModal">
+    <div class="modal">
+      <div class="modal__head"><div class="mtxt"><h3>Invite an admin</h3><div class="sub">They'll get an email to set up their account.</div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
+      <div class="modal__body">
+        <div class="field"><label class="label">Full name</label><input class="input" id="invName" placeholder="Jordan Rivera"/></div>
+        <div class="field"><label class="label">Email</label><input class="input" id="invEmail" type="email" placeholder="jordan@company.com"/></div>
+        <div class="grid grid-2">
+          <div class="field"><label class="label">Role</label><select class="select" id="invRole"><option>Admin</option><option>Editor</option><option>Super Admin</option></select></div>
+          <div class="field"><label class="label">Assign websites</label><select class="select"><option>Choose later</option><option>Northwind Coffee</option><option>Lumen Fitness</option><option>All websites</option></select></div>
+        </div>
+      </div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="sendInvite"><i data-lucide="send"></i> Send invite</button></div>
+    </div>
+  </div>
+
+  <!-- Assign websites modal -->
+  <div class="modal-overlay" id="assignModal">
+    <div class="modal">
+      <div class="modal__head"><div class="mtxt"><h3>Assign websites</h3><div class="sub" id="assignSub"></div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
+      <div class="modal__body"><div class="col gap2" id="assignList"></div></div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" data-close-modal onclick="Cadence.toast({type:'success',title:'Website assignments updated'})">Save</button></div>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK, I = C.icon;
+
+    function applyRoleGate() {
+      const isSuper = C.store.role === "super";
+      document.getElementById("superContent").classList.toggle("hide", !isSuper);
+      document.getElementById("roleGate").classList.toggle("hide", isSuper);
+    }
+    applyRoleGate();
+    window.addEventListener("rolechange", applyRoleGate);
+
+    const admins = M.admins;
+    document.getElementById("cntPeople").textContent = admins.length;
+
+    const stats = [
+      { l: "Total admins", v: admins.length, icon: "users", tile: "blog" },
+      { l: "Active", v: admins.filter(a=>a.status==="Active").length, icon: "circle-check", tile: "linkedin" },
+      { l: "Pending invite", v: admins.filter(a=>a.status==="Invited").length, icon: "mail", tile: "youtube" },
+      { l: "Disabled", v: admins.filter(a=>a.status==="Disabled").length, icon: "ban", tile: "instagram" },
+    ];
+    document.getElementById("admStats").innerHTML = stats.map(s => `
+      <div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div><div class="stat-val mono">${s.v}</div></div>`).join("");
+
+    const statusBadge = { Active: "badge-published", Invited: "badge-scheduled", Disabled: "badge-draft" };
+    const roleBadge = { "Super Admin": "badge-primary", "Admin": "badge-info", "Editor": "badge-neutral" };
+
+    function renderAdmins(filter = "") {
+      const list = admins.filter(a => a.name.toLowerCase().includes(filter) || a.email.toLowerCase().includes(filter));
+      document.getElementById("admBody").innerHTML = list.map((a, i) => `
+        <tr>
+          <td><div class="user-row"><span class="avatar" style="background:${a.color}">${a.initials}</span><div><div class="nm">${a.name}</div><div class="em">${a.email}</div></div></div></td>
+          <td><span class="badge ${roleBadge[a.role]||'badge-neutral'}">${a.role}</span></td>
+          <td><div class="row gap2 wrap">${a.websites.slice(0,2).map(w=>`<span class="badge badge-neutral">${w}</span>`).join("")}${a.websites.length>2?`<span class="muted tsm">+${a.websites.length-2}</span>`:""}</div></td>
+          <td><span class="badge ${statusBadge[a.status]}"><span class="pip"></span> ${a.status}</span></td>
+          <td class="cell-muted">${a.last}</td>
+          <td style="text-align:right">
+            <div class="dropdown" style="display:inline-block">
+              <button class="icon-btn btn-sm" data-menu="m${i}">${I("more-horizontal")}</button>
+              <div class="menu" id="m${i}">
+                <button class="menu-item" onclick="Cadence.closeModal();document.getElementById('assignSub').textContent='${a.name}';openAssign()">${I("globe")} Assign websites</button>
+                <button class="menu-item" onclick="Cadence.toast({type:'info',title:'Edit ${a.name}'})">${I("pencil")} Edit</button>
+                <button class="menu-item" onclick="Cadence.toast({type:'info',title:'Reset password sent'})">${I("key-round")} Reset password</button>
+                <div class="menu-sep"></div>
+                <button class="menu-item danger" onclick="Cadence.toast({type:'info',title:'${a.name} disabled'})">${I("ban")} ${a.status==="Disabled"?"Enable":"Disable"}</button>
+              </div></div>
+          </td>
+        </tr>`).join("");
+      C.refreshIcons();
+      C.mountShell && null;
+      rewireMenus();
+    }
+    function rewireMenus() {
+      document.querySelectorAll("#admBody [data-menu]").forEach(t => t.addEventListener("click", e => {
+        e.stopPropagation();
+        const m = document.getElementById(t.dataset.menu);
+        document.querySelectorAll(".menu.open").forEach(x => { if (x!==m) x.classList.remove("open"); });
+        m.classList.toggle("open");
+      }));
+    }
+    renderAdmins();
+    document.getElementById("admSearch").addEventListener("input", e => renderAdmins(e.target.value.toLowerCase()));
+
+    window.openAssign = function () {
+      document.getElementById("assignList").innerHTML = M.websites.map((w,i) => `
+        <label class="chan-conn" style="cursor:pointer"><span class="favicon" style="width:32px;height:32px;border-radius:8px;font-size:13px;background:${w.color}">${w.short}</span>
+          <div style="flex:1"><div class="fw6">${w.name}</div><div class="muted tsm">${w.url}</div></div>
+          <span class="switch"><input type="checkbox" ${i<2?'checked':''}/><span class="track"></span></span></label>`).join("");
+      C.openModal("assignModal");
+    };
+
+    // roles
+    const roles = [
+      { name: "Super Admin", color: "var(--primary)", icon: "shield", desc: "Full control over the workspace, billing, admins and every website.", count: 1 },
+      { name: "Admin", color: "var(--info)", icon: "user-cog", desc: "Manage assigned websites: generate, approve, schedule and publish.", count: 3 },
+      { name: "Editor", color: "var(--text-muted)", icon: "pencil", desc: "Create and edit drafts but cannot approve or publish.", count: 2 },
+    ];
+    document.getElementById("roleCards").innerHTML = roles.map(r => `
+      <div class="card card-pad"><div class="row-between mb3"><span class="icon-tile" style="background:color-mix(in srgb,${r.color} 14%,transparent);color:${r.color}">${I(r.icon)}</span><span class="badge badge-neutral">${r.count} ${r.count===1?'person':'people'}</span></div>
+        <h3 style="font-size:var(--fs-lg)">${r.name}</h3><p class="muted tsm mt2">${r.desc}</p></div>`).join("");
+
+    const perms = [
+      ["Generate content", 1,1,1],["Edit drafts", 1,1,1],["Approve drafts", 1,1,0],["Schedule &amp; publish", 1,1,0],
+      ["Add / remove websites", 1,1,0],["Manage admins", 1,0,0],["Billing &amp; plan", 1,0,0],["Workspace settings", 1,0,0],
+    ];
+    const mark = on => on ? `<span style="color:var(--success)">${I("check","style='width:18px;height:18px;margin:0 auto'")}</span>` : `<span class="faint">${I("minus","style='width:16px;height:16px;margin:0 auto'")}</span>`;
+    document.getElementById("permBody").innerHTML = perms.map(([cap,s,a,e]) => `
+      <tr><td class="cell-strong">${cap}</td><td class="ctr">${mark(s)}</td><td class="ctr">${mark(a)}</td><td class="ctr">${mark(e)}</td></tr>`).join("");
+
+    document.getElementById("sendInvite").addEventListener("click", async () => {
+      const name = document.getElementById("invName").value.trim();
+      const email = document.getElementById("invEmail").value.trim();
+      const roleSel = document.getElementById("invRole").value;
+      
+      if (!name || !email) { C.toast({type:"error",title:"Enter a name and email"}); return; }
+      
+      const roleVal = roleSel === "Super Admin" ? "super" : "admin";
+      const nameParts = name.split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      try {
+        await CadenceAPI.addAdmin(firstName, lastName, email, roleVal, 'demo1234');
+        C.closeModal("inviteModal");
+        C.toast({ type: "success", title: "Invite sent", desc: `${name} added successfully as ${roleSel}` });
+        
+        // Refresh mock data from backend and reload page
+        await M.syncMockData();
+        setTimeout(() => location.reload(), 1100);
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Failed to add admin", desc: err.message });
+      }
+    });
+
+    // ---- activity logs ----
+    let allLogs = [];
+    async function loadLogs() {
+      try {
+        allLogs = await window.CadenceAPI.getActivityLogs();
+        renderLogs();
+      } catch (err) {
+        console.error("Failed to load activity logs", err);
+      }
+    }
+
+    function renderLogs(filter = "") {
+      const tbody = document.getElementById("logBody");
+      if (!tbody) return;
+      
+      const filtered = allLogs.filter(log => {
+        const actor = (log.actor_name || "").toLowerCase();
+        const action = (log.action || "").toLowerCase();
+        const target = (log.target_description || "").toLowerCase();
+        return actor.includes(filter) || action.includes(filter) || target.includes(filter);
+      });
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="cell-muted" style="text-align:center;padding:var(--s6)">No activity logs found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(log => {
+        const actorInitials = log.actor_name ? log.actor_name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : 'AI';
+        
+        let changesHtml = '<span class="muted">—</span>';
+        if (log.metadata && log.metadata.changes) {
+          const changes = log.metadata.changes;
+          const items = [];
+          for (const [field, val] of Object.entries(changes)) {
+            const oldVal = (val.old === null || val.old === undefined) ? 'None' : (typeof val.old === 'object' ? JSON.stringify(val.old) : String(val.old));
+            const newVal = (val.new === null || val.new === undefined) ? 'None' : (typeof val.new === 'object' ? JSON.stringify(val.new) : String(val.new));
+            const oldTrunc = oldVal.length > 80 ? oldVal.substring(0, 80) + '...' : oldVal;
+            const newTrunc = newVal.length > 80 ? newVal.substring(0, 80) + '...' : newVal;
+            
+            items.push(`<div style="margin-bottom:6px;line-height:1.4">
+              <span class="badge badge-neutral" style="font-size:10px;padding:2px 6px;text-transform:uppercase">${field}</span>: 
+              <span style="text-decoration:line-through;color:var(--text-muted);font-size:11px;font-family:monospace;padding:0 2px">${oldTrunc}</span>
+              <span style="color:var(--text-muted)"> &rarr; </span>
+              <span style="color:var(--success);font-weight:600;font-size:11px;font-family:monospace;padding:0 2px">${newTrunc}</span>
+            </div>`);
+          }
+          if (items.length > 0) {
+            changesHtml = `<div class="col" style="gap:2px">${items.join('')}</div>`;
+          }
+        }
+
+        const date = new Date(log.timestamp);
+        const dateStr = date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+        return `<tr>
+          <td><div class="user-row"><span class="avatar avatar-sm" style="background:#818cf8">${actorInitials}</span><div><div class="nm">${log.actor_name || 'System'}</div></div></div></td>
+          <td><span class="badge badge-info">${log.action.replace('_', ' ').toUpperCase()}</span></td>
+          <td class="cell-strong" style="max-width:240px;white-space:normal;word-break:break-all">${log.target_description || '—'}</td>
+          <td class="mono tsm">${log.ip_address || '—'}</td>
+          <td style="white-space:normal;min-width:280px;padding:8px 12px">${changesHtml}</td>
+          <td class="cell-muted tsm">${dateStr}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    document.getElementById("logSearch").addEventListener("input", e => renderLogs(e.target.value.toLowerCase()));
+
+    const logsTabBtn = document.querySelector('button[data-tab="logs"]');
+    if (logsTabBtn) {
+      logsTabBtn.addEventListener("click", loadLogs);
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialTab = urlParams.get('tab') || 'people';
+    if (initialTab === "logs") {
+      document.querySelectorAll("[data-tab]").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll("[data-panel]").forEach(p => p.classList.remove("active"));
+      
+      const targetTab = document.querySelector(`[data-tab="logs"]`);
+      const targetPanel = document.querySelector(`[data-panel="logs"]`);
+      if (targetTab && targetPanel) {
+        targetTab.classList.add("active");
+        targetPanel.classList.add("active");
+        loadLogs();
+      }
+    }
+
+    C.refreshIcons();
+  })();
+  </script>
+  <style>
+    .perm-tbl th.ctr, .perm-tbl td.ctr { text-align:center; }
+    .perm-tbl td.ctr svg { display:inline-block; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

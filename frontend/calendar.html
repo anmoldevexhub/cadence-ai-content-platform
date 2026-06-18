@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="calendar"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Content calendar" style="max-width:1480px">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Calendar</span></div>
+        <div class="page-head">
+          <div class="ph-text"><h1 class="page-title">Content calendar</h1><p class="page-sub">Your week at a glance. Approved drafts post automatically on their slot.</p></div>
+          <div class="ph-actions">
+            <button class="btn btn-secondary" id="prevWeek"><i data-lucide="chevron-left"></i></button>
+            <button class="btn btn-secondary" id="weekLabel" style="min-width:180px">Jun 9 – Jun 15, 2026</button>
+            <button class="btn btn-secondary" id="nextWeek"><i data-lucide="chevron-right"></i></button>
+            <button class="btn btn-primary" id="autoBtn"><i data-lucide="wand-sparkles"></i> Auto-schedule week</button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="cal-filters">
+          <div class="row gap3 wrap">
+            <div class="filt"><span class="filt-l">Website</span>
+              <select class="select" id="fSite" style="min-width:170px"><option value="all">All websites</option></select></div>
+            <div class="filt"><span class="filt-l">Platform</span>
+              <div class="seg-pills" id="fPlat"><button class="active" data-p="all">All</button><button data-p="Blog">Blog</button><button data-p="LinkedIn">LinkedIn</button><button data-p="YouTube">YouTube</button><button data-p="Instagram">Instagram</button></div></div>
+            <div class="filt"><span class="filt-l">Status</span>
+              <div class="seg-pills" id="fStatus"><button class="active" data-s="all">All</button><button data-s="Approved">Approved</button><button data-s="Scheduled">Scheduled</button><button data-s="Published">Published</button></div></div>
+          </div>
+          <div class="cal-legend">
+            <span><span class="lg-dot" style="background:var(--blog)"></span> Blog</span>
+            <span><span class="lg-dot" style="background:var(--linkedin)"></span> LinkedIn</span>
+            <span><span class="lg-dot" style="background:var(--youtube)"></span> YouTube</span>
+            <span><span class="lg-dot" style="background:var(--instagram)"></span> Instagram</span>
+          </div>
+        </div>
+
+        <!-- Weekly board -->
+        <div class="cal-board" id="board"></div>
+
+        <p class="muted tsm mt4 row gap2"><i data-lucide="grip-vertical" style="width:14px;height:14px"></i> Tip: drag a card to a different day to reschedule it.</p>
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    const role = C.store.role;
+    const dates = { Mon: "9", Tue: "10", Wed: "11", Thu: "12", Fri: "13", Sat: "14", Sun: "15" };
+    const today = "Wed";
+
+    // build site filter
+    const fSite = document.getElementById("fSite");
+    M.websites.forEach(w => { const o = document.createElement("option"); o.value = w.id; o.textContent = w.name; fSite.appendChild(o); });
+
+    // working set of cards (clone so reschedule is non-destructive)
+    let cards = M.content.map(c => ({ ...c }));
+    if (role !== "super") cards = cards.filter(c => ["northwind","lumen"].includes(c.site));
+
+    let filters = { site: "all", plat: "all", status: "all" };
+
+    function visible(c) {
+      return (filters.site === "all" || c.site === filters.site)
+        && (filters.plat === "all" || c.platform === filters.plat)
+        && (filters.status === "all" || c.status === filters.status);
+    }
+
+    function cardHTML(c) {
+      const p = M.platMeta(c.platform), w = M.site(c.site);
+      return `<div class="cal-card" draggable="true" data-id="${c.id}" style="border-left:3px solid ${p.color}">
+        <div class="cc-top"><span class="icon-tile tile-${p.tile}" style="width:22px;height:22px;border-radius:6px">${I(p.icon,"style='width:12px;height:12px'")}</span>
+          <span class="cc-time mono">${c.time}</span><span class="badge badge-${c.status.toLowerCase()}" style="margin-left:auto">${c.status}</span></div>
+        <div class="cc-title">${c.title}</div>
+        <div class="cc-foot"><span class="favicon" style="width:16px;height:16px;border-radius:4px;font-size:9px;background:${w.color}">${w.short}</span> ${w.name}</div>
+      </div>`;
+    }
+
+    function render() {
+      const board = document.getElementById("board");
+      board.innerHTML = M.schedule.days.map(d => {
+        const items = cards.filter(c => c.day === d && visible(c)).sort((a,b) => a.time.localeCompare(b.time));
+        return `<div class="cal-col ${d===today?'is-today':''}" data-day="${d}">
+          <div class="cal-head"><div><div class="cal-dow">${d}</div><div class="cal-date">Jun ${dates[d]}</div></div>
+            ${d===today?'<span class="badge badge-primary txs">Today</span>':''}<span class="cal-count">${items.length}</span></div>
+          <div class="cal-slots" data-day="${d}">
+            ${items.map(cardHTML).join("") || `<div class="cal-empty">${I("plus")}<span>Drop or add</span></div>`}
+          </div></div>`;
+      }).join("");
+      C.refreshIcons();
+      wireDnD();
+    }
+
+    function wireDnD() {
+      let dragId = null;
+      document.querySelectorAll(".cal-card").forEach(card => {
+        card.addEventListener("dragstart", e => { dragId = card.dataset.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+        card.addEventListener("dragend", () => { dragId = null; document.querySelectorAll(".cal-card").forEach(c=>c.classList.remove("dragging")); document.querySelectorAll(".cal-slots").forEach(s=>s.classList.remove("drop-on")); });
+      });
+      document.querySelectorAll(".cal-slots").forEach(slot => {
+        slot.addEventListener("dragover", e => { e.preventDefault(); slot.classList.add("drop-on"); });
+        slot.addEventListener("dragleave", () => slot.classList.remove("drop-on"));
+        slot.addEventListener("drop", async e => {
+          e.preventDefault(); slot.classList.remove("drop-on");
+          const card = cards.find(c => c.id === dragId);
+          if (card && card.day !== slot.dataset.day) {
+            // Calculate date for the new day
+            const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+            const todayDate = new Date();
+            const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday() + 1)); // Monday
+            const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[slot.dataset.day]));
+            const timeParts = card.time.split(':');
+            targetDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1] || 0), 0, 0);
+
+            try {
+              await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+              card.day = slot.dataset.day; 
+              // Refresh mock data from backend and re-render
+              await M.syncMockData();
+              cards = M.content.map(c => ({ ...c }));
+              render();
+              C.toast({ type: "success", title: "Rescheduled", desc: `Moved to ${slot.dataset.day}` });
+            } catch (err) {
+              console.error(err);
+              C.toast({ type: "error", title: "Rescheduling failed", desc: err.message });
+            }
+          }
+        });
+      });
+    }
+
+    // Date helper for Monday of current week
+    if (!Date.prototype.weekday) {
+      Date.prototype.weekday = function() {
+        var day = this.getDay();
+        return day === 0 ? 6 : day - 1; // 0 for Mon, 6 for Sun
+      };
+    }
+
+    // filters
+    fSite.addEventListener("change", () => { filters.site = fSite.value; render(); });
+    document.querySelectorAll("#fPlat button").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll("#fPlat button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); filters.plat = b.dataset.p; render(); }));
+    document.querySelectorAll("#fStatus button").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll("#fStatus button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); filters.status = b.dataset.s; render(); }));
+
+    // auto-schedule: take approved drafts and distribute
+    document.getElementById("autoBtn").addEventListener("click", async function () {
+      this.disabled = true; this.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Scheduling…'; lucide.createIcons();
+      const approved = cards.filter(c => c.status === "Approved");
+      const days = M.schedule.days;
+      
+      try {
+        for (let i = 0; i < approved.length; i++) {
+          const card = approved[i];
+          const targetDay = days[(i * 2 + 1) % 7];
+          const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+          const todayDate = new Date();
+          const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday() + 1));
+          const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[targetDay]));
+          targetDate.setHours(9 + (i % 3) * 2, 0, 0, 0); // e.g., 09:00, 11:00, 13:00
+
+          await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+        }
+        
+        await M.syncMockData();
+        cards = M.content.map(c => ({ ...c }));
+        render();
+        C.toast({ type: "success", title: "Week auto-scheduled", desc: `${approved.length} approved drafts distributed Mon–Sun` });
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Auto-scheduling failed", desc: err.message });
+      } finally {
+        this.disabled = false; this.innerHTML = '<i data-lucide="wand-sparkles"></i> Auto-schedule week'; lucide.createIcons();
+      }
+    });
+
+    document.getElementById("prevWeek").addEventListener("click", () => C.toast({type:"info",title:"Previous week"}));
+    document.getElementById("nextWeek").addEventListener("click", () => C.toast({type:"info",title:"Next week"}));
+
+    render();
+    C.refreshIcons();
+  })();
+  </script>
+
+  <style>
+    .cal-filters { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); margin-bottom:var(--s5); flex-wrap:wrap; }
+    .filt { display:flex; align-items:center; gap:8px; }
+    .filt-l { font-size:var(--fs-sm); font-weight:600; color:var(--text-muted); }
+    .cal-legend { display:flex; gap:var(--s4); font-size:var(--fs-sm); color:var(--text-secondary); }
+    .cal-legend span { display:flex; align-items:center; gap:6px; }
+    .lg-dot { width:9px; height:9px; border-radius:99px; }
+
+    .cal-board { display:grid; grid-template-columns:repeat(7,1fr); gap:var(--s3); align-items:start; }
+    @media (max-width:1200px){ .cal-board { grid-template-columns:repeat(7,minmax(150px,1fr)); overflow-x:auto; padding-bottom:var(--s3); } }
+    .cal-col { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-lg); min-height:420px; display:flex; flex-direction:column; }
+    .cal-col.is-today { border-color:var(--primary); box-shadow:0 0 0 1px var(--primary); }
+    .cal-head { display:flex; align-items:center; gap:8px; padding:var(--s3) var(--s3); border-bottom:1px solid var(--border); }
+    .cal-dow { font-weight:700; font-size:var(--fs-md); }
+    .cal-date { font-size:var(--fs-xs); color:var(--text-muted); }
+    .cal-count { margin-left:auto; background:var(--bg-subtle); color:var(--text-muted); font-size:var(--fs-xs); font-weight:700; min-width:20px; height:20px; border-radius:99px; display:grid; place-items:center; padding:0 6px; }
+    .cal-slots { padding:var(--s3); display:flex; flex-direction:column; gap:var(--s3); flex:1; min-height:80px; transition:background .12s; border-radius:0 0 var(--r-lg) var(--r-lg); }
+    .cal-slots.drop-on { background:var(--primary-soft); outline:2px dashed var(--primary); outline-offset:-4px; }
+    .cal-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:10px; cursor:grab; box-shadow:var(--sh-xs); transition:box-shadow .12s, transform .08s; }
+    .cal-card:hover { box-shadow:var(--sh-md); }
+    .cal-card.dragging { opacity:.4; }
+    .cal-card:active { cursor:grabbing; }
+    .cc-top { display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .cc-time { font-size:var(--fs-sm); font-weight:600; }
+    .cc-title { font-size:var(--fs-sm); font-weight:550; line-height:1.35; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .cc-foot { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+    .cal-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--text-faint); font-size:var(--fs-sm); padding:var(--s5) 0; border:1.5px dashed var(--border); border-radius:var(--r-md); }
+    .cal-empty svg { width:18px; height:18px; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

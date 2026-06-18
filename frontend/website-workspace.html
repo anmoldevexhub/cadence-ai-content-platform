@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="workspace.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active=""></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Website workspace">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur" id="bcName">Website</span></div>
+
+        <!-- Website hero -->
+        <div class="ws-hero">
+          <span class="favicon ws-fav" id="wsFav"></span>
+          <div class="ws-meta">
+            <div class="row gap3 wrap" style="align-items:center">
+              <h1 class="page-title" id="wsName">Website</h1>
+              <span id="wsStatus"></span>
+            </div>
+            <a class="ws-url" id="wsUrl" href="#" target="_blank"><i data-lucide="link"></i><span></span><i data-lucide="external-link" style="width:13px;height:13px"></i></a>
+          </div>
+          <div class="ws-hero-stats" id="wsStats"></div>
+          <div class="ws-hero-actions" style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-secondary" id="crawlBtn"><i data-lucide="refresh-cw"></i> Crawl website</button>
+            <button class="btn btn-secondary" id="visitBtn"><i data-lucide="globe"></i> Visit site</button>
+            <button class="btn btn-primary" data-tab="generate" id="heroGen"><i data-lucide="sparkles"></i> Generate content</button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs ws-tabs" data-tabs data-tabs-scope="wsPanels" style="margin-bottom:var(--s6)">
+          <button class="tab active" data-tab="overview"><i data-lucide="layout-grid"></i> Overview</button>
+          <button class="tab" data-tab="generate"><i data-lucide="sparkles"></i> Generate</button>
+          <button class="tab" data-tab="calendar"><i data-lucide="calendar-days"></i> Calendar</button>
+          <button class="tab" data-tab="published"><i data-lucide="send"></i> Published</button>
+          <button class="tab" data-tab="settings"><i data-lucide="settings"></i> Settings</button>
+        </div>
+
+        <div id="wsPanels">
+          <!-- OVERVIEW -->
+          <div class="tab-panel active" data-panel="overview">
+            <div class="grid grid-4 mb5" id="ovStats"></div>
+            <div class="grid" style="grid-template-columns:1.5fr 1fr;align-items:start">
+              <div class="card">
+                <div class="card__header"><h3>Content pipeline</h3><div class="spacer"></div><button class="btn btn-soft btn-sm" data-tab="generate"><i data-lucide="plus"></i> New</button></div>
+                <div class="card__body" id="ovPipeline" style="padding-top:var(--s3)"></div>
+              </div>
+              <div class="card card-pad">
+                <h3 style="font-size:var(--fs-lg)">Channels</h3>
+                <p class="muted tsm mb5">Output by platform this month</p>
+                <div id="ovChannels" class="col gap4"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GENERATE -->
+          <div class="tab-panel" data-panel="generate">
+            <div class="gen-grid">
+              <!-- Composer -->
+              <div>
+                <div class="card card-pad mb5">
+                  <div class="row gap3 mb4"><span class="icon-tile tile-blog"><i data-lucide="lightbulb"></i></span>
+                    <div><h3 style="font-size:var(--fs-lg)">New content idea</h3><div class="muted tsm">Pick a channel, give a topic — Cadence drafts it.</div></div></div>
+
+                  <div class="field">
+                    <label class="label">Channel</label>
+                    <div class="chan-pick" id="chanPick">
+                      <button class="chan active" data-chan="Blog"><span class="icon-tile tile-blog"></span> Blog</button>
+                      <button class="chan" data-chan="LinkedIn"><span class="icon-tile tile-linkedin"></span> LinkedIn</button>
+                      <button class="chan" data-chan="YouTube"><span class="icon-tile tile-youtube"></span> YouTube</button>
+                      <button class="chan" data-chan="Instagram"><span class="icon-tile tile-instagram"></span> Instagram</button>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label class="label" for="ideaTitle">Topic / title</label>
+                    <input class="input" id="ideaTitle" placeholder="e.g. The complete guide to pour-over coffee" />
+                  </div>
+                  <div class="field" style="margin-bottom:var(--s4)">
+                    <label class="label" for="ideaNotes">Notes <span class="opt">(optional)</span></label>
+                    <textarea class="textarea" id="ideaNotes" placeholder="Angle, key points, links to include, target keyword…"></textarea>
+                  </div>
+                  <button class="btn btn-primary btn-block btn-lg" id="genBtn"><i data-lucide="sparkles"></i> Generate with AI</button>
+                </div>
+
+                <div class="card card-pad">
+                  <div class="row-between mb3"><h3 style="font-size:var(--fs-md)">Idea queue</h3><span class="badge badge-neutral" id="queueCount">3</span></div>
+                  <div class="col gap2" id="ideaQueue"></div>
+                </div>
+              </div>
+
+              <!-- Drafts -->
+              <div>
+                <div class="row-between mb4">
+                  <div><h2 style="font-size:var(--fs-xl)">Generated drafts</h2><div class="muted tsm">Review, edit and approve before scheduling</div></div>
+                  <div class="seg-pills" id="draftFilter">
+                    <button class="active" data-f="all">All</button>
+                    <button data-f="Draft">Draft</button>
+                    <button data-f="Approved">Approved</button>
+                    <button data-f="Scheduled">Scheduled</button>
+                  </div>
+                </div>
+                <div id="draftList" class="col gap5"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CALENDAR -->
+          <div class="tab-panel" data-panel="calendar">
+            <div class="card">
+              <div class="card__header"><h3>This week</h3><div class="sub">Scheduled content for this website</div><div class="spacer"></div><a class="btn btn-secondary btn-sm" href="calendar.html"><i data-lucide="maximize-2"></i> Full calendar</a></div>
+              <div class="card__body" style="padding:0"><div class="week-strip" id="wsWeek"></div></div>
+            </div>
+          </div>
+
+          <!-- PUBLISHED -->
+          <div class="tab-panel" data-panel="published">
+            <div class="row-between mb4">
+              <div class="seg-pills" id="pubFilter"><button class="active" data-p="all">All channels</button><button data-p="Blog">Blog</button><button data-p="LinkedIn">LinkedIn</button><button data-p="Instagram">Instagram</button></div>
+              <span class="muted tsm" id="pubCount"></span>
+            </div>
+            <div class="pub-grid" id="pubGrid"></div>
+          </div>
+
+          <!-- SETTINGS -->
+          <div class="tab-panel" data-panel="settings">
+            <div class="gen-grid">
+              <div>
+                <div class="card card-pad mb5">
+                  <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Website details</h3>
+                  <div class="field"><label class="label">Display name</label><input class="input" id="setName" /></div>
+                  <div class="field"><label class="label">URL</label><div class="input-prefix"><span class="pfx">https://</span><input class="input" id="setUrl" /></div></div>
+                  <div class="field"><label class="label">Brand tone</label><select class="select" id="setTone"><option>Warm &amp; artisanal</option><option>Energetic &amp; motivating</option><option>Calm &amp; informative</option></select></div>
+                  <div class="field"><label class="label">Contact Email</label><input class="input" id="setEmail" placeholder="e.g. contact@company.com" /></div>
+                  <div class="field"><label class="label">Contact Phone</label><input class="input" id="setPhone" placeholder="e.g. +1 555-019-2834" /></div>
+                  <div class="field">
+                    <label class="label">Company logo</label>
+                    <div class="row gap3" style="align-items:center">
+                      <div id="logoPreview" style="width:60px;height:60px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden">
+                        <i data-lucide="image" class="muted" style="width:24px;height:24px"></i>
+                      </div>
+                      <div class="col gap1" style="flex:1">
+                        <input type="file" id="logoUpload" accept="image/*" style="display:none" />
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('logoUpload').click()"><i data-lucide="upload"></i> Upload logo</button>
+                        <input class="input" id="setLogoUrl" placeholder="Or paste logo URL" style="font-size:var(--fs-xs);margin-top:6px"/>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="divider"></div>
+                  <button class="btn btn-primary btn-block" id="saveDetailsBtn"><i data-lucide="check"></i> Save website details</button>
+                </div>
+
+                <div class="card card-pad mb5">
+                  <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Extracted Style Guide</h3>
+                  <p class="muted tsm mb4">Heuristics-derived pattern cues and writing guidelines.</p>
+                  <div class="field">
+                    <label class="label">Tone &amp; Sentence Length</label>
+                    <input class="input" id="styleTone" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.8;"/>
+                  </div>
+                  <div class="field">
+                    <label class="label">Heading Pattern</label>
+                    <input class="input" id="styleHeadings" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.8;"/>
+                  </div>
+                  <div class="field">
+                    <label class="label">Recurring Vocabulary</label>
+                    <input class="input" id="styleVocab" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.8;"/>
+                  </div>
+                  <div class="field" style="margin-bottom:0">
+                    <label class="label">Call to Action (CTA) Examples</label>
+                    <textarea class="textarea" id="styleCTAs" readonly style="background:var(--bg-card); min-height:80px; cursor:not-allowed; opacity:0.8;"></textarea>
+                  </div>
+                </div>
+                <div class="card card-pad">
+                  <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Auto-publishing</h3>
+                  <p class="muted tsm mb4">Approved content posts automatically on its scheduled slot.</p>
+                  <label class="row-between" style="cursor:pointer"><span>Enable auto-publish</span><span class="switch"><input type="checkbox" checked /><span class="track"></span></span></label>
+                  <div class="divider"></div>
+                  <label class="row-between" style="cursor:pointer"><span>Require approval before posting</span><span class="switch"><input type="checkbox" checked /><span class="track"></span></span></label>
+                </div>
+              </div>
+              <div>
+                <div class="card card-pad mb5">
+                  <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Connected channels</h3>
+                  <div class="col gap3" id="setChannels"></div>
+                </div>
+                <div class="card card-pad" style="border-color:var(--error-soft)">
+                  <h3 style="font-size:var(--fs-lg);color:var(--error);margin-bottom:4px">Danger zone</h3>
+                  <p class="muted tsm mb4">Pausing stops all scheduled posting. Removing deletes all content.</p>
+                  <div class="row gap2"><button class="btn btn-secondary"><i data-lucide="pause"></i> Pause website</button><button class="btn btn-danger" onclick="Cadence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Edit draft modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal lg">
+      <div class="modal__head"><div class="mtxt"><h3>Edit draft</h3><div class="sub" id="editSub">Make changes before approving</div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
+      <div class="modal__body">
+        <div class="field"><label class="label">Title</label><input class="input" id="editTitle" /></div>
+        <div class="field" style="margin-bottom:0"><label class="label">Content</label><textarea class="textarea" id="editBody" style="min-height:200px"></textarea></div>
+      </div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="saveEdit"><i data-lucide="check"></i> Save changes</button></div>
+    </div>
+  </div>
+
+  <!-- Delete modal -->
+  <div class="modal-overlay" id="delModal">
+    <div class="modal">
+      <div class="modal__head"><span class="icon-tile" style="background:var(--error-soft);color:var(--error)"><i data-lucide="alert-triangle"></i></span><div class="mtxt"><h3>Remove this website?</h3><div class="sub">This deletes all drafts, schedules and published history. This can't be undone.</div></div></div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-danger" data-close-modal onclick="Cadence.toast({type:'success',title:'Website removed'})">Remove website</button></div>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script src="workspace.js"></script>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

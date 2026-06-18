@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Websites · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="all-websites"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="All websites">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">All Websites</span></div>
+        <div class="page-head">
+          <div class="ph-text"><h1 class="page-title">All websites</h1><p class="page-sub">Every website across the workspace, with owner and content stats.</p></div>
+          <div class="ph-actions">
+            <div class="seg-pills" id="viewToggle"><button class="active" data-v="grid"><i data-lucide="layout-grid"></i></button><button data-v="table"><i data-lucide="list"></i></button></div>
+            <a class="btn btn-primary" href="add-website.html"><i data-lucide="plus"></i> Add website</a>
+          </div>
+        </div>
+
+        <div class="grid grid-4 mb5" id="awStats"></div>
+
+        <div class="row gap3 mb4 wrap">
+          <label class="topbar__search" style="max-width:280px"><i data-lucide="search"></i><input placeholder="Search websites…" id="awSearch"/></label>
+          <div class="seg-pills" id="awStatus"><button class="active" data-s="all">All</button><button data-s="Active">Active</button><button data-s="Paused">Paused</button><button data-s="Draft">Setup</button></div>
+        </div>
+
+        <div id="awGrid" class="aw-grid"></div>
+        <div id="awTable" class="hide"></div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    let view = "grid", status = "all", search = "";
+
+    const totals = M.websites.reduce((a,w)=>({pub:a.pub+w.published, sch:a.sch+w.scheduled, pen:a.pen+w.pending}),{pub:0,sch:0,pen:0});
+    document.getElementById("awStats").innerHTML = [
+      { l:"Total websites", v:M.websites.length, icon:"globe", tile:"blog" },
+      { l:"Published (all-time)", v:C.fmt(totals.pub), icon:"send", tile:"linkedin" },
+      { l:"Scheduled", v:totals.sch, icon:"calendar-clock", tile:"youtube" },
+      { l:"Pending approvals", v:totals.pen, icon:"clock", tile:"instagram" },
+    ].map(s=>`<div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div><div class="stat-val mono">${s.v}</div></div>`).join("");
+
+    const statusBadge = { Active:"badge-published", Paused:"badge-scheduled", Draft:"badge-draft" };
+    const statusLabel = { Active:"Active", Paused:"Paused", Draft:"Setup" };
+
+    function list() {
+      return M.websites.filter(w => (status==="all"||w.status===status) && (w.name.toLowerCase().includes(search)||w.url.includes(search)));
+    }
+
+    function gridCard(w) {
+      return `<a class="aw-card" href="website-workspace.html?site=${w.id}">
+        <div class="aw-top"><span class="favicon" style="width:42px;height:42px;border-radius:11px;font-size:18px;background:${w.color}">${w.short}</span>
+          <div style="flex:1;min-width:0"><div class="aw-name">${w.name}</div><div class="aw-url">${w.url}</div></div>
+          <span class="badge ${statusBadge[w.status]}"><span class="pip"></span> ${statusLabel[w.status]}</span></div>
+        <div class="aw-tags">${w.topics.slice(0,2).map(t=>`<span class="badge badge-neutral">${t}</span>`).join("")}<span class="badge badge-neutral">${w.industry}</span></div>
+        <div class="aw-stats">
+          <div><div class="v mono">${w.published}</div><div class="l">Published</div></div>
+          <div><div class="v mono">${w.scheduled}</div><div class="l">Scheduled</div></div>
+          <div><div class="v mono">${w.pending}</div><div class="l">Pending</div></div>
+          <div><div class="v mono" style="color:var(--success)">${w.engagement}</div><div class="l">Engagement</div></div>
+        </div>
+        <div class="aw-foot"><span class="user-row"><span class="avatar avatar-sm" style="background:var(--text-muted)">${w.owner.split(" ").map(n=>n[0]).join("")}</span><span class="tsm muted">${w.owner}</span></span>
+          <span class="row gap2 tsm" style="color:var(--primary);font-weight:600">Open ${I("arrow-right","style='width:14px;height:14px'")}</span></div>
+      </a>`;
+    }
+
+    function tableHTML() {
+      return `<div class="table-wrap"><table class="tbl"><thead><tr><th>Website</th><th>Owner</th><th>Industry</th><th>Status</th><th>Published</th><th>Scheduled</th><th>Pending</th><th>Engagement</th></tr></thead><tbody>
+        ${list().map(w=>`<tr onclick="location.href='website-workspace.html?site=${w.id}'" style="cursor:pointer">
+          <td><div class="user-row"><span class="favicon" style="width:28px;height:28px;border-radius:7px;font-size:12px;background:${w.color}">${w.short}</span><div><div class="nm">${w.name}</div><div class="em">${w.url}</div></div></div></td>
+          <td class="cell-muted">${w.owner}</td><td class="cell-muted">${w.industry}</td>
+          <td><span class="badge ${statusBadge[w.status]}"><span class="pip"></span> ${statusLabel[w.status]}</span></td>
+          <td class="mono">${w.published}</td><td class="mono">${w.scheduled}</td><td class="mono">${w.pending}</td>
+          <td class="mono" style="color:var(--success);font-weight:600">${w.engagement}</td></tr>`).join("")}
+        </tbody></table></div>`;
+    }
+
+    function render() {
+      const items = list();
+      const g = document.getElementById("awGrid"), t = document.getElementById("awTable");
+      g.classList.toggle("hide", view!=="grid"); t.classList.toggle("hide", view!=="table");
+      if (!items.length) { g.innerHTML = t.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art">${I("globe")}</div><h3>No websites found</h3><p>Try a different search or filter.</p></div>`; C.refreshIcons(); return; }
+      if (view==="grid") g.innerHTML = items.map(gridCard).join("");
+      else t.innerHTML = tableHTML();
+      C.refreshIcons();
+    }
+
+    document.querySelectorAll("#viewToggle button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#viewToggle button").forEach(x=>x.classList.remove("active"));b.classList.add("active");view=b.dataset.v;render();}));
+    document.querySelectorAll("#awStatus button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#awStatus button").forEach(x=>x.classList.remove("active"));b.classList.add("active");status=b.dataset.s;render();}));
+    document.getElementById("awSearch").addEventListener("input",e=>{search=e.target.value.toLowerCase();render();});
+
+    render();
+    C.refreshIcons();
+  })();
+  </script>
+  <style>
+    .aw-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s5); }
+    @media (max-width:1080px){ .aw-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:720px){ .aw-grid { grid-template-columns:1fr; } }
+    .aw-card { display:flex; flex-direction:column; gap:var(--s4); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s5); box-shadow:var(--sh-xs); transition:.15s; }
+    .aw-card:hover { box-shadow:var(--sh-md); transform:translateY(-2px); border-color:var(--border-strong); }
+    .aw-top { display:flex; align-items:center; gap:var(--s3); }
+    .aw-name { font-weight:650; font-size:var(--fs-lg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .aw-url { font-size:var(--fs-sm); color:var(--text-muted); }
+    .aw-tags { display:flex; gap:6px; flex-wrap:wrap; }
+    .aw-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2); padding:var(--s4) 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .aw-stats .v { font-size:var(--fs-lg); font-weight:700; letter-spacing:-.02em; }
+    .aw-stats .l { font-size:11px; color:var(--text-muted); }
+    .aw-foot { display:flex; align-items:center; justify-content:space-between; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>

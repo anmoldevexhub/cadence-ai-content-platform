@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="analytics"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Analytics" style="max-width:1400px">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Analytics</span></div>
+        <div class="page-head">
+          <div class="ph-text"><h1 class="page-title">Analytics</h1><p class="page-sub">Content performance across every website and channel.</p></div>
+          <div class="ph-actions">
+            <select class="select" id="aSite" style="min-width:180px"><option value="all">All websites</option></select>
+            <div class="seg-pills" id="aRange"><button data-r="30">30d</button><button class="active" data-r="8w">8 weeks</button><button data-r="q">Quarter</button></div>
+            <button class="btn btn-secondary" onclick="Cadence.toast({type:'success',title:'Report exported (CSV)'})"><i data-lucide="download"></i> Export</button>
+          </div>
+        </div>
+
+        <div class="grid grid-4 mb6" id="kpis"></div>
+
+        <div class="grid mb6" style="grid-template-columns:1.6fr 1fr;align-items:start">
+          <div class="card">
+            <div class="card__header"><div><h3>Publishing volume</h3><div class="sub">Posts published per week</div></div><div class="spacer"></div><span class="badge badge-success"><i data-lucide="trending-up"></i> +49%</span></div>
+            <div class="card__body"><div style="height:280px"><canvas id="volChart"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card__header"><h3>By platform</h3><div class="sub">Share of output</div></div>
+            <div class="card__body"><div style="height:220px"><canvas id="platChart"></canvas></div>
+              <div id="platLegend" class="plat-legend mt4"></div></div>
+          </div>
+        </div>
+
+        <div class="grid mb6" style="grid-template-columns:1fr 1fr;align-items:start">
+          <div class="card">
+            <div class="card__header"><div><h3>Approval rate</h3><div class="sub">% of AI drafts approved without edits</div></div></div>
+            <div class="card__body"><div style="height:240px"><canvas id="apprChart"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card__header"><div><h3>Engagement rate</h3><div class="sub">Avg. engagement per post (%)</div></div></div>
+            <div class="card__body"><div style="height:240px"><canvas id="engChart"></canvas></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header"><h3>Top performing content</h3><div class="spacer"></div><a class="tsm" style="color:var(--primary);font-weight:600" href="#">View all</a></div>
+          <div class="table-wrap" style="border:none;border-radius:0">
+            <table class="tbl"><thead><tr><th>Content</th><th>Website</th><th>Platform</th><th>Reach</th><th>Engagement</th><th>Published</th></tr></thead><tbody id="topBody"></tbody></table>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  (function () {
+    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    const charts = {};
+
+    M.websites.forEach(w => { const o=document.createElement("option"); o.value=w.id; o.textContent=w.name; document.getElementById("aSite").appendChild(o); });
+
+    function tc() { const cs=getComputedStyle(document.documentElement); return {
+      primary:cs.getPropertyValue("--primary").trim(), text:cs.getPropertyValue("--text-muted").trim(),
+      grid:cs.getPropertyValue("--border").trim(), blog:"#6366f1", linkedin:"#0a66c2", youtube:"#ef4444", instagram:"#d62976",
+      success:cs.getPropertyValue("--success").trim() }; }
+
+    function baseOpts(t){ return { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}},
+      scales:{ x:{grid:{display:false},ticks:{color:t.text}}, y:{grid:{color:t.grid},ticks:{color:t.text},border:{display:false},beginAtZero:true} } }; }
+
+    let currentSiteId = "all";
+    let currentRange = "8w";
+
+    function updateAnalytics(siteId = currentSiteId, range = currentRange) {
+      currentSiteId = siteId;
+      currentRange = range;
+
+      const filteredContent = M.content.filter(c => siteId === "all" || c.site === siteId);
+      const publishedContent = filteredContent.filter(c => c.status === 'Published');
+
+      // KPIs calculation
+      const pubCount = publishedContent.length;
+      
+      let sumEng = 0;
+      publishedContent.forEach(c => {
+        sumEng += 5.0 + (parseInt(c.id) % 7) * 1.1;
+      });
+      const avgEng = pubCount > 0 ? (sumEng / pubCount).toFixed(1) + "%" : "0.0%";
+
+      const totalDrafts = filteredContent.length;
+      const approvedDrafts = filteredContent.filter(c => c.status === 'Approved' || c.status === 'Scheduled' || c.status === 'Published').length;
+      const apprRate = totalDrafts > 0 ? Math.round((approvedDrafts / totalDrafts) * 100) : 100;
+
+      let sumReach = 0;
+      publishedContent.forEach(c => {
+        sumReach += (parseInt(c.id) || 1) * 12.3 + 5.1;
+      });
+      let reachStr = "0k";
+      if (sumReach >= 1000) {
+        reachStr = (sumReach / 1000).toFixed(1) + "M";
+      } else {
+        reachStr = sumReach.toFixed(1) + "k";
+      }
+
+      // Renders KPIs cards
+      document.getElementById("kpis").innerHTML = [
+        { l:"Posts published", v:pubCount, d:"+22%", icon:"send", tile:"blog" },
+        { l:"Avg. engagement", v:avgEng, d:"+1.7pt", icon:"heart", tile:"linkedin" },
+        { l:"Approval rate", v:apprRate + "%", d:"+13pt", icon:"check-check", tile:"youtube" },
+        { l:"Total reach", v:reachStr, d:"+34%", icon:"users", tile:"instagram" },
+      ].map(s=>`<div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div>
+        <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up">${I("trending-up")} ${s.d} <span class="muted">vs prev.</span></div></div>`).join("");
+
+      // Renders top content table
+      const staticFallback = [
+        ["Lisbon in 48 hours — the locals' itinerary","Atlas Travel","#db2777","YouTube","48.2k","12.4%","Jun 8"],
+        ["5 signs your beans are past their prime","Northwind Coffee","#b45309","Instagram","31.1k","9.8%","Jun 6"],
+        ["Why progressive overload beats motivation","Lumen Fitness","#0ea5e9","LinkedIn","22.7k","7.1%","Jun 5"],
+        ["7 Low-Light Houseplants That Thrive","Verdant Home","#16a34a","Blog","18.9k","6.2%","Jun 3"],
+        ["The underrated European winter cities","Atlas Travel","#db2777","Blog","16.4k","5.9%","Jun 1"],
+      ];
+
+      let top = publishedContent.length ? publishedContent.map(c => {
+        const siteObj = M.websites.find(w => w.id === c.site) || { name: 'General', color: '#6366f1' };
+        const idInt = parseInt(c.id) || 1;
+        const reachVal = (idInt * 12.3 + 5.1).toFixed(1);
+        const reach = `${reachVal}k`;
+        const engagement = `${(5.0 + (idInt % 7) * 1.1).toFixed(1)}%`;
+        const createdDate = new Date(c.created_at || Date.now());
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const dateStr = `${monthNames[createdDate.getMonth()]} ${createdDate.getDate()}`;
+        return [
+          c.title,
+          siteObj.name,
+          siteObj.color,
+          c.platform,
+          reach,
+          engagement,
+          dateStr
+        ];
+      }) : (siteId === "all" ? staticFallback : []);
+
+      if (publishedContent.length) {
+        top.sort((a, b) => parseFloat(b[5]) - parseFloat(a[5]));
+      }
+
+      const tableBody = document.getElementById("topBody");
+      if (top.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="cell-muted" style="text-align:center;padding:var(--s6)">No published posts found for this site.</td></tr>`;
+      } else {
+        tableBody.innerHTML = top.slice(0, 5).map(([t,s,col,p,r,e,d])=>{ const pm=M.platMeta(p);
+          return `<tr><td class="cell-strong" style="max-width:320px">${t}</td>
+            <td><span class="user-row"><span class="favicon" style="width:22px;height:22px;border-radius:5px;font-size:10px;background:${col}">${s[0]}</span><span class="tsm">${s}</span></span></td>
+            <td><span class="badge badge-neutral row gap2" style="display:inline-flex">${I(pm.icon,"style='width:13px;height:13px'")} ${p}</span></td>
+            <td class="mono">${r}</td><td class="mono" style="color:var(--success);font-weight:600">${e}</td><td class="cell-muted">${d}</td></tr>`;
+        }).join("");
+      }
+
+      // Recalculate Weekly series data
+      const nowObj = new Date();
+      const publishedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+      const engagementSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+      const approvalRateSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+      const totalSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+      const approvedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+
+      filteredContent.forEach(c => {
+        const createdDate = new Date(c.created_at || nowObj);
+        const diffMs = nowObj - createdDate;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const weekIndex = 7 - Math.floor(diffDays / 7);
+        
+        if (weekIndex >= 0 && weekIndex <= 7) {
+          totalSeries[weekIndex]++;
+          if (c.status === 'Approved' || c.status === 'Scheduled' || c.status === 'Published') {
+            approvedSeries[weekIndex]++;
+          }
+          if (c.status === 'Published') {
+            publishedSeries[weekIndex]++;
+            engagementSeries[weekIndex] += 5.0 + (parseInt(c.id) % 7) * 1.1;
+          }
+        }
+      });
+
+      for (let i = 0; i < 8; i++) {
+        if (publishedSeries[i] === 0) {
+          publishedSeries[i] = i + 1;
+          engagementSeries[i] = Number((3.0 + i * 0.4).toFixed(1));
+        } else {
+          engagementSeries[i] = Number((engagementSeries[i] / publishedSeries[i]).toFixed(1));
+        }
+        if (totalSeries[i] > 0) {
+          approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
+        } else {
+          approvalRateSeries[i] = 80 + (i * 2);
+        }
+      }
+
+      const byPlatform = { Blog: 0, LinkedIn: 0, YouTube: 0, Instagram: 0 };
+      filteredContent.forEach(c => {
+        if (byPlatform[c.platform] !== undefined) {
+          byPlatform[c.platform]++;
+        }
+      });
+      let totalPlatform = Object.values(byPlatform).reduce((a,b)=>a+b,0);
+      if (totalPlatform === 0) {
+        byPlatform.Blog = 5;
+        byPlatform.LinkedIn = 3;
+        byPlatform.YouTube = 2;
+        byPlatform.Instagram = 1;
+        totalPlatform = 11;
+      }
+
+      // Rebuild charts
+      const t = tc();
+      Object.values(charts).forEach(c=>c&&c.destroy());
+      
+      const vctx = document.getElementById("volChart");
+      const grad = vctx.getContext("2d").createLinearGradient(0,0,0,260); grad.addColorStop(0,t.primary+"4d"); grad.addColorStop(1,t.primary+"00");
+      charts.vol = new Chart(vctx,{type:"line",data:{labels:M.weeks,datasets:[{data:publishedSeries,borderColor:t.primary,backgroundColor:grad,fill:true,tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:baseOpts(t)});
+
+      charts.plat = new Chart(document.getElementById("platChart"),{type:"doughnut",data:{labels:Object.keys(byPlatform),datasets:[{data:Object.values(byPlatform),backgroundColor:[t.blog,t.linkedin,t.youtube,t.instagram],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:"64%",plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}}}});
+      document.getElementById("platLegend").innerHTML=Object.entries(byPlatform).map(([k,v],i)=>`<div class="pl-row"><span class="lg-dot" style="background:${[t.blog,t.linkedin,t.youtube,t.instagram][i]}"></span><span class="pl-name">${k}</span><span class="pl-val mono">${Math.round(v/totalPlatform*100)}%</span></div>`).join("");
+
+      charts.appr = new Chart(document.getElementById("apprChart"),{type:"line",data:{labels:M.weeks,datasets:[{data:approvalRateSeries,borderColor:t.success,backgroundColor:"transparent",tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:{...baseOpts(t),scales:{...baseOpts(t).scales,y:{...baseOpts(t).scales.y,min:50,max:100,ticks:{color:t.text,callback:v=>v+"%"}}}}});
+
+      charts.eng = new Chart(document.getElementById("engChart"),{type:"bar",data:{labels:M.weeks,datasets:[{data:engagementSeries,backgroundColor:t.primary,borderRadius:6,maxBarThickness:24}]},options:baseOpts(t)});
+
+      setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()),90);
+      C.refreshIcons();
+    }
+
+    updateAnalytics("all");
+
+    window.addEventListener("themechange", () => updateAnalytics());
+    document.querySelectorAll("#aRange button").forEach(b=>b.addEventListener("click",()=>{
+      document.querySelectorAll("#aRange button").forEach(x=>x.classList.remove("active"));
+      b.classList.add("active");
+      updateAnalytics(undefined, b.dataset.r);
+    }));
+    document.getElementById("aSite").addEventListener("change", (e)=>{
+      updateAnalytics(e.target.value);
+      C.toast({type:"success",title:"Filtered analytics",desc:"Displaying data for " + e.target.options[e.target.selectedIndex].text});
+    });
+
+    C.refreshIcons();
+  })();
+  </script>
+  <style>
+    .plat-legend { display:flex; flex-direction:column; gap:10px; }
+    .pl-row { display:flex; align-items:center; gap:10px; font-size:var(--fs-md); }
+    .lg-dot { width:10px; height:10px; border-radius:99px; }
+    .pl-name { flex:1; }
+    .pl-val { font-weight:700; }
+  </style>
+  <div id="__bundler_thumbnail" hidden></div>
+</body>
+</html>
