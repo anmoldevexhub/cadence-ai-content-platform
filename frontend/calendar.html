@@ -52,6 +52,33 @@
         <div class="cal-board" id="board"></div>
 
         <p class="muted tsm mt4 row gap2"><i data-lucide="grip-vertical" style="width:14px;height:14px"></i> Tip: drag a card to a different day to reschedule it.</p>
+
+        <!-- Schedule draft modal -->
+        <div class="modal-overlay" id="addEventModal">
+          <div class="modal">
+            <div class="modal__head">
+              <div class="mtxt">
+                <h3 id="addEventTitle">Schedule draft</h3>
+                <div class="sub">Choose an approved draft and set the publishing time.</div>
+              </div>
+              <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal__body">
+              <div class="field">
+                <label class="label">Approved Draft</label>
+                <select class="select" id="aeDraft" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"></select>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label class="label">Publish Time</label>
+                <input class="input" type="time" id="aeTime" value="09:00" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+              </div>
+            </div>
+            <div class="modal__foot">
+              <button class="btn btn-ghost" data-close-modal>Cancel</button>
+              <button class="btn btn-primary" id="aeSave"><i data-lucide="calendar-plus"></i> Schedule</button>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
@@ -62,16 +89,61 @@
   (function () {
     const C = window.Cadence, M = window.MOCK, I = C.icon;
     const role = C.store.role;
-    const dates = { Mon: "9", Tue: "10", Wed: "11", Thu: "12", Fri: "13", Sat: "14", Sun: "15" };
-    const today = "Wed";
+
+    // Define Date.prototype.weekday first
+    if (!Date.prototype.weekday) {
+      Date.prototype.weekday = function() {
+        var day = this.getDay();
+        return day === 0 ? 6 : day - 1; // 0 for Mon, 6 for Sun
+      };
+    }
+
+    const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const todayIndex = new Date().weekday();
+    const today = daysOfWeek[todayIndex];
+
+    // Calculate dates of the current week dynamically
+    const dates = {};
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    const nowObj = new Date();
+    const mondayObj = new Date(nowObj.setDate(nowObj.getDate() - nowObj.weekday()));
+    
+    const formatMonthDay = (dateObj) => `${months[dateObj.getMonth()]} ${dateObj.getDate()}`;
+    
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const dObj = new Date(mondayObj);
+      dObj.setDate(mondayObj.getDate() + i);
+      const dayName = daysOfWeek[i];
+      dates[dayName] = dObj.getDate();
+      weekDates.push(dObj);
+    }
+    
+    // Set week label dynamically
+    const startStr = formatMonthDay(weekDates[0]);
+    const endStr = formatMonthDay(weekDates[6]);
+    const yearStr = weekDates[6].getFullYear();
+    document.getElementById("weekLabel").textContent = `${startStr} – ${endStr}, ${yearStr}`;
+
+    // Get user sites
+    const user = role === "super" ? M.users.super : M.users.admin;
+    const userSites = role === "super" ? M.websites : M.websites.filter(w => w.owner === user.name);
+    const userSiteIds = userSites.map(s => String(s.id));
 
     // build site filter
     const fSite = document.getElementById("fSite");
-    M.websites.forEach(w => { const o = document.createElement("option"); o.value = w.id; o.textContent = w.name; fSite.appendChild(o); });
+    userSites.forEach(w => { const o = document.createElement("option"); o.value = w.id; o.textContent = w.name; fSite.appendChild(o); });
 
-    // working set of cards (clone so reschedule is non-destructive)
-    let cards = M.content.map(c => ({ ...c }));
-    if (role !== "super") cards = cards.filter(c => ["northwind","lumen"].includes(c.site));
+    // working set of cards
+    let cards = [];
+    function loadCards() {
+      cards = M.content.map(c => ({ ...c })).filter(c => c.status === "Scheduled" || c.status === "Published");
+      if (role !== "super") {
+        cards = cards.filter(c => userSiteIds.includes(String(c.site)));
+      }
+    }
+    loadCards();
 
     let filters = { site: "all", plat: "all", status: "all" };
 
@@ -83,12 +155,38 @@
 
     function cardHTML(c) {
       const p = M.platMeta(c.platform), w = M.site(c.site);
-      return `<div class="cal-card" draggable="true" data-id="${c.id}" style="border-left:3px solid ${p.color}">
+      return `<div class="cal-card" draggable="true" data-id="${c.id}" style="border-left:3px solid ${p.color}; position: relative;">
+        <button class="icon-btn btn-sm cal-card-delete" data-del-id="${c.id}" title="Remove slot" style="position: absolute; top: var(--s2); right: var(--s2); padding: 4px; display: none; color: var(--text-muted); background: var(--surface-2); border-radius: var(--r-sm); z-index: 10;"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>
         <div class="cc-top"><span class="icon-tile tile-${p.tile}" style="width:22px;height:22px;border-radius:6px">${I(p.icon,"style='width:12px;height:12px'")}</span>
-          <span class="cc-time mono">${c.time}</span><span class="badge badge-${c.status.toLowerCase()}" style="margin-left:auto">${c.status}</span></div>
-        <div class="cc-title">${c.title}</div>
+          <span class="cc-time mono">${c.time}</span><span class="badge badge-${c.status.toLowerCase()}" style="margin-left:auto; margin-right: 20px;">${c.status}</span></div>
+        <div class="cc-title" style="margin-right: 15px;">${c.title}</div>
         <div class="cc-foot"><span class="favicon" style="width:16px;height:16px;border-radius:4px;font-size:9px;background:${w.color}">${w.short}</span> ${w.name}</div>
       </div>`;
+    }
+
+    let selectedDayForAdd = null;
+
+    function openAddEventModal() {
+      const select = document.getElementById("aeDraft");
+      select.innerHTML = "";
+      
+      const approvedDrafts = M.content.filter(c => c.status === "Approved" && userSiteIds.includes(String(c.site)));
+      
+      if (!approvedDrafts.length) {
+        select.innerHTML = `<option value="">No approved drafts available</option>`;
+        document.getElementById("aeSave").disabled = true;
+      } else {
+        approvedDrafts.forEach(d => {
+          const opt = document.createElement("option");
+          opt.value = d.id;
+          opt.textContent = `[${d.platform}] ${d.title}`;
+          select.appendChild(opt);
+        });
+        document.getElementById("aeSave").disabled = false;
+      }
+      
+      document.getElementById("addEventTitle").textContent = `Schedule draft for ${selectedDayForAdd}`;
+      C.openModal("addEventModal");
     }
 
     function render() {
@@ -96,12 +194,39 @@
       board.innerHTML = M.schedule.days.map(d => {
         const items = cards.filter(c => c.day === d && visible(c)).sort((a,b) => a.time.localeCompare(b.time));
         return `<div class="cal-col ${d===today?'is-today':''}" data-day="${d}">
-          <div class="cal-head"><div><div class="cal-dow">${d}</div><div class="cal-date">Jun ${dates[d]}</div></div>
+          <div class="cal-head"><div><div class="cal-dow">${d}</div><div class="cal-date">${months[weekDates[daysOfWeek.indexOf(d)].getMonth()] || 'Jun'} ${dates[d]}</div></div>
             ${d===today?'<span class="badge badge-primary txs">Today</span>':''}<span class="cal-count">${items.length}</span></div>
           <div class="cal-slots" data-day="${d}">
-            ${items.map(cardHTML).join("") || `<div class="cal-empty">${I("plus")}<span>Drop or add</span></div>`}
+            ${items.map(cardHTML).join("") || `<div class="cal-empty" data-add-day="${d}">${I("plus")}<span>Drop or add</span></div>`}
           </div></div>`;
       }).join("");
+
+      // Wire delete clicks
+      document.querySelectorAll(".cal-card-delete").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.delId;
+          try {
+            await CadenceAPI.unscheduleDraft(id);
+            C.toast({ type: "success", title: "Removed from calendar" });
+            await M.syncMockData();
+            loadCards();
+            render();
+          } catch (err) {
+            console.error(err);
+            C.toast({ type: "error", title: "Removal failed", desc: err.message });
+          }
+        });
+      });
+
+      // Wire empty slot clicks
+      document.querySelectorAll(".cal-empty").forEach(empty => {
+        empty.addEventListener("click", () => {
+          selectedDayForAdd = empty.dataset.addDay;
+          openAddEventModal();
+        });
+      });
+
       C.refreshIcons();
       wireDnD();
     }
@@ -122,7 +247,7 @@
             // Calculate date for the new day
             const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
             const todayDate = new Date();
-            const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday() + 1)); // Monday
+            const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday())); // Monday
             const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[slot.dataset.day]));
             const timeParts = card.time.split(':');
             targetDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1] || 0), 0, 0);
@@ -132,7 +257,7 @@
               card.day = slot.dataset.day; 
               // Refresh mock data from backend and re-render
               await M.syncMockData();
-              cards = M.content.map(c => ({ ...c }));
+              loadCards();
               render();
               C.toast({ type: "success", title: "Rescheduled", desc: `Moved to ${slot.dataset.day}` });
             } catch (err) {
@@ -144,20 +269,42 @@
       });
     }
 
-    // Date helper for Monday of current week
-    if (!Date.prototype.weekday) {
-      Date.prototype.weekday = function() {
-        var day = this.getDay();
-        return day === 0 ? 6 : day - 1; // 0 for Mon, 6 for Sun
-      };
-    }
-
     // filters
     fSite.addEventListener("change", () => { filters.site = fSite.value; render(); });
     document.querySelectorAll("#fPlat button").forEach(b => b.addEventListener("click", () => {
       document.querySelectorAll("#fPlat button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); filters.plat = b.dataset.p; render(); }));
     document.querySelectorAll("#fStatus button").forEach(b => b.addEventListener("click", () => {
       document.querySelectorAll("#fStatus button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); filters.status = b.dataset.s; render(); }));
+
+    // aeSave modal save action
+    document.getElementById("aeSave").addEventListener("click", async () => {
+      const draftId = document.getElementById("aeDraft").value;
+      const timeVal = document.getElementById("aeTime").value || "09:00";
+      
+      if (!draftId) {
+        C.toast({ type: "warning", title: "Please select a draft" });
+        return;
+      }
+      
+      const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+      const todayDate = new Date();
+      const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday()));
+      const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[selectedDayForAdd]));
+      const timeParts = timeVal.split(':');
+      targetDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1] || 0), 0, 0);
+
+      try {
+        await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        C.closeModal("addEventModal");
+        await M.syncMockData();
+        loadCards();
+        render();
+        C.toast({ type: "success", title: "Scheduled", desc: `Added to ${selectedDayForAdd} at ${timeVal}` });
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Scheduling failed", desc: err.message });
+      }
+    });
 
     // auto-schedule: take approved drafts and distribute
     document.getElementById("autoBtn").addEventListener("click", async function () {
@@ -171,7 +318,7 @@
           const targetDay = days[(i * 2 + 1) % 7];
           const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
           const todayDate = new Date();
-          const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday() + 1));
+          const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday()));
           const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[targetDay]));
           targetDate.setHours(9 + (i % 3) * 2, 0, 0, 0); // e.g., 09:00, 11:00, 13:00
 
@@ -179,7 +326,7 @@
         }
         
         await M.syncMockData();
-        cards = M.content.map(c => ({ ...c }));
+        loadCards();
         render();
         C.toast({ type: "success", title: "Week auto-scheduled", desc: `${approved.length} approved drafts distributed Mon–Sun` });
       } catch (err) {
@@ -226,6 +373,10 @@
     .cc-foot { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
     .cal-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--text-faint); font-size:var(--fs-sm); padding:var(--s5) 0; border:1.5px dashed var(--border); border-radius:var(--r-md); }
     .cal-empty svg { width:18px; height:18px; }
+    .cal-empty { cursor: pointer; }
+    .cal-empty:hover { background: var(--surface); border-color: var(--primary); color: var(--primary); }
+    .cal-card:hover .cal-card-delete { display: block !important; }
+    .cal-card-delete:hover { color: var(--error) !important; background: var(--error-soft) !important; }
   </style>
   <div id="__bundler_thumbnail" hidden></div>
 </body>

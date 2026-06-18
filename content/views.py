@@ -238,3 +238,31 @@ class ApprovalsQueueView(generics.ListAPIView):
         if user.role != 'super_admin':
             qs = qs.filter(website__owner=user)
         return qs
+
+
+class UnscheduleDraftView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request, pk):
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Not found.'}, status=404)
+
+        if draft.status == 'scheduled':
+            ScheduledPost.objects.filter(draft=draft).delete()
+            old_status = draft.status
+            draft.status = 'approved'
+            draft.save(update_fields=['status'])
+            ip, _ = get_client_ip(request)
+            ActivityLog.objects.create(
+                actor=request.user, actor_name=request.user.get_full_name(),
+                action='content_unscheduled',
+                target_description=draft.title,
+                ip_address=ip,
+                metadata={'changes': {
+                    'status': {'old': old_status, 'new': 'approved'}
+                }}
+            )
+            return Response({'status': 'approved'})
+        return Response({'detail': 'Draft is not scheduled.'}, status=400)

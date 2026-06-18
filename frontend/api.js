@@ -329,6 +329,12 @@
       });
     },
 
+    async unscheduleDraft(id) {
+      return await request(`/content/drafts/${id}/unschedule/`, {
+        method: 'POST'
+      });
+    },
+
     async updateDraft(id, data) {
       return await request(`/content/drafts/${id}/`, {
         method: 'PATCH',
@@ -413,16 +419,26 @@
 
         window.MOCK.websites = mappedWebsites;
 
+        // Get scheduled posts
+        const scheduled = await this.getScheduledPosts(websiteId) || [];
+        const scheduledMap = {};
+        scheduled.forEach(sp => {
+          const dateObj = new Date(sp.scheduled_for);
+          const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          const dayName = days[dateObj.getDay()];
+          const hours = String(dateObj.getHours()).padStart(2, '0');
+          const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+          scheduledMap[sp.draft] = { day: dayName, time: `${hours}:${minutes}` };
+        });
+
         // Get drafts
         const drafts = await this.getDrafts({ website: websiteId });
         const mappedDrafts = drafts.map(d => {
           // Find day of week from scheduled_post or mock
           let day = 'Mon', time = '09:00';
-          if (d.status === 'scheduled' || d.status === 'published') {
-            // Wait, we can query scheduled details
-            // For now, let's parse created_at/updated_at or generate from ID
-            const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-            day = days[d.id % 7];
+          if (scheduledMap[d.id]) {
+            day = scheduledMap[d.id].day;
+            time = scheduledMap[d.id].time;
           } else {
             const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
             day = days[d.id % 7];

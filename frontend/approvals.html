@@ -96,7 +96,7 @@
     }
 
     function platPreview(c) {
-      const p = M.platMeta(c.platform), body = SAMPLE[c.platform] || c.excerpt;
+      const p = M.platMeta(c.platform), body = c.body || c.excerpt || SAMPLE[c.platform] || "";
       const site = (window.MOCK?.websites || []).find(s => String(s.id) === String(c.site)) || {};
       const guide = site.style_guide || {};
       const primaryFont = guide.primary_font ? guide.primary_font : 'inherit';
@@ -106,7 +106,7 @@
 
       const isColorLight = (colorStr) => {
         if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
-        const col = colorStr.trim().toLowerCase();
+        const col = colorStr.replace(/!important/gi, '').trim().toLowerCase();
         if (['white', 'yellow', 'cyan', 'lightgray', 'lightblue', 'lightgreen', 'lime', '#fff', '#ffffff'].includes(col)) return true;
         if (['black', 'navy', 'darkblue', 'darkgray', 'maroon', 'purple', 'green'].includes(col)) return false;
         if (col.startsWith('#')) {
@@ -129,7 +129,7 @@
 
       const isColorDark = (colorStr) => {
         if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
-        const col = colorStr.trim().toLowerCase();
+        const col = colorStr.replace(/!important/gi, '').trim().toLowerCase();
         if (['black', 'navy', 'darkblue', 'darkgray', 'maroon', 'purple', 'green', 'indigo', 'slate', '#000', '#000000'].includes(col)) return true;
         if (['white', 'yellow', 'cyan', 'lightgray', 'lightblue', 'lightgreen', 'lime'].includes(col)) return false;
         if (col.startsWith('#')) {
@@ -209,10 +209,12 @@
       `;
 
       if (c.platform === "Blog") {
+        const isHTML = body.trim().startsWith("<");
+        const blogContent = isHTML ? body : body.split("\n\n").map(t=>`<p style="line-height:1.7;margin-bottom:12px">${t}</p>`).join("");
         return `<div class="bp preview-wrapper-${c.site}"><div class="bp-kicker" style="color:var(--primary);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">${c.siteName}</div>
           <h2 style="font-size:24px;margin:8px 0 12px;letter-spacing:-.02em">${c.title}</h2>
           <div style="height:140px;border-radius:9px;background:linear-gradient(135deg,${c.siteColor},#1c1917);display:grid;place-items:center;color:rgba(255,255,255,.5);margin-bottom:16px">${I("image","style='width:28px;height:28px'")}</div>
-          ${body.split("\n\n").map(t=>`<p style="line-height:1.7;margin-bottom:12px">${t}</p>`).join("")}</div>`;
+          ${blogContent}</div>`;
       }
       if (c.platform === "Instagram") {
         return `<div style="max-width:320px;margin:0 auto;border:1px solid var(--border);border-radius:13px;overflow:hidden">
@@ -298,6 +300,7 @@
         selected.delete(id);
         C.toast({ type: action === "approve" ? "success" : "info", title: action === "approve" ? "Draft approved" : "Draft rejected" });
         await M.syncMockData();
+        if (C.mountShell) C.mountShell();
         renderList(); renderPreview();
       } catch (err) {
         C.toast({ type: "error", title: "Operation failed", desc: err.message });
@@ -328,6 +331,7 @@
         }
         selected.clear();
         await M.syncMockData();
+        if (C.mountShell) C.mountShell();
         renderList(); renderPreview(); C.toast({ type: "success", title: `${ids.length} drafts approved`, desc: "Ready to schedule" });
       } catch (err) {
         C.toast({ type: "error", title: "Bulk approval failed", desc: err.message });
@@ -342,6 +346,7 @@
         }
         selected.clear();
         await M.syncMockData();
+        if (C.mountShell) C.mountShell();
         renderList(); renderPreview(); C.toast({ type: "info", title: `${ids.length} drafts rejected` });
       } catch (err) {
         C.toast({ type: "error", title: "Bulk rejection failed", desc: err.message });

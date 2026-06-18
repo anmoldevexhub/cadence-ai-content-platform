@@ -14,6 +14,7 @@ urlpatterns = [
     path('drafts/<int:pk>/reject/', views.RejectDraftView.as_view()),
     path('drafts/<int:pk>/regenerate/', views.RegenerateDraftView.as_view()),
     path('drafts/<int:pk>/schedule/', views.ScheduleDraftView.as_view()),
+    path('drafts/<int:pk>/unschedule/', views.UnscheduleDraftView.as_view()),
     
     # Schedule
     path('scheduled/', views.ScheduledPostListView.as_view()),

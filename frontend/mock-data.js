@@ -44,7 +44,7 @@ window.MOCK = (function () {
 
   const access = localStorage.getItem('cadence.access_token');
   if (isAuth || !access) {
-    document.write('<script src="api.js"></script>');
+    document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return {
       ...defaultMock,
       site: (id) => defaultMock.websites.find(w => w.id === id)
@@ -347,7 +347,7 @@ window.MOCK = (function () {
       platMeta: (p) => PLAT[p] || PLAT.Blog,
       site: (id) => websites.find(w => w.id === id)
     };
-    document.write('<script src="api.js"></script>');
+    document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return finalResult;
 
   } catch (err) {
@@ -356,7 +356,7 @@ window.MOCK = (function () {
       ...defaultMock,
       site: (id) => defaultMock.websites.find(w => w.id === id)
     };
-    document.write('<script src="api.js"></script>');
+    document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return finalResult;
   }
 })();

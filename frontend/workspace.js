@@ -334,7 +334,7 @@
 
     const isColorLight = (colorStr) => {
       if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
-      const c = colorStr.trim().toLowerCase();
+      const c = colorStr.replace(/!important/gi, '').trim().toLowerCase();
       if (['white', 'yellow', 'cyan', 'lightgray', 'lightblue', 'lightgreen', 'lime', '#fff', '#ffffff'].includes(c)) return true;
       if (['black', 'navy', 'darkblue', 'darkgray', 'maroon', 'purple', 'green'].includes(c)) return false;
       if (c.startsWith('#')) {
@@ -357,7 +357,7 @@
 
     const isColorDark = (colorStr) => {
       if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
-      const c = colorStr.trim().toLowerCase();
+      const c = colorStr.replace(/!important/gi, '').trim().toLowerCase();
       if (['black', 'navy', 'darkblue', 'darkgray', 'maroon', 'purple', 'green', 'indigo', 'slate', '#000', '#000000'].includes(c)) return true;
       if (['white', 'yellow', 'cyan', 'lightgray', 'lightblue', 'lightgreen', 'lime'].includes(c)) return false;
       if (c.startsWith('#')) {
@@ -521,6 +521,8 @@
             await CadenceAPI.approveDraft(d.id);
             d.status = "Approved";
             C.toast({ type: "success", title: "Draft approved", desc: "Ready to schedule" });
+            await M.syncMockData(site.id);
+            if (C.mountShell) C.mountShell();
             renderDrafts();
           } catch (err) {
             C.toast({ type: "error", title: "Approval failed", desc: err.message });
@@ -531,6 +533,8 @@
             await CadenceAPI.rejectDraft(d.id, "Rejected by administrator");
             drafts = drafts.filter(x => x.id !== id);
             C.toast({ type: "info", title: "Draft rejected" });
+            await M.syncMockData(site.id);
+            if (C.mountShell) C.mountShell();
             renderDrafts();
           } catch (err) {
             C.toast({ type: "error", title: "Rejection failed", desc: err.message });
