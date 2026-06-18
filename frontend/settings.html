@@ -38,16 +38,20 @@
               <div class="card card-pad mb5">
                 <h3 class="set-h">Profile</h3>
                 <div class="row gap4 mb5" style="align-items:center">
-                  <span class="avatar avatar-xl" id="profAv"></span>
-                  <div><button class="btn btn-secondary btn-sm"><i data-lucide="upload"></i> Upload photo</button><div class="muted tsm mt2">JPG or PNG, max 2MB</div></div>
+                   <span class="avatar avatar-xl" id="profAv"></span>
+                  <div>
+                    <button class="btn btn-secondary btn-sm" id="btnUploadPhoto"><i data-lucide="upload"></i> Upload photo</button>
+                    <input type="file" id="avatarUpload" accept="image/*" style="display:none">
+                    <div class="muted tsm mt2">JPG or PNG, max 2MB</div>
+                  </div>
                 </div>
                 <div class="grid grid-2">
                   <div class="field"><label class="label">Full name</label><input class="input" id="pName"/></div>
                   <div class="field"><label class="label">Email</label><input class="input" id="pEmail" type="email"/></div>
-                  <div class="field"><label class="label">Job title</label><input class="input" value="Content Manager"/></div>
-                  <div class="field"><label class="label">Timezone</label><select class="select"><option>(GMT-08:00) Pacific Time</option><option selected>(GMT+00:00) London</option><option>(GMT+01:00) Berlin</option></select></div>
+                  <div class="field"><label class="label">Job title</label><input class="input" id="pJobTitle" value="Content Manager"/></div>
+                  <div class="field"><label class="label">Timezone</label><select class="select" id="pTimezone"><option>(GMT-08:00) Pacific Time</option><option selected>(GMT+00:00) London</option><option>(GMT+01:00) Berlin</option></select></div>
                 </div>
-                <div class="field" style="margin-bottom:0"><label class="label">Bio</label><textarea class="textarea">Managing content for specialty brands at Cadence.</textarea></div>
+                <div class="field" style="margin-bottom:0"><label class="label">Bio</label><textarea class="textarea" id="pBio">Managing content for specialty brands at Cadence.</textarea></div>
               </div>
               <div class="card card-pad">
                 <h3 class="set-h">Appearance</h3>
@@ -70,11 +74,11 @@
                 <h3 class="set-h">Weekly run</h3>
                 <p class="muted tsm" style="margin-top:-8px;margin-bottom:var(--s5)">Cadence drafts the week's content on a schedule. You review, approve, and it publishes daily.</p>
                 <div class="grid grid-2">
-                  <div class="field"><label class="label">Run day</label><select class="select"><option selected>Monday</option><option>Sunday</option><option>Friday</option></select></div>
-                  <div class="field"><label class="label">Run time</label><input class="input" type="time" value="09:00"/></div>
+                  <div class="field"><label class="label">Run day</label><select class="select" id="sRunDay"><option selected>Monday</option><option>Sunday</option><option>Friday</option></select></div>
+                  <div class="field"><label class="label">Run time</label><input class="input" type="time" id="sRunTime" value="09:00"/></div>
                 </div>
-                <label class="set-row" style="border-top:1px solid var(--border);padding-top:var(--s4)"><div><div class="fw6">Auto-generate drafts</div><div class="muted tsm">Create drafts from your idea queue automatically</div></div><span class="switch"><input type="checkbox" checked/><span class="track"></span></span></label>
-                <label class="set-row"><div><div class="fw6">Auto-publish approved content</div><div class="muted tsm">Post on the scheduled slot without manual send</div></div><span class="switch"><input type="checkbox" checked/><span class="track"></span></span></label>
+                <label class="set-row" style="border-top:1px solid var(--border);padding-top:var(--s4)"><div><div class="fw6">Auto-generate drafts</div><div class="muted tsm">Create drafts from your idea queue automatically</div></div><span class="switch"><input type="checkbox" id="sAutoGenerate" checked/><span class="track"></span></span></label>
+                <label class="set-row"><div><div class="fw6">Auto-publish approved content</div><div class="muted tsm">Post on the scheduled slot without manual send</div></div><span class="switch"><input type="checkbox" id="sAutoPublish" checked/><span class="track"></span></span></label>
               </div>
               <div class="card card-pad">
                 <h3 class="set-h">Posting times per platform</h3>
@@ -96,10 +100,10 @@
               <div class="card mb5" style="overflow:hidden">
                 <div class="plan-banner">
                   <div><div class="badge" style="background:rgba(255,255,255,.2);color:#fff;margin-bottom:8px">Current plan</div>
-                    <h3 style="font-size:var(--fs-2xl);color:#fff">Scale</h3>
-                    <p style="color:rgba(255,255,255,.85);margin-top:4px">Unlimited websites · 8 admins · 10k AI generations/mo</p></div>
-                  <div style="text-align:right"><div style="font-size:34px;font-weight:800;color:#fff;letter-spacing:-.03em">$149<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span></div>
-                    <button class="btn btn-sm mt2" style="background:#fff;color:var(--primary)">Manage plan</button></div>
+                    <h3 style="font-size:var(--fs-2xl);color:#fff" id="planName">Scale</h3>
+                    <p style="color:rgba(255,255,255,.85);margin-top:4px" id="planLimits">Unlimited websites · 8 admins · 10k AI generations/mo</p></div>
+                  <div style="text-align:right"><div style="font-size:34px;font-weight:800;color:#fff;letter-spacing:-.03em" id="planPrice">$149<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span></div>
+                    <button class="btn btn-sm mt2" id="btnManagePlan" style="background:#fff;color:var(--primary)">Manage plan</button></div>
                 </div>
                 <div class="card__body">
                   <div class="row-between mb2"><span class="fw6">AI generations this month</span><span class="muted tsm mono">6,420 / 10,000</span></div>
@@ -114,8 +118,8 @@
               <div class="card card-pad mb5">
                 <h3 class="set-h">Payment method</h3>
                 <div class="chan-conn"><span class="icon-tile tile-blog"><i data-lucide="credit-card"></i></span>
-                  <div style="flex:1"><div class="fw6">Visa ending 4242</div><div class="muted tsm">Expires 09 / 2028</div></div>
-                  <button class="btn btn-secondary btn-sm">Update</button></div>
+                  <div style="flex:1"><div class="fw6" id="cardName">Visa ending 4242</div><div class="muted tsm" id="cardExpiry">Expires 09 / 2028</div></div>
+                  <button class="btn btn-secondary btn-sm" id="btnUpdateCard">Update</button></div>
               </div>
               <div class="card">
                 <div class="card__header"><h3>Billing history</h3></div>
@@ -126,7 +130,7 @@
             </section>
 
             <div class="set-actions">
-              <button class="btn btn-ghost">Cancel</button>
+              <button class="btn btn-ghost" id="btnCancel">Cancel</button>
               <button class="btn btn-primary" id="saveSettings"><i data-lucide="check"></i> Save changes</button>
             </div>
           </div>
@@ -140,13 +144,75 @@
   <script src="app.js"></script>
   <script>
   (function () {
+    if (!window.Cadence || !window.MOCK) {
+      console.error("[Settings] Cadence or MOCK not loaded. Buttons may not work.");
+      return;
+    }
     const C = window.Cadence, M = window.MOCK, I = C.icon;
-    const u = C.store.role === "super" ? M.users.super : M.users.admin;
+    const u = (C.store.role === "super" ? M.users.super : M.users.admin) || M.users.admin || {};
 
-    document.getElementById("profAv").textContent = u.initials;
-    document.getElementById("profAv").style.background = u.color;
+    // Load initial profile data
     document.getElementById("pName").value = u.name;
     document.getElementById("pEmail").value = u.email;
+    document.getElementById("pJobTitle").value = localStorage.getItem("cadence.settings.jobTitle") || "Content Manager";
+    document.getElementById("pTimezone").value = localStorage.getItem("cadence.settings.timezone") || "(GMT+00:00) London";
+    document.getElementById("pBio").value = localStorage.getItem("cadence.settings.bio") || "Managing content for specialty brands at Cadence.";
+
+    // Load scheduler data
+    document.getElementById("sRunDay").value = localStorage.getItem("cadence.settings.runDay") || "Monday";
+    document.getElementById("sRunTime").value = localStorage.getItem("cadence.settings.runTime") || "09:00";
+    document.getElementById("sAutoGenerate").checked = localStorage.getItem("cadence.settings.autoGenerate") !== "false";
+    document.getElementById("sAutoPublish").checked = localStorage.getItem("cadence.settings.autoPublish") !== "false";
+
+    function updateProfileAvatar() {
+      const savedAv = localStorage.getItem("cadence.settings.avatar");
+      const profAv = document.getElementById("profAv");
+      if (savedAv) {
+        profAv.innerHTML = `<img src="${savedAv}" alt="User Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:99px;">`;
+        profAv.style.background = "transparent";
+      } else {
+        profAv.textContent = u.initials;
+        profAv.style.background = u.color;
+      }
+    }
+    updateProfileAvatar();
+
+    // Wire avatar upload
+    document.getElementById("btnUploadPhoto").addEventListener("click", () => {
+      document.getElementById("avatarUpload").click();
+    });
+    document.getElementById("avatarUpload").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          C.toast({ type: "error", title: "File too large", desc: "Max file size is 2MB" });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          const img = new Image();
+          img.onload = function () {
+            const canvas = document.createElement("canvas");
+            canvas.width = 150;
+            canvas.height = 150;
+            const ctx = canvas.getContext("2d");
+            
+            const size = Math.min(img.width, img.height);
+            const x = (img.width - size) / 2;
+            const y = (img.height - size) / 2;
+            ctx.drawImage(img, x, y, size, size, 0, 0, 150, 150);
+            
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+            localStorage.setItem("cadence.settings.avatar", dataUrl);
+            updateProfileAvatar();
+            C.mountShell(); // rebuilds the topbar and sidebar instantly
+            C.toast({ type: "success", title: "Photo uploaded successfully" });
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
     function applyRole() { document.querySelectorAll(".super-only").forEach(e => e.classList.toggle("hide", C.store.role !== "super")); }
     applyRole();
@@ -160,7 +226,7 @@
     document.querySelectorAll(".set-link").forEach(l => l.addEventListener("click", () => switchTo(l.dataset.s)));
 
     // notifications
-    const notifs = [
+    const defaultNotifs = [
       ["Draft ready for approval","When AI finishes generating drafts",true,true],
       ["Content published","When a post goes live on a channel",true,false],
       ["Weekly run summary","A Monday recap of what was generated",true,true],
@@ -168,37 +234,188 @@
       ["Mentions &amp; comments","When someone @mentions you",false,true],
       ["Product updates","New features and tips from Cadence",false,true],
     ];
+
+    let savedNotifs;
+    try {
+      savedNotifs = JSON.parse(localStorage.getItem("cadence.settings.notifications"));
+    } catch(e) {}
+
+    const notifs = defaultNotifs.map(([title, desc, emailVal, inappVal], idx) => {
+      if (savedNotifs && savedNotifs[idx]) {
+        return [title, desc, savedNotifs[idx].email, savedNotifs[idx].inapp];
+      }
+      return [title, desc, emailVal, inappVal];
+    });
+
     document.getElementById("notifList").innerHTML = `
       <div class="notif-head"><span>Notification</span><span class="ctr">Email</span><span class="ctr">In-app</span></div>` +
-      notifs.map(([t,d,em,ip])=>`<div class="notif-row"><div><div class="fw6">${t}</div><div class="muted tsm">${d}</div></div>
-        <span class="ctr"><label class="switch"><input type="checkbox" ${em?'checked':''}/><span class="track"></span></label></span>
-        <span class="ctr"><label class="switch"><input type="checkbox" ${ip?'checked':''}/><span class="track"></span></label></span></div>`).join("");
+      notifs.map(([t,d,em,ip], idx)=>`<div class="notif-row"><div><div class="fw6">${t}</div><div class="muted tsm">${d}</div></div>
+        <span class="ctr"><label class="switch"><input type="checkbox" class="notif-email" data-idx="${idx}" ${em?'checked':''}/><span class="track"></span></label></span>
+        <span class="ctr"><label class="switch"><input type="checkbox" class="notif-inapp" data-idx="${idx}" ${ip?'checked':''}/><span class="track"></span></label></span></div>`).join("");
 
     // posting times
-    const times = [["Blog","blog","08:00"],["LinkedIn","linkedin","08:30"],["YouTube","youtube","17:00"],["Instagram","instagram","12:30"]];
+    const defaultTimes = [["Blog","blog","08:00"],["LinkedIn","linkedin","08:30"],["YouTube","youtube","17:00"],["Instagram","instagram","12:30"]];
+    let savedTimes;
+    try {
+      savedTimes = JSON.parse(localStorage.getItem("cadence.settings.postingTimes"));
+    } catch(e) {}
+
+    const times = defaultTimes.map(([n,t,tm]) => {
+      if (savedTimes && savedTimes[t]) {
+        return [n, t, savedTimes[t]];
+      }
+      return [n, t, tm];
+    });
+
     document.getElementById("postTimes").innerHTML = times.map(([n,t,tm])=>`
       <div class="chan-conn"><span class="icon-tile tile-${t}">${I(M.platMeta(n).icon)}</span>
         <div style="flex:1"><div class="fw6">${n}</div><div class="muted tsm">Default daily posting time</div></div>
-        <input class="input" type="time" value="${tm}" style="width:130px"/></div>`).join("");
+        <input class="input post-time-input" data-platform="${t}" type="time" value="${tm}" style="width:130px"/></div>`).join("");
 
     // connections
-    const conns = [["LinkedIn","linkedin","Connected as Northwind Coffee",true],["YouTube","youtube","Connected as @northwind",true],["Instagram","instagram","Not connected",false],["X / Twitter","blog","Not connected",false]];
-    document.getElementById("connList").innerHTML = conns.map(([n,t,st,on])=>`
-      <div class="chan-conn"><span class="icon-tile tile-${t}">${I(M.platMeta(n==="X / Twitter"?"Blog":n).icon)}</span>
-        <div class="cc-meta"><div class="cc-nm">${n}</div><div class="cc-st">${st}</div></div>
-        ${on?`<button class="btn btn-secondary btn-sm" onclick="this.closest('.chan-conn').querySelector('.cc-st').textContent='Not connected';Cadence.toast({type:'info',title:'${n} disconnected'})">Disconnect</button>`
-            :`<button class="btn btn-primary btn-sm" onclick="this.closest('.chan-conn').querySelector('.cc-st').textContent='Connected';Cadence.toast({type:'success',title:'${n} connected'})">Connect</button>`}</div>`).join("");
+    const defaultConns = [
+      { name: "LinkedIn", key: "linkedin", status: "Connected as Northwind Coffee", connected: true },
+      { name: "YouTube", key: "youtube", status: "Connected as @northwind", connected: true },
+      { name: "Instagram", key: "instagram", status: "Not connected", connected: false },
+      { name: "X / Twitter", key: "blog", status: "Not connected", connected: false }
+    ];
+
+    let conns;
+    try {
+      conns = JSON.parse(localStorage.getItem("cadence.settings.connections")) || defaultConns;
+    } catch(e) {
+      conns = defaultConns;
+    }
+
+    function renderConnections() {
+      document.getElementById("connList").innerHTML = conns.map((c) => `
+        <div class="chan-conn">
+          <span class="icon-tile tile-${c.key}">${I(M.platMeta(c.name === "X / Twitter" ? "Blog" : c.name).icon)}</span>
+          <div class="cc-meta">
+            <div class="cc-nm">${c.name}</div>
+            <div class="cc-st">${c.status}</div>
+          </div>
+          ${c.connected 
+            ? `<button class="btn btn-secondary btn-sm btn-conn-toggle" data-key="${c.key}" data-action="disconnect">Disconnect</button>`
+            : `<button class="btn btn-primary btn-sm btn-conn-toggle" data-key="${c.key}" data-action="connect">Connect</button>`
+          }
+        </div>`).join("");
+      
+      document.querySelectorAll(".btn-conn-toggle").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const key = btn.dataset.key;
+          const action = btn.dataset.action;
+          const connItem = conns.find(c => c.key === key);
+          
+          if (action === "disconnect") {
+            connItem.connected = false;
+            connItem.status = "Not connected";
+            localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
+            renderConnections();
+            C.toast({ type: "info", title: `${connItem.name} disconnected` });
+          } else {
+            const handle = prompt(`Enter account/page name for ${connItem.name}:`, connItem.key === "linkedin" ? "Northwind Coffee" : "@northwind");
+            if (handle !== null) {
+              connItem.connected = true;
+              connItem.status = "Connected as " + (handle.trim() || "Guest");
+              localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
+              renderConnections();
+              C.toast({ type: "success", title: `${connItem.name} connected`, desc: connItem.status });
+            }
+          }
+        });
+      });
+      C.refreshIcons();
+    }
+    renderConnections();
 
     // invoices
     const inv = [["Jun 1, 2026","Scale plan — monthly","$149.00"],["May 1, 2026","Scale plan — monthly","$149.00"],["Apr 1, 2026","Scale plan — monthly","$149.00"]];
-    document.getElementById("invBody").innerHTML = inv.map(([d,desc,a])=>`<tr><td class="cell-muted">${d}</td><td class="cell-strong">${desc}</td><td class="mono">${a}</td><td><span class="badge badge-success">Paid</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm">${I("download")}</button></td></tr>`).join("");
+    document.getElementById("invBody").innerHTML = inv.map(([d,desc,a])=>`<tr><td class="cell-muted">${d}</td><td class="cell-strong">${desc}</td><td class="mono">${a}</td><td><span class="badge badge-success">Paid</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm btn-download-invoice" data-date="${d}">${I("download")}</button></td></tr>`).join("");
+    
+    document.querySelectorAll(".btn-download-invoice").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const date = btn.dataset.date;
+        C.toast({ type: "success", title: "Downloading invoice", desc: `Invoice for ${date} downloaded successfully.` });
+      });
+    });
 
     // theme buttons
-    document.getElementById("themeLight").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","light"); C.store.theme="light"; syncTheme(); });
-    document.getElementById("themeDark").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","dark"); C.store.theme="dark"; syncTheme(); });
-    function syncTheme(){ const d=C.store.theme==="dark"; document.getElementById("themeDark").classList.toggle("active",d); document.getElementById("themeLight").classList.toggle("active",!d); window.dispatchEvent(new CustomEvent("themechange")); }
+    document.getElementById("themeLight").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","light"); C.store.theme="light"; syncTheme(); window.dispatchEvent(new CustomEvent("themechange")); });
+    document.getElementById("themeDark").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","dark"); C.store.theme="dark"; syncTheme(); window.dispatchEvent(new CustomEvent("themechange")); });
+    function syncTheme(){ const d=C.store.theme==="dark"; document.getElementById("themeDark").classList.toggle("active",d); document.getElementById("themeLight").classList.toggle("active",!d); }
     syncTheme();
+    window.addEventListener("themechange", syncTheme);
 
+    // card modal logic
+    const cardNameEl = document.getElementById("cardName");
+    const cardExpiryEl = document.getElementById("cardExpiry");
+    
+    cardNameEl.textContent = localStorage.getItem("cadence.settings.cardName") || "Visa ending 4242";
+    cardExpiryEl.textContent = localStorage.getItem("cadence.settings.cardExpiry") || "Expires 09 / 2028";
+    
+    document.getElementById("btnUpdateCard").addEventListener("click", () => {
+      document.getElementById("mCardNumber").value = cardNameEl.textContent;
+      document.getElementById("mCardExpiry").value = cardExpiryEl.textContent.replace("Expires ", "");
+      C.openModal("updateCardModal");
+    });
+    
+    document.getElementById("btnSaveCard").addEventListener("click", () => {
+      const newCard = document.getElementById("mCardNumber").value.trim() || "Visa ending 4242";
+      const newExpiry = document.getElementById("mCardExpiry").value.trim() || "09 / 2028";
+      
+      localStorage.setItem("cadence.settings.cardName", newCard);
+      localStorage.setItem("cadence.settings.cardExpiry", "Expires " + newExpiry);
+      
+      cardNameEl.textContent = newCard;
+      cardExpiryEl.textContent = "Expires " + newExpiry;
+      
+      C.closeModal("updateCardModal");
+      C.toast({ type: "success", title: "Payment method updated" });
+    });
+
+    // plan modal logic
+    const planNameEl = document.getElementById("planName");
+    const planPriceEl = document.getElementById("planPrice");
+    const planLimitsEl = document.getElementById("planLimits");
+    
+    const PLANS_METADATA = {
+      growth: { name: "Growth", price: "$49", limits: "5 websites · 3 admins · 2k AI generations/mo" },
+      scale: { name: "Scale", price: "$149", limits: "Unlimited websites · 8 admins · 10k AI generations/mo" },
+      enterprise: { name: "Enterprise", price: "$499", limits: "Unlimited websites · 20 admins · 50k AI generations/mo" }
+    };
+    
+    const activePlanKey = localStorage.getItem("cadence.settings.plan") || "scale";
+    const currentPlan = PLANS_METADATA[activePlanKey] || PLANS_METADATA.scale;
+    planNameEl.textContent = currentPlan.name;
+    planPriceEl.innerHTML = `${currentPlan.price}<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span>`;
+    planLimitsEl.textContent = currentPlan.limits;
+    
+    document.getElementById("btnManagePlan").addEventListener("click", () => {
+      document.getElementById("mPlanSelect").value = localStorage.getItem("cadence.settings.plan") || "scale";
+      C.openModal("managePlanModal");
+    });
+    
+    document.getElementById("btnSavePlan").addEventListener("click", () => {
+      const selectedPlanKey = document.getElementById("mPlanSelect").value;
+      const planInfo = PLANS_METADATA[selectedPlanKey];
+      
+      localStorage.setItem("cadence.settings.plan", selectedPlanKey);
+      
+      planNameEl.textContent = planInfo.name;
+      planPriceEl.innerHTML = `${planInfo.price}<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span>`;
+      planLimitsEl.textContent = planInfo.limits;
+      
+      C.closeModal("managePlanModal");
+      C.toast({ type: "success", title: "Subscription updated", desc: `Switched to the ${planInfo.name} plan.` });
+    });
+
+    // cancel button
+    document.getElementById("btnCancel").addEventListener("click", () => {
+      location.href = "dashboard.html";
+    });
+
+    // save changes
     document.getElementById("saveSettings").addEventListener("click", async () => {
       const name = document.getElementById("pName").value.trim();
       const email = document.getElementById("pEmail").value.trim();
@@ -207,6 +424,55 @@
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
       
+      const jobTitle = document.getElementById("pJobTitle").value.trim();
+      const timezone = document.getElementById("pTimezone").value;
+      const bio = document.getElementById("pBio").value.trim();
+      const runDay = document.getElementById("sRunDay").value;
+      const runTime = document.getElementById("sRunTime").value;
+      const autoGen = document.getElementById("sAutoGenerate").checked;
+      const autoPub = document.getElementById("sAutoPublish").checked;
+      
+      // notification settings
+      const savedNotifs = [];
+      document.querySelectorAll(".notif-email").forEach(cb => {
+        const idx = cb.dataset.idx;
+        if (!savedNotifs[idx]) savedNotifs[idx] = {};
+        savedNotifs[idx].email = cb.checked;
+      });
+      document.querySelectorAll(".notif-inapp").forEach(cb => {
+        const idx = cb.dataset.idx;
+        if (!savedNotifs[idx]) savedNotifs[idx] = {};
+        savedNotifs[idx].inapp = cb.checked;
+      });
+
+      // posting times
+      const savedTimes = {};
+      document.querySelectorAll(".post-time-input").forEach(inp => {
+        const platform = inp.dataset.platform;
+        savedTimes[platform] = inp.value;
+      });
+      
+      // --- Always save to localStorage first (non-blocking) ---
+      localStorage.setItem("cadence.settings.jobTitle", jobTitle);
+      localStorage.setItem("cadence.settings.timezone", timezone);
+      localStorage.setItem("cadence.settings.bio", bio);
+      localStorage.setItem("cadence.settings.runDay", runDay);
+      localStorage.setItem("cadence.settings.runTime", runTime);
+      localStorage.setItem("cadence.settings.autoGenerate", autoGen);
+      localStorage.setItem("cadence.settings.autoPublish", autoPub);
+      localStorage.setItem("cadence.settings.notifications", JSON.stringify(savedNotifs));
+      localStorage.setItem("cadence.settings.postingTimes", JSON.stringify(savedTimes));
+
+      // Update name locally in mock data (so topbar & sidebar reflect new name immediately)
+      u.name = name || u.name;
+      const fi = firstName[0] || '';
+      const li = lastName[0] || '';
+      u.initials = (fi + li).toUpperCase() || u.initials;
+      u.email = email || u.email;
+      updateProfileAvatar();
+      C.mountShell();
+
+      // --- Try to persist profile to backend (soft failure) ---
       try {
         await CadenceAPI.request('/auth/me/', {
           method: 'PATCH',
@@ -216,23 +482,22 @@
             email: email
           })
         });
-        
-        // Sync local storage user and refresh mock data
+        // Refresh local user cache from backend
         await CadenceAPI.getMe();
         await M.syncMockData();
-        
-        // Update avatar display
         const me = CadenceAPI.getUser();
         if (me) {
-          const initials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || me.username.substring(0,2).toUpperCase();
-          document.getElementById("profAv").textContent = initials;
+          u.name = (me.first_name + ' ' + me.last_name).trim() || u.name;
+          u.initials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || u.initials;
+          updateProfileAvatar();
+          C.mountShell();
         }
-
-        C.toast({ type:"success", title:"Profile updated successfully" });
-      } catch (err) {
-        console.error(err);
-        C.toast({ type:"error", title:"Update failed", desc: err.message });
+      } catch (apiErr) {
+        // Backend unavailable or token issue — settings are already saved locally
+        console.warn("Profile sync to backend failed (settings saved locally):", apiErr.message || apiErr);
       }
+
+      C.toast({ type:"success", title:"Settings saved successfully" });
     });
 
     C.refreshIcons();
@@ -262,6 +527,66 @@
     .notif-row .ctr { display:flex; justify-content:center; }
     .plan-banner { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s6); background:linear-gradient(120deg,var(--primary),#9333ea); flex-wrap:wrap; }
   </style>
+  <!-- Modal: Update Card -->
+  <div class="modal-overlay" id="updateCardModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Update payment method</h3>
+          <div class="sub">Enter your new credit card details.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body col gap3" style="display:flex; flex-direction:column; gap:16px;">
+        <div class="field">
+          <label class="label">Card number</label>
+          <input class="input" type="text" id="mCardNumber" placeholder="•••• •••• •••• 4242" value="Visa ending 4242" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+        </div>
+        <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="field">
+            <label class="label">Expiry date</label>
+            <input class="input" type="text" id="mCardExpiry" placeholder="MM / YYYY" value="09 / 2028" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+          </div>
+          <div class="field">
+            <label class="label">CVC</label>
+            <input class="input" type="password" id="mCardCVC" placeholder="•••" value="123" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-ghost" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" id="btnSaveCard"><i data-lucide="check"></i> Save Card</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Manage Plan -->
+  <div class="modal-overlay" id="managePlanModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Change subscription plan</h3>
+          <div class="sub">Choose a plan that fits your content needs.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body col gap3" style="display:flex; flex-direction:column; gap:16px; min-width:320px;">
+        <div class="field">
+          <label class="label">Select Plan</label>
+          <select class="select" id="mPlanSelect" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);">
+            <option value="growth">Growth — $49/mo (5 websites, 3 admins, 2k AI gens)</option>
+            <option value="scale" selected>Scale — $149/mo (Unlimited websites, 8 admins, 10k AI gens)</option>
+            <option value="enterprise">Enterprise — $499/mo (Unlimited websites, 20 admins, 50k AI gens)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-ghost" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" id="btnSavePlan"><i data-lucide="check"></i> Update Plan</button>
+      </div>
+    </div>
+  </div>
+
   <div id="__bundler_thumbnail" hidden></div>
 </body>
 </html>

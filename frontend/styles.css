@@ -661,3 +661,56 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .auth-row a { color: var(--primary); font-weight: 600; font-size: var(--fs-md); }
 .auth-theme { position: absolute; top: var(--s5); right: var(--s5); z-index: 2; }
 @media (max-width: 880px){ .auth { grid-template-columns: 1fr; } .auth__brand { display: none; } }
+
+/* --- Sample Upload and Management UI styles --- */
+.sample-upload-section {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s4);
+  background: var(--bg-card);
+}
+.sample-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  margin-top: var(--s2);
+}
+.sample-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px var(--s3);
+  transition: all 0.15s ease;
+}
+.sample-item:hover {
+  border-color: var(--border-strong);
+}
+.sample-item .sample-file-input {
+  flex: 1;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.sample-item .sample-title-input {
+  flex: 1.5;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  outline: none;
+}
+.sample-item .sample-title-input:focus {
+  border-color: var(--primary);
+}
+.sample-item .remove-sample-btn {
+  color: var(--text-muted);
+  transition: color 0.12s;
+}
+.sample-item .remove-sample-btn:hover {
+  color: var(--error);
+}
+

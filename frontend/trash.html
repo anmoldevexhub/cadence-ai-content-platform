@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trash Bin · Cadence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" data-active="trash"></aside>
+    <div class="backdrop" id="backdrop"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" data-screen-label="Trash Bin">
+
+        <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Trash Bin</span></div>
+        <div class="page-head">
+          <div class="ph-text"><h1 class="page-title">Trash Bin</h1><p class="page-sub">Restore soft-deleted websites and content drafts, or permanently delete them.</p></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs ws-tabs" data-tabs data-tabs-scope="trashPanels" style="margin-bottom:var(--s6)">
+          <button class="tab active" data-tab="websites"><i data-lucide="globe"></i> Websites</button>
+          <button class="tab" data-tab="drafts"><i data-lucide="file-text"></i> Drafts</button>
+        </div>
+
+        <div id="trashPanels">
+          <!-- WEBSITES PANEL -->
+          <div class="tab-panel active" data-panel="websites">
+            <div id="deletedWebsitesList" class="aw-grid"></div>
+          </div>
+
+          <!-- DRAFTS PANEL -->
+          <div class="tab-panel" data-panel="drafts">
+            <div id="deletedDraftsList" class="trash-drafts-grid"></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="mock-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    (async function () {
+      const C = window.Cadence, M = window.MOCK, I = C.icon;
+      
+      async function loadTrash() {
+        await renderWebsites();
+        await renderDrafts();
+      }
+
+      async function renderWebsites() {
+        const wrap = document.getElementById("deletedWebsitesList");
+        try {
+          const websites = await CadenceAPI.getWebsites({ trash: true });
+          if (!websites.length) {
+            wrap.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art">${I("globe")}</div><h3>No deleted websites</h3><p>Websites you delete will appear here.</p></div>`;
+            C.refreshIcons();
+            return;
+          }
+          wrap.innerHTML = websites.map(w => {
+            const short = w.name ? w.name[0].toUpperCase() : 'W';
+            const color = w.color || '#6366f1';
+            return `<div class="aw-card">
+              <div class="aw-top">
+                <span class="favicon" style="width:42px;height:42px;border-radius:11px;font-size:18px;background:${color}">${short}</span>
+                <div style="flex:1;min-width:0">
+                  <div class="aw-name">${w.name}</div>
+                  <div class="aw-url">${w.domain || w.url || ''}</div>
+                </div>
+              </div>
+              <div class="aw-foot" style="margin-top:var(--s4); border-top: 1px solid var(--border); padding-top:var(--s3)">
+                <span class="tsm muted">Owner: ${w.owner_name || 'Admin'}</span>
+                <div class="row gap2">
+                  <button class="btn btn-secondary btn-sm restore-site-btn" data-id="${w.id}">${I("rotate-ccw")} Restore</button>
+                  <button class="btn btn-danger btn-sm delete-site-perm-btn" data-id="${w.id}">${I("trash-2")} Delete</button>
+                </div>
+              </div>
+            </div>`;
+          }).join("");
+          
+          C.refreshIcons();
+          wireWebsiteActions();
+        } catch (err) {
+          wrap.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art" style="color:var(--error)">${I("alert-triangle")}</div><h3>Failed to load</h3><p>${err.message}</p></div>`;
+          C.refreshIcons();
+        }
+      }
+
+      function wireWebsiteActions() {
+        document.querySelectorAll(".restore-site-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            btn.disabled = true;
+            try {
+              await CadenceAPI.updateWebsite(id, { is_deleted: false });
+              C.toast({ type: "success", title: "Website restored" });
+              await M.syncMockData();
+              if (C.mountShell) C.mountShell();
+              await renderWebsites();
+            } catch (err) {
+              C.toast({ type: "error", title: "Restore failed", desc: err.message });
+              btn.disabled = false;
+            }
+          });
+        });
+
+        document.querySelectorAll(".delete-site-perm-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            if (!confirm("Are you sure you want to permanently delete this website? This will delete all content history and cannot be undone.")) return;
+            btn.disabled = true;
+            try {
+              await CadenceAPI.deleteWebsite(id, true);
+              C.toast({ type: "success", title: "Website permanently deleted" });
+              await M.syncMockData();
+              if (C.mountShell) C.mountShell();
+              await renderWebsites();
+            } catch (err) {
+              C.toast({ type: "error", title: "Deletion failed", desc: err.message });
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function renderDrafts() {
+        const wrap = document.getElementById("deletedDraftsList");
+        try {
+          const drafts = await CadenceAPI.getDrafts({ trash: true });
+          if (!drafts.length) {
+            wrap.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art">${I("file-text")}</div><h3>No deleted drafts</h3><p>Drafts you delete will appear here.</p></div>`;
+            C.refreshIcons();
+            return;
+          }
+          
+          wrap.innerHTML = drafts.map(d => {
+            const rawPlatform = d.platform || 'blog';
+            const platformName = ({ blog: 'Blog', linkedin: 'LinkedIn', youtube: 'YouTube', instagram: 'Instagram' })[rawPlatform.toLowerCase()] || rawPlatform;
+            const p = M.platMeta(platformName);
+            const excerpt = d.excerpt || (d.body ? d.body.substring(0, 120) + "..." : "No content");
+            return `<div class="aw-card">
+              <div class="aw-top">
+                <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+                <div style="flex:1;min-width:0">
+                  <div class="aw-name" style="font-size:var(--fs-md)">${d.title}</div>
+                  <div class="aw-url">${d.website_name || 'Website'} · ${platformName}</div>
+                </div>
+              </div>
+              <div style="font-size:var(--fs-sm); color:var(--text-muted); margin:var(--s3) 0; line-height:1.4">${excerpt}</div>
+              <div class="aw-foot" style="border-top: 1px solid var(--border); padding-top:var(--s3)">
+                <span class="tsm muted">Status: ${d.status_display || d.status}</span>
+                <div class="row gap2">
+                  <button class="btn btn-secondary btn-sm restore-draft-btn" data-id="${d.id}">${I("rotate-ccw")} Restore</button>
+                  <button class="btn btn-danger btn-sm delete-draft-perm-btn" data-id="${d.id}">${I("trash-2")} Delete</button>
+                </div>
+              </div>
+            </div>`;
+          }).join("");
+          
+          C.refreshIcons();
+          wireDraftActions();
+        } catch (err) {
+          wrap.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art" style="color:var(--error)">${I("alert-triangle")}</div><h3>Failed to load</h3><p>${err.message}</p></div>`;
+          C.refreshIcons();
+        }
+      }
+
+      function wireDraftActions() {
+        document.querySelectorAll(".restore-draft-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            btn.disabled = true;
+            try {
+              await CadenceAPI.updateDraft(id, { is_deleted: false });
+              C.toast({ type: "success", title: "Draft restored" });
+              await M.syncMockData();
+              if (C.mountShell) C.mountShell();
+              await renderDrafts();
+            } catch (err) {
+              C.toast({ type: "error", title: "Restore failed", desc: err.message });
+              btn.disabled = false;
+            }
+          });
+        });
+
+        document.querySelectorAll(".delete-draft-perm-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            if (!confirm("Are you sure you want to permanently delete this draft? This cannot be undone.")) return;
+            btn.disabled = true;
+            try {
+              await CadenceAPI.deleteDraft(id, true);
+              C.toast({ type: "success", title: "Draft permanently deleted" });
+              await M.syncMockData();
+              if (C.mountShell) C.mountShell();
+              await renderDrafts();
+            } catch (err) {
+              C.toast({ type: "error", title: "Deletion failed", desc: err.message });
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      await loadTrash();
+    })();
+  </script>
+  <style>
+    .aw-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s5); }
+    @media (max-width:1080px){ .aw-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:720px){ .aw-grid { grid-template-columns:1fr; } }
+    .trash-drafts-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s5); }
+    @media (max-width:1080px){ .trash-drafts-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:720px){ .trash-drafts-grid { grid-template-columns:1fr; } }
+    .aw-card { display:flex; flex-direction:column; gap:var(--s2); background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--s5); box-shadow:var(--sh-xs); transition:.15s; }
+    .aw-card:hover { box-shadow:var(--sh-md); border-color:var(--border-strong); }
+    .aw-top { display:flex; align-items:center; gap:var(--s3); }
+    .aw-name { font-weight:650; font-size:var(--fs-lg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .aw-url { font-size:var(--fs-sm); color:var(--text-muted); }
+    .aw-foot { display:flex; align-items:center; justify-content:space-between; }
+  </style>
+</body>
+</html>

@@ -36,6 +36,7 @@
     { id: "calendar", label: "Content Calendar", icon: "calendar-days", href: "calendar.html" },
     { id: "approvals", label: "Approvals", icon: "check-check", href: "approvals.html", badge: "approvals" },
     { id: "analytics", label: "Analytics", icon: "bar-chart-3", href: "analytics.html" },
+    { id: "trash", label: "Trash", icon: "trash-2", href: "trash.html" },
   ];
   const NAV_ADMIN = [
     { id: "admins", label: "Admins & Roles", icon: "users", href: "admins.html" },
@@ -48,7 +49,7 @@
 
   function buildSidebar(active) {
     const role = store.role;
-    const sites = (window.MOCK?.websites || []).slice(0, 6);
+    const sites = (window.MOCK?.websites || []).filter(s => !s.is_deleted).slice(0, 6);
     const pendingCount = (window.MOCK?.approvals || []).filter(a => a.status === "Draft").length;
 
     const navItem = (n) => {
@@ -96,7 +97,7 @@
       <div class="sidebar__footer">
         <div class="dropdown">
           <div class="user-card" data-menu="usermenu">
-            <span class="avatar" style="background:${user.color}">${user.initials}</span>
+            <span class="avatar" style="background:${user.color}">${localStorage.getItem("cadence.settings.avatar") ? `<img src="${localStorage.getItem("cadence.settings.avatar")}" alt="${user.name}">` : user.initials}</span>
             <span class="meta"><span class="nm">${user.name}</span><span class="rl">${role === "super" ? "Super Admin" : "Admin"}</span></span>
             ${I("chevrons-up-down")}
           </div>
@@ -142,7 +143,7 @@
         <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle theme">${I("sun-moon")}</button>
         <div class="dropdown">
           <button class="icon-btn" data-menu="topuser" aria-label="Account" style="width:auto;padding:3px;border-radius:99px">
-            <span class="avatar avatar-sm" style="background:${(role==='super'?window.MOCK.users.super:window.MOCK.users.admin).color}">${(role==='super'?window.MOCK.users.super:window.MOCK.users.admin).initials}</span>
+            <span class="avatar avatar-sm" style="background:${(role==='super'?window.MOCK.users.super:window.MOCK.users.admin).color}">${localStorage.getItem("cadence.settings.avatar") ? `<img src="${localStorage.getItem("cadence.settings.avatar")}" alt="User">` : (role==='super'?window.MOCK.users.super:window.MOCK.users.admin).initials}</span>
           </button>
           <div class="menu" id="topuser">
             <a class="menu-item" href="settings.html">${I("user")}Profile</a>
@@ -290,11 +291,21 @@
     });
   }
 
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
+      reader.readAsText(file);
+    });
+  }
+
   /* ---------- helpers exposed ---------- */
   window.Cadence = {
     store, toast, openModal, closeModal, wireTabs, refreshIcons, mountShell,
     icon: I,
     fmt: (n) => n.toLocaleString("en-US"),
+    readFileAsText
   };
 
   /* ---------- boot ---------- */

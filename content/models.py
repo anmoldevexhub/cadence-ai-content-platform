@@ -71,6 +71,9 @@ class ContentDraft(models.Model):
     generation_prompt = models.TextField(blank=True)  # stored for debugging / regen
     cover_image = models.CharField(max_length=500, blank=True)
     category = models.CharField(max_length=100, blank=True)
+    author_name = models.CharField(max_length=100, blank=True, default="")
+    custom_date = models.CharField(max_length=50, blank=True, default="")
+    is_deleted = models.BooleanField(default=False, help_text="Soft delete flag")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -83,6 +86,14 @@ class ContentDraft(models.Model):
 
     def save(self, *args, **kwargs):
         self.word_count = len(self.body.split())
+        if not self.pk:
+            if not self.author_name:
+                self.author_name = self.website.name
+            if not self.category:
+                self.category = self.website.industry or "Marketing"
+            if not self.custom_date:
+                from django.utils import timezone
+                self.custom_date = timezone.now().strftime("%B %d, %Y")
         super().save(*args, **kwargs)
 
 

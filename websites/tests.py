@@ -272,3 +272,61 @@ class CrawlerScraperTests(TestCase):
                 os.remove(disk_path)
             except Exception:
                 pass
+
+
+from rest_framework.test import APITestCase
+
+
+class WebsiteSoftDeleteAPITests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="testowner@cadence.io",
+            username="testowner",
+            password="testpassword",
+            role="admin"
+        )
+        self.website = Website.objects.create(
+            name="Test Coffee",
+            domain="testcoffee.com",
+            url="https://testcoffee.com",
+            owner=self.user,
+            status="active"
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
+        token = str(RefreshToken.for_user(self.user).access_token)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
+
+    def test_list_excludes_deleted_by_default(self):
+        # Soft delete the site
+        self.website.is_deleted = True
+        self.website.save()
+
+        response = self.client.get('/api/websites/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 0)
+
+    def test_list_includes_deleted_when_trash_param(self):
+        # Soft delete the site
+        self.website.is_deleted = True
+        self.website.save()
+
+        response = self.client.get('/api/websites/?trash=true')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]['id'], self.website.id)
+
+    def test_delete_performs_soft_delete_by_default(self):
+        response = self.client.delete(f'/api/websites/{self.website.id}/')
+        self.assertEqual(response.status_code, 204)
+        
+        self.website.refresh_from_db()
+        self.assertTrue(self.website.is_deleted)
+        # Ensure it is NOT deleted from DB
+        self.assertTrue(Website.objects.filter(id=self.website.id).exists())
+
+    def test_delete_performs_hard_delete_with_hard_param(self):
+        response = self.client.delete(f'/api/websites/{self.website.id}/?hard=true')
+        self.assertEqual(response.status_code, 204)
+        
+        # Ensure it is deleted from DB
+        self.assertFalse(Website.objects.filter(id=self.website.id).exists())

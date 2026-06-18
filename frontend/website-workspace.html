@@ -96,7 +96,16 @@
                 </div>
 
                 <div class="card card-pad">
-                  <div class="row-between mb3"><h3 style="font-size:var(--fs-md)">Idea queue</h3><span class="badge badge-neutral" id="queueCount">3</span></div>
+                  <div class="row-between mb3">
+                    <h3 style="font-size:var(--fs-md)">Idea queue</h3>
+                    <div style="display:flex;align-items:center;gap:var(--s2)">
+                      <span class="badge badge-neutral" id="queueCount">0</span>
+                      <button class="icon-btn btn-sm" id="refreshIdeaQueue" title="Generate new AI suggestions" style="padding:4px 8px;border-radius:var(--radius-sm);display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--accent)">
+                        <i data-lucide="refresh-cw" style="width:13px;height:13px"></i>
+                        <span>Refresh</span>
+                      </button>
+                    </div>
+                  </div>
                   <div class="col gap2" id="ideaQueue"></div>
                 </div>
               </div>
@@ -163,23 +172,42 @@
                 </div>
 
                 <div class="card card-pad mb5">
-                  <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Extracted Style Guide</h3>
-                  <p class="muted tsm mb4">Heuristics-derived pattern cues and writing guidelines.</p>
+                  <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Sample Content Management</h3>
+                  <p class="muted tsm mb4">Manage style samples used as reference. Up to 7 active samples per platform are supported.</p>
+                  
                   <div class="field">
-                    <label class="label">Tone &amp; Sentence Length</label>
-                    <input class="input" id="styleTone" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.8;"/>
+                    <label class="label" for="samplePlatformSelect">Select Platform</label>
+                    <select class="select" id="samplePlatformSelect">
+                      <option value="blog">📝 Blog</option>
+                      <option value="linkedin">💼 LinkedIn</option>
+                      <option value="instagram">📸 Instagram</option>
+                      <option value="youtube">🎥 YouTube</option>
+                      <option value="facebook">👥 Facebook</option>
+                      <option value="twitter">🐦 Twitter/X</option>
+                    </select>
                   </div>
-                  <div class="field">
-                    <label class="label">Heading Pattern</label>
-                    <input class="input" id="styleHeadings" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.8;"/>
+
+                  <div class="divider"></div>
+
+                  <!-- Upload new sample on the fly -->
+                  <div class="card card-pad" style="background:var(--bg-card); margin-bottom:var(--s4); border:1px dashed var(--border-strong);">
+                    <h4 style="font-size:var(--fs-md);margin-bottom:var(--s2)">Upload New Sample</h4>
+                    <div class="field">
+                      <label class="label">Choose File (HTML, TXT, MD)</label>
+                      <input type="file" id="workspaceSampleFile" class="input" style="padding:var(--s1) var(--s2); font-size:var(--fs-sm);" />
+                    </div>
+                    <div class="field">
+                      <label class="label">Title / Label (optional)</label>
+                      <input type="text" id="workspaceSampleTitle" class="input" placeholder="e.g. Autumn promotion post" />
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="uploadWorkspaceSampleBtn" style="margin-top:var(--s2)"><i data-lucide="upload"></i> Upload Sample</button>
                   </div>
-                  <div class="field">
-                    <label class="label">Recurring Vocabulary</label>
-                    <input class="input" id="styleVocab" readonly style="background:var(--bg-card); cursor:not-allowed; opacity:0.8;"/>
-                  </div>
-                  <div class="field" style="margin-bottom:0">
-                    <label class="label">Call to Action (CTA) Examples</label>
-                    <textarea class="textarea" id="styleCTAs" readonly style="background:var(--bg-card); min-height:80px; cursor:not-allowed; opacity:0.8;"></textarea>
+
+                  <div class="divider"></div>
+
+                  <h4 style="font-size:var(--fs-md);margin-bottom:var(--s3)">Active Reference Samples</h4>
+                  <div class="sample-manager-list" id="sampleManagerList" style="display:flex; flex-direction:column; gap:var(--s3)">
+                    <!-- Dynamically populated -->
                   </div>
                 </div>
                 <div class="card card-pad">
@@ -198,7 +226,7 @@
                 <div class="card card-pad" style="border-color:var(--error-soft)">
                   <h3 style="font-size:var(--fs-lg);color:var(--error);margin-bottom:4px">Danger zone</h3>
                   <p class="muted tsm mb4">Pausing stops all scheduled posting. Removing deletes all content.</p>
-                  <div class="row gap2"><button class="btn btn-secondary"><i data-lucide="pause"></i> Pause website</button><button class="btn btn-danger" onclick="Cadence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button></div>
+                  <div class="row gap2"><button class="btn btn-secondary" id="pauseSiteBtn"><i data-lucide="pause"></i> Pause website</button><button class="btn btn-danger" onclick="Cadence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button></div>
                 </div>
               </div>
             </div>
@@ -213,9 +241,97 @@
   <div class="modal-overlay" id="editModal">
     <div class="modal lg">
       <div class="modal__head"><div class="mtxt"><h3>Edit draft</h3><div class="sub" id="editSub">Make changes before approving</div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
-      <div class="modal__body">
-        <div class="field"><label class="label">Title</label><input class="input" id="editTitle" /></div>
-        <div class="field" style="margin-bottom:0"><label class="label">Content</label><textarea class="textarea" id="editBody" style="min-height:200px"></textarea></div>
+      <div class="modal__body editor-modal-body" style="padding:0">
+        <div class="editor-layout">
+          <!-- Editor Main Area (Left) -->
+          <div class="editor-main">
+            <div class="field">
+              <label class="label">Title</label>
+              <input class="input editor-title-input" id="editTitle" placeholder="Enter post title..." />
+            </div>
+            
+            <div class="field" style="display:flex; flex-direction:column; flex:1; margin-bottom:0;">
+              <label class="label">Body Content</label>
+              <div class="rich-editor">
+                <div class="rich-toolbar" id="editorToolbar">
+                  <button type="button" class="tb-btn" data-cmd="bold" title="Bold"><i data-lucide="bold"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="italic" title="Italic"><i data-lucide="italic"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="underline" title="Underline"><i data-lucide="underline"></i></button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" data-block="h2" title="Heading 1" style="font-weight:bold; font-size:12px;">H1</button>
+                  <button type="button" class="tb-btn" data-block="h3" title="Heading 2" style="font-weight:bold; font-size:10px;">H2</button>
+                  <button type="button" class="tb-btn" data-block="p" title="Paragraph" style="font-size:11px;">P</button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" id="tb-forecolor-btn" title="Text Color" style="position:relative;">
+                    <i data-lucide="palette"></i>
+                    <input type="color" id="tb-forecolor" value="#111827" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer;" />
+                  </button>
+                  <button type="button" class="tb-btn" id="tb-backcolor-btn" title="Highlight Color" style="position:relative;">
+                    <i data-lucide="highlighter"></i>
+                    <input type="color" id="tb-backcolor" value="#ffffff" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer;" />
+                  </button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet List"><i data-lucide="list"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered List"><i data-lucide="list-ordered"></i></button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" id="tb-link" title="Insert Link"><i data-lucide="link"></i></button>
+                  <button type="button" class="tb-btn" id="tb-image" title="Insert Inline Image"><i data-lucide="image"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="unlink" title="Remove Link"><i data-lucide="link-2-off"></i></button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear Formatting"><i data-lucide="remove-formatting"></i></button>
+                </div>
+                <div class="rich-content" contenteditable="true" id="editBodyRich" placeholder="Write your post here..."></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Editor Settings Panel (Right) -->
+          <div class="editor-sidebar">
+            <!-- Cover Image section -->
+            <div class="sidebar-card">
+              <h4>Cover Image</h4>
+              <div class="editor-cover-preview" id="editCoverPreview">
+                <i data-lucide="image" class="muted" style="width:32px;height:32px"></i>
+              </div>
+              <div class="field mt3">
+                <label class="label txs">Image URL</label>
+                <input class="input input-sm" id="editCoverUrl" placeholder="https://example.com/image.jpg" />
+              </div>
+              <div class="row gap2 mt2">
+                <button type="button" class="btn btn-secondary btn-sm" id="uploadCoverBtn" style="flex:1">Upload</button>
+                <input type="file" id="editCoverFile" accept="image/*" style="display:none" />
+                <input type="file" id="inlineImageFile" accept="image/*" style="display:none" />
+                <button type="button" class="btn btn-ghost btn-sm text-danger" id="removeCoverBtn">Remove</button>
+              </div>
+            </div>
+            
+            <!-- Metadata Settings section -->
+            <div class="sidebar-card">
+              <h4>Post Metadata</h4>
+              <div class="field">
+                <label class="label txs">Author Name</label>
+                <input class="input input-sm" id="editAuthor" placeholder="e.g. Devex Hub" />
+              </div>
+              <div class="field mt2">
+                <label class="label txs">Publish Date</label>
+                <input class="input input-sm" id="editDate" placeholder="e.g. June 1, 2026" />
+              </div>
+              <div class="field mt2">
+                <label class="label txs">Category</label>
+                <input class="input input-sm" id="editCategory" placeholder="e.g. Marketing" />
+              </div>
+            </div>
+            
+            <!-- Tags & Style section -->
+            <div class="sidebar-card">
+              <h4>Tags &amp; Styling</h4>
+              <div class="tag-input-wrap">
+                <input class="input input-sm" id="newTagInput" placeholder="Add tag and press Enter..." />
+              </div>
+              <div id="tagsList" class="editor-tags-list mt3"></div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="saveEdit"><i data-lucide="check"></i> Save changes</button></div>
     </div>
@@ -225,7 +341,7 @@
   <div class="modal-overlay" id="delModal">
     <div class="modal">
       <div class="modal__head"><span class="icon-tile" style="background:var(--error-soft);color:var(--error)"><i data-lucide="alert-triangle"></i></span><div class="mtxt"><h3>Remove this website?</h3><div class="sub">This deletes all drafts, schedules and published history. This can't be undone.</div></div></div>
-      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-danger" data-close-modal onclick="Cadence.toast({type:'success',title:'Website removed'})">Remove website</button></div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-danger" id="confirmDeleteSiteBtn" data-close-modal>Remove website</button></div>
     </div>
   </div>
 

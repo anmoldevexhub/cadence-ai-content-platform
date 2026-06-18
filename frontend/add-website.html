@@ -113,9 +113,105 @@
               </div>
             </div>
 
+            <!-- Sample Upload Sections -->
+            <div class="card card-pad mb5">
+              <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Sample Content (Optional but Recommended)</h3>
+              <p class="muted tsm mb4">Upload 5-7 examples of your best content for each platform. This helps AI match your brand voice perfectly.</p>
+              
+              <!-- Blog Samples -->
+              <div class="sample-upload-section mb4" data-platform="blog">
+                <div class="row-between mb3">
+                  <div><h4 style="font-size:var(--fs-md)">📝 Blog Samples</h4><span class="muted tsm">Upload 5-7 blog posts (HTML, TXT, MD)</span></div>
+                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="blog">+ Add Sample</button>
+                </div>
+                <div class="sample-list" id="blog-samples">
+                  <div class="sample-item">
+                    <input type="file" accept=".html,.txt,.md" class="sample-file-input" data-platform="blog" />
+                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="blog" />
+                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- LinkedIn Samples -->
+              <div class="sample-upload-section mb4" data-platform="linkedin">
+                <div class="row-between mb3">
+                  <div><h4 style="font-size:var(--fs-md)">💼 LinkedIn Samples</h4><span class="muted tsm">Upload LinkedIn posts (TXT)</span></div>
+                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="linkedin">+ Add Sample</button>
+                </div>
+                <div class="sample-list" id="linkedin-samples">
+                  <div class="sample-item">
+                    <input type="file" accept=".txt" class="sample-file-input" data-platform="linkedin" />
+                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="linkedin" />
+                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Instagram Samples -->
+              <div class="sample-upload-section mb4" data-platform="instagram">
+                <div class="row-between mb3">
+                  <div><h4 style="font-size:var(--fs-md)">📸 Instagram Samples</h4><span class="muted tsm">Upload Instagram captions (TXT)</span></div>
+                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="instagram">+ Add Sample</button>
+                </div>
+                <div class="sample-list" id="instagram-samples">
+                  <div class="sample-item">
+                    <input type="file" accept=".txt" class="sample-file-input" data-platform="instagram" />
+                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="instagram" />
+                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- YouTube Samples -->
+              <div class="sample-upload-section mb4" data-platform="youtube">
+                <div class="row-between mb3">
+                  <div><h4 style="font-size:var(--fs-md)">🎥 YouTube Samples</h4><span class="muted tsm">Upload YouTube descriptions (TXT)</span></div>
+                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="youtube">+ Add Sample</button>
+                </div>
+                <div class="sample-list" id="youtube-samples">
+                  <div class="sample-item">
+                    <input type="file" accept=".txt" class="sample-file-input" data-platform="youtube" />
+                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="youtube" />
+                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Facebook Samples -->
+              <div class="sample-upload-section mb4" data-platform="facebook">
+                <div class="row-between mb3">
+                  <div><h4 style="font-size:var(--fs-md)">👥 Facebook Samples</h4><span class="muted tsm">Upload Facebook posts (TXT)</span></div>
+                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="facebook">+ Add Sample</button>
+                </div>
+                <div class="sample-list" id="facebook-samples">
+                  <div class="sample-item">
+                    <input type="file" accept=".txt" class="sample-file-input" data-platform="facebook" />
+                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="facebook" />
+                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Twitter Samples -->
+              <div class="sample-upload-section" data-platform="twitter">
+                <div class="row-between mb3">
+                  <div><h4 style="font-size:var(--fs-md)">🐦 Twitter/X Samples</h4><span class="muted tsm">Upload Twitter threads/posts (TXT)</span></div>
+                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="twitter">+ Add Sample</button>
+                </div>
+                <div class="sample-list" id="twitter-samples">
+                  <div class="sample-item">
+                    <input type="file" accept=".txt" class="sample-file-input" data-platform="twitter" />
+                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="twitter" />
+                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="row-between">
               <a class="btn btn-ghost" href="dashboard.html"><i data-lucide="arrow-left"></i> Cancel</a>
-              <button class="btn btn-primary btn-lg" type="submit"><i data-lucide="radar"></i> Crawl &amp; continue</button>
+              <button class="btn btn-primary btn-lg" type="submit"><i data-lucide="save"></i> Save Samples &amp; Continue</button>
             </div>
           </form>
         </section>
@@ -334,6 +430,72 @@
       }
     }
 
+    function createSampleItem(platform) {
+      const div = document.createElement("div");
+      div.className = "sample-item";
+      div.innerHTML = `
+        <input type="file" accept=".html,.txt,.md" class="sample-file-input" data-platform="${platform}" />
+        <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="${platform}" />
+        <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
+      `;
+      div.querySelector(".remove-sample-btn").addEventListener("click", () => div.remove());
+      return div;
+    }
+
+    document.querySelectorAll(".add-sample-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const platform = btn.dataset.platform;
+        const list = document.getElementById(`${platform}-samples`);
+        if (list) {
+          list.appendChild(createSampleItem(platform));
+        }
+      });
+    });
+
+    document.querySelectorAll(".remove-sample-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        btn.closest(".sample-item").remove();
+      });
+    });
+
+    async function handleSampleUpload(websiteId) {
+      const promises = [];
+      document.querySelectorAll('.sample-upload-section').forEach(section => {
+        const platform = section.dataset.platform;
+        const items = section.querySelectorAll('.sample-item');
+        
+        items.forEach(item => {
+          const fileInput = item.querySelector('.sample-file-input');
+          const titleInput = item.querySelector('.sample-title-input');
+          
+          if (fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            const title = titleInput.value || '';
+            const promise = window.Cadence.readFileAsText(file).then(async (content) => {
+              await CadenceAPI.addSample(websiteId, {
+                platform: platform,
+                title: title,
+                content: content,
+                file_name: file.name
+              });
+            }).catch(err => {
+              console.error("Failed to read file", file.name, err);
+            });
+            promises.push(promise);
+          }
+        });
+      });
+      if (promises.length > 0) {
+        addLogMessage("Uploading style reference samples...", "loader-circle", true);
+        await Promise.all(promises);
+        addLogMessage("Samples uploaded successfully!", "check-circle-2", false, "var(--success)");
+        return true;
+      }
+      return false;
+    }
+
     // STEP 1 submit
     document.getElementById("siteForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -351,24 +513,57 @@
       domain = url.value.trim().replace(/^https?:\/\//, "");
       siteName = name.value.trim();
       document.getElementById("crawlDomain").textContent = domain;
-      setStep(2); 
 
-      try {
-        const log = document.getElementById("crawlLog");
-        log.innerHTML = "";
-        addLogMessage("Creating website draft record...", "loader-circle", true);
-        const urlStr = url.value.trim().startsWith('http') ? url.value.trim() : 'https://' + url.value.trim();
-        const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, "General", "Professional", []);
-        createdSiteId = site.id;
+      const hasSamples = Array.from(document.querySelectorAll('.sample-file-input')).some(input => input.files && input.files[0]);
+
+      if (hasSamples) {
+        // Show loading state on the button
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i data-lucide="loader-circle" class="spin"></i> Saving...`;
+        lucide.createIcons();
         
-        addLogMessage("Website record created. Initiating crawler...", "check-circle-2", false, "var(--success)");
-        await CadenceAPI.triggerCrawl(site.id);
-        addLogMessage("Crawl request dispatched. Running page crawler...", "loader-circle", true);
-        runCrawlPolling(site.id);
-      } catch (err) {
-        console.error("Onboarding setup failed:", err);
-        addLogMessage("Onboarding setup failed: " + err.message, "x-circle", false, "var(--danger)");
-        C.toast({ type: "error", title: "Failed to initiate crawl", desc: err.message });
+        try {
+          const urlStr = url.value.trim().startsWith('http') ? url.value.trim() : 'https://' + url.value.trim();
+          const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, "General", "Professional", [], true);
+          createdSiteId = site.id;
+          
+          await handleSampleUpload(site.id);
+          
+          // Set status to active directly
+          await CadenceAPI.updateWebsite(site.id, { status: 'active' });
+          await M.syncMockData();
+          
+          C.toast({ type: "success", title: `${siteName} added`, desc: "Opening the workspace…" });
+          setTimeout(() => location.href = `website-workspace.html?site=${site.id}`, 1100);
+        } catch (err) {
+          console.error("Save website & samples failed:", err);
+          C.toast({ type: "error", title: "Failed to add website", desc: err.message });
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnText;
+          lucide.createIcons();
+        }
+      } else {
+        setStep(2); 
+
+        try {
+          const log = document.getElementById("crawlLog");
+          log.innerHTML = "";
+          addLogMessage("Creating website draft record...", "loader-circle", true);
+          const urlStr = url.value.trim().startsWith('http') ? url.value.trim() : 'https://' + url.value.trim();
+          const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, "General", "Professional", [], false);
+          createdSiteId = site.id;
+          
+          addLogMessage("Website record created. Initiating crawler...", "check-circle-2", false, "var(--success)");
+          await CadenceAPI.triggerCrawl(site.id);
+          addLogMessage("Crawl request dispatched. Running page crawler...", "loader-circle", true);
+          runCrawlPolling(site.id);
+        } catch (err) {
+          console.error("Onboarding setup failed:", err);
+          addLogMessage("Onboarding setup failed: " + err.message, "x-circle", false, "var(--danger)");
+          C.toast({ type: "error", title: "Failed to initiate crawl", desc: err.message });
+        }
       }
     });
 

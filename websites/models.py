@@ -35,6 +35,7 @@ class Website(models.Model):
         default='pending'
     )
     last_crawled = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False, help_text="Soft delete flag")
 
     class Meta:
         ordering = ['-created_at']
@@ -104,3 +105,32 @@ class ScrapeResult(models.Model):
     
     class Meta:
         ordering = ['-crawled_at']
+
+
+class SampleContent(models.Model):
+    """User-uploaded sample content for style reference."""
+    PLATFORM_CHOICES = [
+        ('blog', 'Blog'),
+        ('linkedin', 'LinkedIn'),
+        ('instagram', 'Instagram'),
+        ('youtube', 'YouTube'),
+        ('facebook', 'Facebook'),
+        ('twitter', 'Twitter/X'),
+    ]
+    
+    website = models.ForeignKey('Website', on_delete=models.CASCADE, related_name='samples')
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    title = models.CharField(max_length=500, blank=True, help_text="Optional title or headline")
+    content = models.TextField(help_text="Full content of the sample post")
+    file_name = models.CharField(max_length=255, blank=True, help_text="Original file name if uploaded")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True, help_text="Enable/disable this sample")
+    
+    class Meta:
+        ordering = ['-uploaded_at']
+        indexes = [
+            models.Index(fields=['website', 'platform', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.website.name} - {self.platform} - {self.file_name or self.id}"

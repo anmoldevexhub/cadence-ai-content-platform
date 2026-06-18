@@ -217,14 +217,17 @@
     },
 
     // Websites endpoints
-    async getWebsites() {
-      return await request('/websites/');
+    async getWebsites(filters = {}) {
+      const q = new URLSearchParams();
+      if (filters.trash) q.append('trash', 'true');
+      const queryStr = q.toString() ? ('?' + q.toString()) : '';
+      return await request(`/websites/${queryStr}`);
     },
 
-    async addWebsite(name, domain, url, industry, tone, topics) {
+    async addWebsite(name, domain, url, industry, tone, topics, hasSamples = false) {
       return await request('/websites/', {
         method: 'POST',
-        body: JSON.stringify({ name, domain, url, industry, tone, topics, status: 'draft' })
+        body: JSON.stringify({ name, domain, url, industry, tone, topics, status: 'draft', has_samples: hasSamples })
       });
     },
 
@@ -235,8 +238,9 @@
       });
     },
 
-    async deleteWebsite(id) {
-      return await request(`/websites/${id}/`, {
+    async deleteWebsite(id, hard = false) {
+      const query = hard ? '?hard=true' : '';
+      return await request(`/websites/${id}/${query}`, {
         method: 'DELETE'
       });
     },
@@ -259,6 +263,30 @@
       return await request(`/websites/${id}/pages/`);
     },
 
+    async getSamples(id) {
+      return await request(`/websites/${id}/samples/`);
+    },
+
+    async addSample(websiteId, data) {
+      return await request(`/websites/${websiteId}/samples/`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async updateSample(websiteId, sampleId, data) {
+      return await request(`/websites/${websiteId}/samples/${sampleId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async deleteSample(websiteId, sampleId) {
+      return await request(`/websites/${websiteId}/samples/${sampleId}/`, {
+        method: 'DELETE'
+      });
+    },
+
     async getSocialConnections(id) {
       return await request(`/websites/${id}/social/`);
     },
@@ -276,9 +304,17 @@
       if (filters.website) q.append('website', filters.website);
       if (filters.status) q.append('status', filters.status);
       if (filters.platform) q.append('platform', filters.platform);
+      if (filters.trash) q.append('trash', 'true');
       
       const queryStr = q.toString() ? ('?' + q.toString()) : '';
       return await request(`/content/drafts/${queryStr}`);
+    },
+
+    async deleteDraft(id, hard = false) {
+      const query = hard ? '?hard=true' : '';
+      return await request(`/content/drafts/${id}/${query}`, {
+        method: 'DELETE'
+      });
     },
 
     async getScheduledPosts(websiteId) {
@@ -288,6 +324,18 @@
 
     async getApprovalsQueue() {
       return await request('/content/approvals/');
+    },
+
+    async getContentIdeas(websiteId) {
+      const queryStr = websiteId ? `?website=${websiteId}` : '';
+      return await request(`/content/ideas/${queryStr}`);
+    },
+
+    async getIdeaSuggestions(websiteId) {
+      return await request(`/content/suggestions/?website=${websiteId}`, {
+        method: 'POST',
+        body: JSON.stringify({ website: websiteId })
+      });
     },
 
     async submitIdea(websiteId, title, platform) {
@@ -459,7 +507,10 @@
             body: d.body,
             tags: d.tags || [],
             cover_image: d.cover_image,
-            category: d.category
+            category: d.category,
+            author_name: d.author_name,
+            custom_date: d.custom_date,
+            created_at: d.created_at
           };
         });
 

@@ -4,7 +4,7 @@
 (function () {
   const C = window.Cadence, M = window.MOCK, I = C.icon;
   const params = new URLSearchParams(location.search);
-  const site = M.site(params.get("site")) || M.websites[0];
+  let site = M.site(params.get("site")) || M.websites[0];
 
   /* ---------- hero ---------- */
   document.getElementById("bcName").textContent = site.name;
@@ -209,15 +209,189 @@
     });
   }
 
-  /* ---------- style guide population ---------- */
-  function populateStyleGuideFields() {
-    const guide = site.style_guide || {};
-    document.getElementById("styleTone").value = (guide.primary_tone || "Pending crawl...") + (guide.average_sentence_length ? ` (Avg: ${guide.average_sentence_length})` : "");
-    document.getElementById("styleHeadings").value = guide.heading_pattern || "Pending crawl...";
-    document.getElementById("styleVocab").value = (guide.recurring_vocabulary && guide.recurring_vocabulary.length) ? guide.recurring_vocabulary.join(", ") : "Pending crawl...";
-    document.getElementById("styleCTAs").value = (guide.call_to_action_examples && guide.call_to_action_examples.length) ? guide.call_to_action_examples.join("\n") : "Pending crawl...";
+  /* ---------- Pause/Resume & Delete Website ---------- */
+  const pauseBtn = document.getElementById("pauseSiteBtn");
+  if (pauseBtn) {
+    function updatePauseBtnState() {
+      if (site.status === "Paused") {
+        pauseBtn.innerHTML = `${I("play")} Resume website`;
+      } else {
+        pauseBtn.innerHTML = `${I("pause")} Pause website`;
+      }
+      C.refreshIcons();
+    }
+    updatePauseBtnState();
+
+    pauseBtn.addEventListener("click", async () => {
+      const nextStatus = site.status === "Paused" ? "active" : "paused";
+      pauseBtn.disabled = true;
+      try {
+        await CadenceAPI.updateWebsite(site.id, { status: nextStatus });
+        await window.MOCK.syncMockData(site.id);
+        site = window.MOCK.site(site.id);
+        
+        // update status badge
+        const [sc, si, st] = statusMap[site.status] || statusMap.Active;
+        document.getElementById("wsStatus").innerHTML = `<span class="badge ${sc}">${I(si)} ${st}</span>`;
+        
+        updatePauseBtnState();
+        C.toast({ type: "success", title: nextStatus === "paused" ? "Website paused" : "Website resumed" });
+      } catch (err) {
+        C.toast({ type: "error", title: "Action failed", desc: err.message });
+      } finally {
+        pauseBtn.disabled = false;
+      }
+    });
   }
-  populateStyleGuideFields();
+
+  const confirmDeleteSiteBtn = document.getElementById("confirmDeleteSiteBtn");
+  if (confirmDeleteSiteBtn) {
+    confirmDeleteSiteBtn.addEventListener("click", async () => {
+      confirmDeleteSiteBtn.disabled = true;
+      try {
+        await CadenceAPI.deleteWebsite(site.id);
+        C.toast({ type: "success", title: "Website removed", desc: "Successfully moved to Trash." });
+        setTimeout(() => {
+          window.location.href = "dashboard.html";
+        }, 1000);
+      } catch (err) {
+        C.toast({ type: "error", title: "Delete failed", desc: err.message });
+        confirmDeleteSiteBtn.disabled = false;
+      }
+    });
+  }
+
+  /* ---------- Sample Content Management ---------- */
+  let currentSamples = [];
+
+  async function loadSamples() {
+    try {
+      currentSamples = await CadenceAPI.getSamples(site.id);
+      renderSamplesList();
+    } catch (err) {
+      console.error("Failed to load samples:", err);
+    }
+  }
+
+  function renderSamplesList() {
+    const listEl = document.getElementById("sampleManagerList");
+    if (!listEl) return;
+    
+    const platform = document.getElementById("samplePlatformSelect").value;
+    const filtered = currentSamples.filter(s => s.platform === platform);
+    
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div class="muted tsm" style="text-align:center;padding:var(--s4)">No samples uploaded for this platform yet.</div>`;
+      return;
+    }
+    
+    listEl.innerHTML = filtered.map(s => `
+      <div class="row-between p3" style="background:var(--bg-subtle); border-radius:8px; border:1px solid var(--border);">
+        <div class="col" style="flex:1; margin-right:var(--s3);">
+          <strong style="font-size:var(--fs-sm)">${s.title || s.file_name || 'Untitled Sample'}</strong>
+          <div class="muted txs" style="margin-top:2px">${s.file_name || 'Text entry'} · ${new Date(s.uploaded_at).toLocaleDateString()}</div>
+        </div>
+        <div class="row gap3" style="align-items:center">
+          <label class="switch" title="Toggle active status">
+            <input type="checkbox" data-sample-id="${s.id}" class="sample-active-toggle" ${s.is_active ? 'checked' : ''} />
+            <span class="track"></span>
+          </label>
+          <button type="button" class="icon-btn btn-sm delete-sample-btn" data-sample-id="${s.id}" title="Delete sample" style="color:var(--error)">
+            ${I("trash-2", "style='width:14px;height:14px'")}
+          </button>
+        </div>
+      </div>
+    `).join("");
+    
+    C.refreshIcons();
+    wireSampleActions();
+  }
+
+  function wireSampleActions() {
+    document.querySelectorAll(".sample-active-toggle").forEach(cb => {
+      cb.addEventListener("change", async () => {
+        const id = cb.dataset.sampleId;
+        const isActive = cb.checked;
+        try {
+          await CadenceAPI.updateSample(site.id, id, { is_active: isActive });
+          const sample = currentSamples.find(s => String(s.id) === String(id));
+          if (sample) sample.is_active = isActive;
+          C.toast({ type: "success", title: "Status updated", desc: `Sample is now ${isActive ? 'active' : 'inactive'}.` });
+        } catch (err) {
+          cb.checked = !isActive;
+          C.toast({ type: "error", title: "Update failed", desc: err.message });
+        }
+      });
+    });
+
+    document.querySelectorAll(".delete-sample-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.sampleId;
+        if (!confirm("Are you sure you want to delete this sample?")) return;
+        try {
+          await CadenceAPI.deleteSample(site.id, id);
+          currentSamples = currentSamples.filter(s => String(s.id) !== String(id));
+          renderSamplesList();
+          C.toast({ type: "success", title: "Sample deleted" });
+        } catch (err) {
+          C.toast({ type: "error", title: "Delete failed", desc: err.message });
+        }
+      });
+    });
+  }
+
+  // Bind dropdown change
+  const selectEl = document.getElementById("samplePlatformSelect");
+  if (selectEl) {
+    selectEl.addEventListener("change", renderSamplesList);
+  }
+
+  // Bind upload button
+  const uploadBtn = document.getElementById("uploadWorkspaceSampleBtn");
+  if (uploadBtn) {
+    uploadBtn.addEventListener("click", async () => {
+      const fileInput = document.getElementById("workspaceSampleFile");
+      const titleInput = document.getElementById("workspaceSampleTitle");
+      const platform = document.getElementById("samplePlatformSelect").value;
+      
+      if (!fileInput.files || !fileInput.files[0]) {
+        C.toast({ type: "error", title: "No file selected", desc: "Please choose a sample file first." });
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      const title = titleInput.value.trim();
+      
+      uploadBtn.disabled = true;
+      const originalText = uploadBtn.innerHTML;
+      uploadBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Uploading...`;
+      C.refreshIcons();
+      
+      try {
+        const content = await window.Cadence.readFileAsText(file);
+        const newSample = await CadenceAPI.addSample(site.id, {
+          platform: platform,
+          title: title,
+          content: content,
+          file_name: file.name
+        });
+        
+        currentSamples.unshift(newSample);
+        fileInput.value = "";
+        titleInput.value = "";
+        renderSamplesList();
+        C.toast({ type: "success", title: "Sample uploaded", desc: `Successfully added reference for ${platform}.` });
+      } catch (err) {
+        C.toast({ type: "error", title: "Upload failed", desc: err.message });
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = originalText;
+        C.refreshIcons();
+      }
+    });
+  }
+
+  loadSamples();
 
   /* ---------- crawl action ---------- */
   const crawlBtn = document.getElementById("crawlBtn");
@@ -297,25 +471,72 @@
     document.querySelectorAll(".chan").forEach(x => x.classList.remove("active")); b.classList.add("active"); curChan = b.dataset.chan;
   }));
 
-  const ideaQueue = [
-    { chan: "Blog", title: "How to store coffee beans for peak freshness" },
-    { chan: "Instagram", title: "Behind the roast: a 15-second reel" },
-    { chan: "LinkedIn", title: "Why we switched to compostable bags" },
-  ];
+  let ideaQueue = [];
+  let ideaQueueLoading = false;
+
+  async function loadIdeaQueue(showLoader = true) {
+    if (ideaQueueLoading) return;
+    ideaQueueLoading = true;
+    const refreshBtn = document.getElementById("refreshIdeaQueue");
+    if (refreshBtn) {
+      refreshBtn.disabled = true;
+      refreshBtn.querySelector("i").style.animation = "spin 1s linear infinite";
+    }
+    if (showLoader) {
+      document.getElementById("ideaQueue").innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:var(--s2)">
+          ${[1,2,3,4].map(() => `<div style="height:38px;border-radius:var(--radius-sm);background:var(--surface2);animation:pulse 1.5s ease-in-out infinite;opacity:0.6"></div>`).join("")}
+        </div>`;
+      document.getElementById("queueCount").textContent = "…";
+    }
+    try {
+      const suggestions = await CadenceAPI.getIdeaSuggestions(site.id) || [];
+      ideaQueue = suggestions.map(s => ({
+        chan: s.platform.charAt(0).toUpperCase() + s.platform.slice(1),
+        title: s.title,
+        reason: s.reason || ""
+      }));
+      renderQueue();
+    } catch (err) {
+      console.error("Failed to load idea queue:", err);
+      document.getElementById("ideaQueue").innerHTML = `<div class="muted tsm" style="text-align:center;padding:var(--s4)">Failed to load suggestions. Try refreshing.</div>`;
+      document.getElementById("queueCount").textContent = "0";
+    } finally {
+      ideaQueueLoading = false;
+      if (refreshBtn) {
+        refreshBtn.disabled = false;
+        refreshBtn.querySelector("i").style.animation = "";
+      }
+    }
+  }
+
   function renderQueue() {
     document.getElementById("queueCount").textContent = ideaQueue.length;
     document.getElementById("ideaQueue").innerHTML = ideaQueue.length ? ideaQueue.map((q, i) => { const p = M.platMeta(q.chan);
-      return `<div class="idea-q"><span class="icon-tile tile-${p.tile} iq-ic">${I(p.icon,"style='width:14px;height:14px'")}</span>
-        <span class="iq-t">${q.title}</span><button class="icon-btn btn-sm" data-q="${i}" title="Generate this">${I("sparkles","style='width:15px;height:15px'")}</button></div>`;
-    }).join("") : `<div class="muted tsm" style="text-align:center;padding:var(--s4)">Queue is empty</div>`;
+      return `<div class="idea-q" title="${q.reason ? q.reason.replace(/"/g, '&quot;') : ''}" style="position:relative"><span class="icon-tile tile-${p.tile} iq-ic">${I(p.icon,"style='width:14px;height:14px'")}</span>
+        <span class="iq-t">${q.title}</span><button class="icon-btn btn-sm" data-q="${i}" title="Use this suggestion">${I("sparkles","style='width:15px;height:15px'")}</button></div>`;
+    }).join("") : `<div class="muted tsm" style="text-align:center;padding:var(--s4)">Click Refresh to generate AI suggestions for your brand.</div>`;
     C.refreshIcons();
     document.querySelectorAll("[data-q]").forEach(b => b.addEventListener("click", () => {
-      const q = ideaQueue[+b.dataset.q]; document.getElementById("ideaTitle").value = q.title; curChan = q.chan;
+      const q = ideaQueue[+b.dataset.q];
+      const titleInput = document.getElementById("ideaTitle");
+      if (titleInput) {
+        titleInput.value = q.title;
+        titleInput.focus();
+      }
+      curChan = q.chan;
       document.querySelectorAll(".chan").forEach(x => x.classList.toggle("active", x.dataset.chan === q.chan));
-      startGenerate();
     }));
   }
-  renderQueue();
+
+  // Wire up the Refresh button
+  const refreshIdeaQueueBtn = document.getElementById("refreshIdeaQueue");
+  if (refreshIdeaQueueBtn) {
+    refreshIdeaQueueBtn.addEventListener("click", () => loadIdeaQueue(true));
+  }
+
+  loadIdeaQueue();
+
 
   /* ----- sample generated bodies ----- */
   const SAMPLE = {
@@ -325,7 +546,7 @@
     YouTube: { title: "Roasting at home: light vs. medium vs. dark (same beans)", dur: "8:42", desc: "We roasted the same Ethiopian beans three ways so you don't have to guess." },
   };
 
-  function previewHTML(plat, title, body, coverImage) {
+  function previewHTML(plat, title, body, coverImage, tags, category, createdAt, authorName, customDate) {
     const guide = site.style_guide || {};
     const primaryFont = guide.primary_font ? guide.primary_font : 'inherit';
     const headingFont = guide.heading_font ? guide.heading_font : primaryFont;
@@ -444,12 +665,70 @@
         const b = body || SAMPLE.Blog;
         blogBody = (b.body || []).map(p => `<p>${p}</p>`).join("");
       }
+      let tagsHTML = "";
+      if (tags && tags.length > 0) {
+        tagsHTML = `<div class="editor-tags-list mt4" style="border-top:1px solid var(--border); padding-top:var(--s3); margin-top:var(--s4); display:flex; flex-wrap:wrap; gap:6px;">` +
+          tags.map(t => {
+            const parts = t.split(':');
+            const name = parts[0];
+            const style = parts[1] || 'neutral';
+            let styleClass = 'badge-neutral';
+            if (style === 'primary') styleClass = 'badge-primary';
+            else if (style === 'success') styleClass = 'badge-success';
+            else if (style === 'danger') styleClass = 'badge-error';
+            else if (style === 'warning') styleClass = 'badge-scheduled';
+            return `<span class="badge ${styleClass}" style="text-transform:uppercase;font-size:10px">${name}</span>`;
+          }).join(" ") + `</div>`;
+      }
       const coverStyle = coverImage ? ` style="background-image: url('${coverImage}'); background-size: cover; background-position: center; border: none; height: 220px;"` : '';
       const coverContent = coverImage ? '' : I("image","style='width:28px;height:28px'");
+
+      const dateObj = createdAt ? new Date(createdAt) : new Date();
+      const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      
+      const displayAuthor = authorName !== undefined ? authorName : site.name;
+      const displayDate = customDate !== undefined ? customDate : formattedDate;
+      const displayCategory = category !== undefined ? category : (site.industry || "Marketing");
+
+      let bylineItems = [];
+      if (displayAuthor) {
+        bylineItems.push(`
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            ${I("user", "style='width:14px;height:14px;color:var(--text-muted)'")} By: ${displayAuthor}
+          </span>
+        `);
+      }
+      if (displayDate) {
+        bylineItems.push(`
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            ${I("calendar", "style='width:14px;height:14px;color:var(--text-muted)'")} ${displayDate}
+          </span>
+        `);
+      }
+      if (displayCategory) {
+        bylineItems.push(`
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            ${I("folder", "style='width:14px;height:14px;color:var(--text-muted)'")} ${displayCategory}
+          </span>
+        `);
+      }
+      bylineItems.push(`
+        <span style="display: inline-flex; align-items: center; gap: 4px;">
+          ${I("message-square", "style='width:14px;height:14px;color:var(--text-muted)'")} 0 Comments
+        </span>
+      `);
+
+      const bylineHTML = bylineItems.length > 0 
+        ? `<div class="bp-byline" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin: var(--s2) 0 var(--s4) 0;">` +
+          bylineItems.join(`<span style="color: var(--border)">/</span>`) +
+          `</div>`
+        : '';
+
       return `<div class="bp preview-wrapper-${site.id}"><div class="bp-kicker">Article</div><h2>${title}</h2>
-        <div class="bp-byline"><span class="avatar avatar-sm" style="background:${site.color}">${site.short}</span> ${site.name} · 5 min read</div>
+        ${bylineHTML}
         <div class="bp-cover"${coverStyle}>${coverContent}</div>
-        ${blogBody}</div>`;
+        ${blogBody}
+        ${tagsHTML}</div>`;
     }
     if (plat === "LinkedIn") {
       const txt = (typeof body === "string" ? body : SAMPLE.LinkedIn);
@@ -497,7 +776,7 @@
       <div class="draft__head"><span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
         <div class="d-meta"><div class="d-title">${d.title}</div><div class="d-sub">${d.chan} · AI draft ${statusPill(d.status)}</div></div>
         <button class="icon-btn btn-sm" data-act="more" data-id="${d.id}">${I("more-vertical")}</button></div>
-      <div class="draft__body">${previewHTML(d.chan, d.title, d.body, d.cover_image)}</div>
+      <div class="draft__body">${previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date)}</div>
       <div class="draft__foot">${actions}</div></div>`;
   }
 
@@ -559,7 +838,18 @@
           openEdit(d);
         }
         else if (act === "more") {
-          C.toast({ type: "info", title: "Duplicate · Move · Delete" });
+          if (confirm("Move this draft to trash?")) {
+            try {
+              await CadenceAPI.deleteDraft(d.id);
+              drafts = drafts.filter(x => x.id !== id);
+              C.toast({ type: "success", title: "Draft moved to trash" });
+              await M.syncMockData(site.id);
+              if (C.mountShell) C.mountShell();
+              renderDrafts();
+            } catch (err) {
+              C.toast({ type: "error", title: "Delete failed", desc: err.message });
+            }
+          }
         }
       });
     });
@@ -605,6 +895,7 @@
       filter = "all";
       document.querySelectorAll("#draftFilter button").forEach(x => x.classList.toggle("active", x.dataset.f === "all"));
       renderDrafts();
+      await loadIdeaQueue();
       
       C.toast({ type: "success", title: "Draft ready", desc: `${curChan} content generated` });
       document.getElementById("ideaTitle").value = "";
@@ -623,21 +914,339 @@
 
   /* ----- edit modal ----- */
   let editing = null;
+  let activeEditorTags = [];
+
+  function renderEditorTags() {
+    const list = document.getElementById("tagsList");
+    if (!list) return;
+    
+    list.innerHTML = activeEditorTags.map((t, idx) => {
+      const parts = t.split(':');
+      const name = parts[0];
+      const style = parts[1] || 'neutral';
+      
+      let badgeClass = 'badge-neutral';
+      if (style === 'primary') badgeClass = 'badge-primary';
+      else if (style === 'success') badgeClass = 'badge-success';
+      else if (style === 'danger') badgeClass = 'badge-error';
+      else if (style === 'warning') badgeClass = 'badge-scheduled';
+      
+      return `
+        <span class="editor-tag-pill badge ${badgeClass}" data-idx="${idx}" title="Click to cycle style">
+          ${name}
+          <span class="remove-tag" data-idx="${idx}">&times;</span>
+        </span>
+      `;
+    }).join("");
+    
+    // Wire remove tag buttons
+    list.querySelectorAll(".remove-tag").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        activeEditorTags.splice(idx, 1);
+        renderEditorTags();
+      });
+    });
+    
+    // Wire click on pills to toggle styles
+    list.querySelectorAll(".editor-tag-pill").forEach(pill => {
+      pill.addEventListener("click", () => {
+        const idx = parseInt(pill.dataset.idx);
+        const parts = activeEditorTags[idx].split(':');
+        const name = parts[0];
+        const style = parts[1] || 'neutral';
+        
+        // Cycle styles: neutral -> primary -> success -> danger -> warning -> neutral
+        const styles = ['neutral', 'primary', 'success', 'danger', 'warning'];
+        const nextIdx = (styles.indexOf(style) + 1) % styles.length;
+        const nextStyle = styles[nextIdx];
+        
+        activeEditorTags[idx] = `${name}:${nextStyle}`;
+        renderEditorTags();
+      });
+    });
+  }
+
+  // Cover Image Inputs and Change Listeners
+  const coverUrlInput = document.getElementById("editCoverUrl");
+  if (coverUrlInput) {
+    coverUrlInput.addEventListener("input", (e) => {
+      const url = e.target.value.trim();
+      const coverPreview = document.getElementById("editCoverPreview");
+      if (coverPreview) {
+        if (url) {
+          coverPreview.style.backgroundImage = `url('${url}')`;
+          coverPreview.style.border = "none";
+          coverPreview.innerHTML = "";
+        } else {
+          coverPreview.style.backgroundImage = "none";
+          coverPreview.style.border = "1.5px dashed var(--border)";
+          coverPreview.innerHTML = `<i data-lucide="image" class="muted" style="width:32px;height:32px"></i>`;
+          if (window.lucide) window.lucide.createIcons();
+        }
+      }
+    });
+  }
+
+  const uploadCoverBtn = document.getElementById("uploadCoverBtn");
+  const uploadCoverFileInput = document.getElementById("editCoverFile");
+  if (uploadCoverBtn && uploadCoverFileInput) {
+    uploadCoverBtn.addEventListener("click", () => uploadCoverFileInput.click());
+    uploadCoverFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target.result;
+          const coverPreview = document.getElementById("editCoverPreview");
+          document.getElementById("editCoverUrl").value = base64;
+          if (coverPreview) {
+            coverPreview.style.backgroundImage = `url('${base64}')`;
+            coverPreview.style.border = "none";
+            coverPreview.innerHTML = "";
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  const removeCoverBtn = document.getElementById("removeCoverBtn");
+  if (removeCoverBtn) {
+    removeCoverBtn.addEventListener("click", () => {
+      document.getElementById("editCoverUrl").value = "";
+      const coverPreview = document.getElementById("editCoverPreview");
+      if (coverPreview) {
+        coverPreview.style.backgroundImage = "none";
+        coverPreview.style.border = "1.5px dashed var(--border)";
+        coverPreview.innerHTML = `<i data-lucide="image" class="muted" style="width:32px;height:32px"></i>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      document.getElementById("editCoverFile").value = "";
+    });
+  }
+
+  // Tag Input Addition Listener
+  const newTagInput = document.getElementById("newTagInput");
+  if (newTagInput) {
+    newTagInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = newTagInput.value.trim();
+        if (val) {
+          const lowerVal = val.toLowerCase();
+          const exists = activeEditorTags.some(t => t.split(':')[0].toLowerCase() === lowerVal);
+          if (!exists) {
+            activeEditorTags.push(`${val}:neutral`);
+            renderEditorTags();
+          }
+          newTagInput.value = "";
+        }
+      }
+    });
+  }
+
+  // Rich Text Editor Toolbar Listeners
+  const editorToolbar = document.getElementById("editorToolbar");
+  if (editorToolbar) {
+    editorToolbar.querySelectorAll("[data-cmd]").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const cmd = btn.dataset.cmd;
+        document.execCommand(cmd, false, null);
+        document.getElementById("editBodyRich").focus();
+      });
+    });
+
+    editorToolbar.querySelectorAll("[data-block]").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const block = btn.dataset.block;
+        document.execCommand("formatBlock", false, block);
+        document.getElementById("editBodyRich").focus();
+      });
+    });
+
+    let savedRange = null;
+    const saveSelection = () => {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        savedRange = selection.getRangeAt(0);
+      }
+    };
+    const restoreSelection = () => {
+      if (savedRange) {
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedRange);
+      }
+    };
+
+    const richBody = document.getElementById("editBodyRich");
+    if (richBody) {
+      richBody.addEventListener("mouseup", saveSelection);
+      richBody.addEventListener("keyup", saveSelection);
+    }
+
+    const foreColorInput = document.getElementById("tb-forecolor");
+    if (foreColorInput) {
+      foreColorInput.addEventListener("input", (e) => {
+        restoreSelection();
+        const color = e.target.value;
+        document.execCommand("foreColor", false, color);
+      });
+    }
+
+    const backColorInput = document.getElementById("tb-backcolor");
+    if (backColorInput) {
+      backColorInput.addEventListener("input", (e) => {
+        restoreSelection();
+        const color = e.target.value;
+        if (!document.execCommand("hiliteColor", false, color)) {
+          document.execCommand("backColor", false, color);
+        }
+      });
+    }
+    
+    const tbLink = document.getElementById("tb-link");
+    if (tbLink) {
+      tbLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          const selectedText = range.toString().trim();
+          
+          if (selectedText.length > 0) {
+            const url = prompt("Enter the link URL (e.g., https://google.com):");
+            if (url) {
+              document.execCommand("createLink", false, url);
+            }
+          } else {
+            const linkText = prompt("Enter link text:");
+            if (linkText) {
+              const url = prompt("Enter the link URL (e.g., https://google.com):");
+              if (url) {
+                const a = document.createElement("a");
+                a.href = url;
+                a.textContent = linkText;
+                a.target = "_blank";
+                range.insertNode(a);
+                // Move cursor after the inserted link
+                range.setStartAfter(a);
+                range.setEndAfter(a);
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
+            }
+          }
+        }
+        document.getElementById("editBodyRich").focus();
+      });
+    }
+    
+    const tbImg = document.getElementById("tb-image");
+    if (tbImg) {
+      tbImg.addEventListener("click", (e) => {
+        e.preventDefault();
+        const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
+        if (url) {
+          document.execCommand("insertImage", false, url);
+          document.getElementById("editBodyRich").focus();
+        } else if (url === "") {
+          const inlineFileInput = document.getElementById("inlineImageFile");
+          if (inlineFileInput) inlineFileInput.click();
+        }
+      });
+    }
+
+    const inlineFileInput = document.getElementById("inlineImageFile");
+    if (inlineFileInput) {
+      inlineFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64 = event.target.result;
+            document.execCommand("insertImage", false, base64);
+            document.getElementById("editBodyRich").focus();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+  }
+
   function openEdit(d) {
     editing = d;
     document.getElementById("editSub").textContent = `${d.chan} · ${d.title}`;
     document.getElementById("editTitle").value = d.title;
-    document.getElementById("editBody").value = d.body || "";
+    
+    // Load body into rich editor
+    const richBody = document.getElementById("editBodyRich");
+    if (richBody) {
+      richBody.innerHTML = d.body || "";
+    }
+    
+    // Load cover image
+    const coverPreview = document.getElementById("editCoverPreview");
+    const coverUrlInput = document.getElementById("editCoverUrl");
+    if (coverPreview && coverUrlInput) {
+      coverUrlInput.value = d.cover_image || "";
+      if (d.cover_image) {
+        coverPreview.style.backgroundImage = `url('${d.cover_image}')`;
+        coverPreview.style.border = "none";
+        coverPreview.innerHTML = "";
+      } else {
+        coverPreview.style.backgroundImage = "none";
+        coverPreview.style.border = "1.5px dashed var(--border)";
+        coverPreview.innerHTML = `<i data-lucide="image" class="muted" style="width:32px;height:32px"></i>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+    
+    // Load tags
+    activeEditorTags = Array.isArray(d.tags) ? [...d.tags] : [];
+    renderEditorTags();
+
+    // Load metadata settings
+    const editAuthor = document.getElementById("editAuthor");
+    if (editAuthor) {
+      editAuthor.value = d.author_name || site.name || "";
+    }
+    const editDate = document.getElementById("editDate");
+    if (editDate) {
+      editDate.value = d.custom_date || (d.created_at ? new Date(d.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+    }
+    const editCategory = document.getElementById("editCategory");
+    if (editCategory) {
+      editCategory.value = d.category || site.industry || "Marketing";
+    }
+    
     C.openModal("editModal");
   }
+
   document.getElementById("saveEdit").addEventListener("click", async () => {
     if (editing) {
-      const title = document.getElementById("editTitle").value;
-      const body = document.getElementById("editBody").value;
+      const title = document.getElementById("editTitle").value.trim();
+      const body = document.getElementById("editBodyRich").innerHTML;
+      const cover_image = document.getElementById("editCoverUrl").value.trim();
+      const tags = activeEditorTags;
+      const author_name = document.getElementById("editAuthor") ? document.getElementById("editAuthor").value.trim() : "";
+      const custom_date = document.getElementById("editDate") ? document.getElementById("editDate").value.trim() : "";
+      const category = document.getElementById("editCategory") ? document.getElementById("editCategory").value.trim() : "";
+      
       try {
-        await CadenceAPI.updateDraft(editing.id, { title, body });
+        await CadenceAPI.updateDraft(editing.id, { title, body, cover_image, tags, author_name, custom_date, category });
         editing.title = title;
         editing.body = body;
+        editing.cover_image = cover_image;
+        editing.tags = tags;
+        editing.author_name = author_name;
+        editing.custom_date = custom_date;
+        editing.category = category;
+        
         await window.MOCK.syncMockData(site.id);
         drafts = window.MOCK.content.filter(x => x.site === site.id);
         renderDrafts();
@@ -655,6 +1264,62 @@
     document.querySelectorAll("#wsPanels .tab-panel").forEach(pp => pp.classList.toggle("active", pp.dataset.panel === "generate"));
     document.getElementById("ideaTitle")?.focus();
   }));
+
+  function openImageLightbox(src) {
+    let overlay = document.getElementById("imageLightboxOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "imageLightboxOverlay";
+      overlay.style = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        cursor: zoom-out;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      `;
+      overlay.innerHTML = `
+        <img id="lightboxImg" style="max-width: 90%; max-height: 90%; border-radius: var(--r-md); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); object-fit: contain; width: 1000px; height: 1200px; transition: transform 0.25s ease;" />
+      `;
+      overlay.addEventListener("click", () => {
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 250);
+      });
+      document.body.appendChild(overlay);
+    }
+    const img = overlay.querySelector("#lightboxImg");
+    img.src = src;
+    setTimeout(() => {
+      overlay.style.opacity = "1";
+    }, 10);
+  }
+
+  document.body.addEventListener("click", (e) => {
+    if (e.target.closest("#editCoverPreview")) {
+      const bg = e.target.closest("#editCoverPreview").style.backgroundImage;
+      if (bg && bg !== "none") {
+        const src = bg.replace(/^url\(['"]?/, "").replace(/['"]?\)$/, "");
+        openImageLightbox(src);
+      }
+    }
+    else if (e.target.closest(".bp-cover")) {
+      const bg = e.target.closest(".bp-cover").style.backgroundImage;
+      if (bg && bg !== "none") {
+        const src = bg.replace(/^url\(['"]?/, "").replace(/['"]?\)$/, "");
+        openImageLightbox(src);
+      }
+    }
+    else if (e.target.tagName === "IMG" && (e.target.closest("#editBodyRich") || e.target.closest(".draft__body"))) {
+      openImageLightbox(e.target.src);
+    }
+  });
 
   renderDrafts();
   C.refreshIcons();

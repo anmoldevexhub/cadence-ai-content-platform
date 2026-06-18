@@ -6,7 +6,10 @@ urlpatterns = [
     path('ideas/', views.ContentIdeaListCreateView.as_view()),
     path('ideas/<int:pk>/', views.ContentIdeaDetailView.as_view()),
     path('ideas/<int:pk>/generate/', views.GenerateContentView.as_view()),
-    
+
+    # AI-powered idea suggestions (dynamic, per website)
+    path('suggestions/', views.IdeaSuggestionsView.as_view()),
+
     # Drafts
     path('drafts/', views.ContentDraftListView.as_view()),
     path('drafts/<int:pk>/', views.ContentDraftDetailView.as_view()),
@@ -15,10 +18,10 @@ urlpatterns = [
     path('drafts/<int:pk>/regenerate/', views.RegenerateDraftView.as_view()),
     path('drafts/<int:pk>/schedule/', views.ScheduleDraftView.as_view()),
     path('drafts/<int:pk>/unschedule/', views.UnscheduleDraftView.as_view()),
-    
+
     # Schedule
     path('scheduled/', views.ScheduledPostListView.as_view()),
-    
+
     # Approvals queue (cross-website pending drafts)
     path('approvals/', views.ApprovalsQueueView.as_view()),
-]
+]

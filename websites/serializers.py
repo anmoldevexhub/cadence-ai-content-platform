@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Website, SocialConnection, ScrapeResult
+from .models import Website, SocialConnection, ScrapeResult, SampleContent
 
 class SocialConnectionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,7 +31,7 @@ class WebsiteSerializer(serializers.ModelSerializer):
             'status', 'color', 'brand_colors', 'avg_read_time', 'owner', 'owner_email', 'owner_name',
             'created_at', 'updated_at', 'scrape_summary', 'scrape_status',
             'last_crawled', 'social_connections', 'style_guide', 'needs_crawl',
-            'contact_email', 'contact_phone', 'logo_url', 'logo_upload'
+            'contact_email', 'contact_phone', 'logo_url', 'logo_upload', 'is_deleted'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'owner']
 
@@ -71,3 +71,10 @@ class WebsiteSerializer(serializers.ModelSerializer):
             instance.save(update_fields=['logo_url'])
             
         return instance
+
+
+class SampleContentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SampleContent
+        fields = ['id', 'platform', 'title', 'content', 'file_name', 'uploaded_at', 'is_active']
+        read_only_fields = ['id', 'uploaded_at']

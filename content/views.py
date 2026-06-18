@@ -9,6 +9,8 @@ from .models import ContentIdea, ContentDraft, ScheduledPost
 from .serializers import (ContentIdeaSerializer, ContentDraftSerializer,
                            ScheduledPostSerializer)
 from .tasks import generate_content_task, regenerate_draft_task
+from .generator import generate_idea_suggestions
+
 from logs.models import ActivityLog
 from accounts.permissions import IsAdminOrSuperAdmin
 
@@ -67,19 +69,36 @@ class ContentDraftListView(generics.ListAPIView):
         website_id = self.request.query_params.get('website')
         draft_status = self.request.query_params.get('status')
         platform = self.request.query_params.get('platform')
+        show_deleted = self.request.query_params.get('trash') == 'true'
         if website_id:
             qs = qs.filter(website_id=website_id)
         if draft_status:
             qs = qs.filter(status=draft_status)
         if platform:
             qs = qs.filter(platform=platform)
-        return qs
+        return qs.filter(is_deleted=show_deleted)
 
 
-class ContentDraftDetailView(generics.RetrieveUpdateAPIView):
+class ContentDraftDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ContentDraftSerializer
     permission_classes = [IsAdminOrSuperAdmin]
     queryset = ContentDraft.objects.all()
+
+    def perform_destroy(self, instance):
+        ip, _ = get_client_ip(self.request)
+        hard = self.request.query_params.get('hard') == 'true'
+        ActivityLog.objects.create(
+            actor=self.request.user,
+            actor_name=self.request.user.get_full_name(),
+            action='content_delete_permanent' if hard else 'content_delete',
+            target_description=instance.title,
+            ip_address=ip
+        )
+        if hard:
+            instance.delete()
+        else:
+            instance.is_deleted = True
+            instance.save(update_fields=['is_deleted'])
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -266,3 +285,28 @@ class UnscheduleDraftView(APIView):
             )
             return Response({'status': 'approved'})
         return Response({'detail': 'Draft is not scheduled.'}, status=400)
+
+
+class IdeaSuggestionsView(APIView):
+    """
+    Generates dynamic AI-powered content idea suggestions for a website.
+    Uses the website's industry, topics, and scrape_summary plus a live trend
+    search to return 8 timely, brand-relevant content ideas.
+
+    POST /api/content/suggestions/?website=<id>
+    Returns: [{"title": str, "platform": str, "reason": str}, ...]
+    """
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request):
+        from websites.models import Website
+        website_id = request.query_params.get('website') or request.data.get('website')
+        if not website_id:
+            return Response({'detail': 'website query param is required.'}, status=400)
+        try:
+            website = Website.objects.get(pk=website_id)
+        except Website.DoesNotExist:
+            return Response({'detail': 'Website not found.'}, status=404)
+
+        suggestions = generate_idea_suggestions(website)
+        return Response(suggestions)

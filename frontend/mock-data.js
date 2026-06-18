@@ -208,7 +208,10 @@ window.MOCK = (function () {
         body: d.body || "",
         tags: d.tags || [],
         cover_image: d.cover_image,
-        category: d.category
+        category: d.category,
+        author_name: d.author_name,
+        custom_date: d.custom_date,
+        created_at: d.created_at
       };
     });
 

@@ -12,7 +12,7 @@ from .models import ContentIdea, ContentDraft
 logger = logging.getLogger(__name__)
 client = OpenAI(api_key=config('OPENAI_API_KEY'))
 
-MODEL = 'gpt-4o-mini'   # cheapest OpenAI model, ~$0.15/1M input tokens
+MODEL = 'gpt-4o'   # cheapest OpenAI model, ~$0.15/1M input tokens
 
 
 def summarize_website_style(structure_text: str) -> str:
@@ -43,67 +43,192 @@ when creating content for this website. Be specific and actionable."""
 
 
 def build_system_prompt(website: Website) -> str:
-    """Builds the persistent system prompt for content generation, including detailed style guide if present."""
-    style_details = ""
-    extra_instructions = []
-    
-    if website.style_guide:
-        import json
-        try:
-            guide = website.style_guide if isinstance(website.style_guide, dict) else json.loads(website.style_guide)
-            parts = []
-            for key, val in guide.items():
-                if key not in {'average_grade_level', 'average_sentiment_polarity', 'call_to_action_examples'}:
-                    parts.append(f"- {key}: {val}")
-            style_details = "\n" + "\n".join(parts)
-            
-            # Extract readability metrics
-            grade_level = guide.get('average_grade_level')
-            if grade_level is not None:
-                extra_instructions.append(f"- Target Reading Level: Write at approximately a {grade_level}th-grade reading level.")
-                
-            # Extract sentiment metrics
-            sentiment = guide.get('average_sentiment_polarity')
-            if sentiment is not None:
-                sentiment_val = float(sentiment)
-                if sentiment_val > 0.15:
-                    tone_desc = "slightly positive and optimistic"
-                elif sentiment_val < -0.15:
-                    tone_desc = "slightly critical or analytical"
-                else:
-                    tone_desc = "neutral and balanced"
-                extra_instructions.append(f"- Sentiment: Maintain a {tone_desc} tone (average sentiment polarity: {sentiment_val}).")
-                
-            # Extract CTA metrics
-            ctas = guide.get('call_to_action_examples')
-            if ctas:
-                ctas_str = ", ".join([f"'{c}'" for c in ctas[:3]])
-                extra_instructions.append(f"- Calls to Action: Naturally include one of these common CTAs where appropriate: {ctas_str}.")
-        except Exception:
-            style_details = "\n" + str(website.style_guide)
-            
-    extra_instructions_str = "\n".join(extra_instructions)
-    if extra_instructions_str:
-        extra_instructions_str = "\n\nWRITING METRICS & CONSTRAINTS:\n" + extra_instructions_str
-        
+    """Minimal system prompt - style is learned from user-uploaded samples."""
     return f"""You are an expert content writer for {website.name} ({website.domain}).
 
-WEBSITE STYLE GUIDE:
-{website.scrape_summary or "No style guide available yet. Write in an engaging, human tone."}{style_details}{extra_instructions_str}
-
-BRAND VOICE: {website.tone or "Conversational and engaging"}
-KEY TOPICS: {", ".join(website.topics) if website.topics else "General content"}
+BRAND: {website.name}
 INDUSTRY: {website.industry or "General"}
+KEY TOPICS: {", ".join(website.topics) if website.topics else "General content"}
 
-When writing blog posts:
-- Always write a detailed, comprehensive, deep-dive article of at least 900 to 1200 words. Do not stop until you have covered the topic in full depth.
-- Avoid brief outlines or summaries. Write in simple, everyday English (no corporate jargon or complex AI words).
-- Vary sentence lengths dramatically. Use very short, punchy sentences alongside longer, conversational ones.
-- Avoid perfectly symmetrical section structures. Make layout, section length, and bullet points uneven and varied.
-- Never break character or mention that you are an AI."""
+Write in the same style as the samples provided in the user prompt."""
+
+
+def get_style_reference(website: Website, platform: str) -> str:
+    """Fetch 5-7 user-uploaded samples for a specific platform, or fall back to crawled data."""
+    from websites.models import SampleContent, ScrapeResult
+    
+    samples = SampleContent.objects.filter(
+        website=website,
+        platform=platform,
+        is_active=True
+    ).order_by('-uploaded_at')[:7]
+    
+    if samples:
+        style_text = ""
+        for i, sample in enumerate(samples, 1):
+            content = sample.content[:3000] if len(sample.content) > 3000 else sample.content
+            style_text += f"""
+================================================================================
+SAMPLE {i} ({platform.upper()}):
+================================================================================
+{'TITLE: ' + sample.title if sample.title else ''}
+CONTENT:
+{content}
+================================================================================
+"""
+        return style_text
+        
+    # Fallback to ScrapeResult (crawled data)
+    scrapes = ScrapeResult.objects.filter(website=website)[:5]
+    if scrapes:
+        style_text = "CRAWLED SAMPLES (Fallback):\n"
+        for i, scrape in enumerate(scrapes, 1):
+            content = scrape.main_content or scrape.raw_text
+            content = content[:2000] if len(content) > 2000 else content
+            style_text += f"""
+================================================================================
+CRAWLED SAMPLE {i}:
+================================================================================
+TITLE: {scrape.page_title}
+URL: {scrape.page_url}
+CONTENT:
+{content}
+================================================================================
+"""
+        return style_text
+        
+    return "No samples or crawled content available. Please upload sample content or crawl the website first."
+
+
+def get_style_reference_samples(website: Website, platform: str) -> str:
+    """Legacy wrapper for get_style_reference to maintain test compatibility."""
+    return get_style_reference(website, platform)
+
+
+def generate_idea_suggestions(website: Website) -> list:
+    """
+    Generates 8 dynamic AI-powered content idea suggestions for a website.
+    Uses the website's industry, topics, and scrape_summary plus a live trend
+    search via DuckDuckGo to suggest relevant, timely content.
+    Returns a list of dicts: [{"title": str, "platform": str, "reason": str}]
+    """
+    import json as _json
+    from datetime import date
+
+    # Build context about the website
+    topics_str = ", ".join(website.topics[:10]) if website.topics else "general content"
+    industry = website.industry or "General"
+    brand_name = website.name
+    style_summary = (website.scrape_summary or "")[:500]
+    today = date.today().strftime("%B %Y")
+
+    # Do a quick live trend search for the industry — skip if unavailable
+    raw_trends = search_live_data(f"{industry} content marketing trends {today}")
+    live_trends_section = ""
+    if raw_trends and raw_trends != "No live data available.":
+        live_trends_section = f"\nLIVE TRENDS CONTEXT (use to make ideas timely):\n{raw_trends}\n"
+
+    prompt = f"""You are an expert content strategist. Generate exactly 8 content idea suggestions for the brand below.
+Return your response as a JSON object with a single key "suggestions" containing an array of 8 items.
+
+BRAND: {brand_name}
+INDUSTRY: {industry}
+KEY TOPICS: {topics_str}
+BRAND STYLE: {style_summary if style_summary else 'Professional and informative'}
+DATE: {today}
+{live_trends_section}
+Rules:
+- Platform mix: 3 blog, 2 linkedin, 2 instagram, 1 youtube
+- Titles must be specific, compelling, and relevant to the brand's industry
+- Blog titles: SEO-friendly, informative
+- LinkedIn titles: punchy, professional insight angle
+- Instagram titles: short, visual hook
+- YouTube titles: descriptive, search-optimised
+- reason: one sentence explaining why this topic matters right now
+
+Required JSON format:
+{{
+  "suggestions": [
+    {{"title": "...", "platform": "blog", "reason": "..."}},
+    {{"title": "...", "platform": "linkedin", "reason": "..."}},
+    {{"title": "...", "platform": "instagram", "reason": "..."}},
+    {{"title": "...", "platform": "blog", "reason": "..."}},
+    {{"title": "...", "platform": "youtube", "reason": "..."}},
+    {{"title": "...", "platform": "linkedin", "reason": "..."}},
+    {{"title": "...", "platform": "instagram", "reason": "..."}},
+    {{"title": "...", "platform": "blog", "reason": "..."}}
+  ]
+}}"""
+
+    def _fallback():
+        platforms = ["blog", "linkedin", "instagram", "blog", "youtube", "linkedin", "instagram", "blog"]
+        first_topic = topics_str.split(',')[0].strip() if topics_str and topics_str != "general content" else industry
+        titles = [
+            f"Top {industry} Trends to Watch in {today}",
+            f"How {brand_name} Is Shaping the Future of {industry}",
+            f"Behind the Scenes at {brand_name} ✨",
+            f"The Complete Guide to {first_topic}",
+            f"{industry} Explained: What Every Business Needs to Know in {today}",
+            f"5 Lessons from {industry} That Changed How We Work",
+            f"Quick Tips for {first_topic} That Actually Work 💡",
+            f"Why {industry} Leaders Are Betting on {brand_name}",
+        ]
+        return [
+            {"title": title, "platform": platform, "reason": f"Relevant to {industry} industry trends"}
+            for title, platform in zip(titles, platforms)
+        ]
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1400,
+            temperature=0.8,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        parsed = _json.loads(raw)
+
+        # Extract suggestions list from object
+        suggestions = []
+        if isinstance(parsed, dict):
+            for val in parsed.values():
+                if isinstance(val, list) and len(val) > 0:
+                    suggestions = val
+                    break
+
+        # Validate and normalise
+        valid_platforms = {"blog", "linkedin", "instagram", "youtube"}
+        cleaned = []
+        for item in suggestions[:8]:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title", "")).strip()
+            if not title:
+                continue
+            plat = str(item.get("platform", "blog")).lower()
+            if plat not in valid_platforms:
+                plat = "blog"
+            cleaned.append({
+                "title": title[:280],
+                "platform": plat,
+                "reason": str(item.get("reason", ""))[:200],
+            })
+
+        # If AI returned nothing useful, use fallback
+        if not cleaned:
+            logger.warning(f"generate_idea_suggestions got empty result for {website.domain}, using fallback")
+            return _fallback()
+
+        return cleaned
+
+    except Exception as exc:
+        logger.warning(f"generate_idea_suggestions failed for {website.domain}: {exc}")
+        return _fallback()
 
 
 def search_live_data(query: str) -> str:
+
     """
     Searches DuckDuckGo HTML for query and extracts snippet descriptions.
     """
@@ -534,358 +659,152 @@ def generate_social_via_gemini(system_prompt: str, user_prompt: str) -> dict:
 
 
 def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
-    """Generates a full blog post (HTML-ready) utilizing crawled styles and live search data."""
+    """Generates a full blog post using user-uploaded samples for style."""
     system_prompt = build_system_prompt(website)
     
-    # Perform live web search to retrieve current facts & context
+    # Get live search data
     logger.info(f"Performing live search for topic: {idea.title}")
     live_data = search_live_data(idea.title)
     
-#     user_prompt = f"""Write a complete, authoritative, high-impact, and SEO-optimized blog post for {website.name}.
+    # Get user-uploaded samples (NOT from crawler)
+    style_reference = get_style_reference_samples(website, 'blog')
+    
+    user_prompt = f"""Write a blog post about "{idea.title}" for {website.name}.
 
-# TOPIC: {idea.title}
-# ADDITIONAL CONTEXT FROM ADMIN: {idea.context or "None provided."}
-# TARGET TAGS/KEYWORDS: {", ".join(idea.meta_tags) if idea.meta_tags else "Auto-select relevant keywords"}
+================================================================================
+REFERENCE SAMPLES (Study these to understand the writing style)
+================================================================================
+{style_reference}
 
-# ================================================================================
-# LIVE SEARCH DATA (REQUIRED – You MUST use at least 2 specific facts/stats from this):
-# ================================================================================
-# {live_data}
+================================================================================
+TASK DETAILS
+================================================================================
+TOPIC: {idea.title}
+ADDITIONAL CONTEXT FROM ADMIN: {idea.context or "None provided."}
+TARGET KEYWORDS: {", ".join(idea.meta_tags) if idea.meta_tags else "Auto-select relevant keywords"}
 
-# ================================================================================
-# VOICE & PERSONALITY REQUIREMENTS (CRITICAL – FOLLOW STRICTLY):
-# ================================================================================
+LIVE SEARCH DATA (Use relevant facts/stats from this):
+{live_data}
 
-# You are NOT a neutral content writer. You are a CONFIDENT INDUSTRY CONSULTANT who has seen what works and what doesn't. Take a stance. Don't sit on the fence.
-
-# 1. THE HOOK (First 2-3 sentences):
-#    - MUST start with a BOLD, COUNTER-INTUITIVE, or PROVOCATIVE statement.
-#    - Use ONE of these hook formulas:
-#      a) Metaphor: "Your [topic] is not a [X]. It's more like a [Y] that [does Z]."
-#      b) Contradiction: "Most [people/companies] think [common belief]. They couldn't be more wrong."
-#      c) Bold Statement: "The [X] you've been told doesn't work. Here's what actually does."
-#      d) Vivid Imagery: "Imagine [visual scenario]. That's exactly what [topic] feels like."
-#    - ❌ NEVER start with: "Have you ever wondered...", "In today's world...", "In this blog post..."
-
-# 2. BOLD OPINION / CHALLENGING THE STATUS QUO (Conditional):
-#    - ONLY include a bold, opinionated section if the topic naturally allows for a debatable stance.
-#    - If the topic is purely educational, technical, or news-based, SKIP this section entirely and write a straightforward, informative article.
-#    - DO NOT force an opinion into every blog. It looks contrived and repetitive.
-#    - If included:
-#      * DO NOT use "I think", "I disagree", "Here's my honest take" – this is a COMPANY blog.
-#      * Use collective voice: "Our team has found...", "In our experience...", "At {website.name}, we've seen..."
-#      * 🔒 IMPORTANT: Weave the opinion naturally into the narrative. Do NOT use a dedicated heading like "Challenging the Status Quo" – it looks forced and repetitive.
-#      * Example: "Most companies assume X. Through our work with clients, we've found that Y actually drives better results."
-#    - If NOT included: Write a clear, informative, and valuable blog without taking a provocative stance.
-
-# 3. AUTHORITY & DATA:
-#    - MUST include at least 2-3 specific statistics, study findings, or data points.
-#    - ALWAYS name the source: "According to [Source]...", "[Organization] reports..."
-#    - Use the LIVE SEARCH DATA to find recent stats. Weave them into the narrative naturally.
-
-# 4. INDUSTRY-SPECIFIC TERMINOLOGY:
-#    - Use the exact terminology that professionals in that industry use.
-#    - Use the LIVE SEARCH DATA to find these terms.
-#    - NEVER use generic language when specific terms exist.
-#    - 🔒 CRITICAL: Do NOT copy terms from examples. Only use terms found in the LIVE SEARCH DATA or the website's own content (topics, industry, style guide).
-
-# 5. DIAGNOSTIC DEPTH:
-#    - Don't just say "poor X" – give 3-4 SPECIFIC, ACTIONABLE examples of problems.
-#    - For each problem, describe: WHAT happens, WHO it affects, and WHY it matters.
-#    - Use the LIVE SEARCH DATA and the website's industry context to find REAL problems people face.
-#    - Example format: "[Specific practice/field] is often mishandled. When [specific action] happens repeatedly, [specific negative consequence] occurs."
-#    - 🔒 CRITICAL: Do NOT copy generic examples. Generate problems specific to THIS industry and topic from the LIVE SEARCH DATA.
-
-# 6. PUNCHY QUOTES:
-#    - Include at least 2-3 short, punchy sentences (under 12 words) throughout the article.
-#    - These should be bold, quotable statements that readers will want to share.
-#    - Create your OWN punchy lines based on the topic – don't copy from examples.
-#    - Formula: Take a key insight from your article and compress it into 6-10 words.
-#    - 🔒 IMPORTANT: Do NOT create a dedicated "Punchy Insights" or "Key Takeaways" section. Weave these punchy lines naturally into the narrative – as standalone bold sentences or pull quotes.
-
-# 7. BRAND INTEGRATION:
-#    - Mention "{website.name}" naturally as the SOLUTION to the problems you've diagnosed.
-#    - The brand mention should feel like a natural next step, not a sales pitch.
-#    - GOOD: "At {website.name}, we help [industry] teams [solve specific problem]."
-#    - GOOD: "Explore {website.name}'s [specific service] to [solve the specific problem you just diagnosed]."
-#    - GOOD: "To talk through what a more reliable [topic] model could look like for your team, reach out to {website.name}."
-#    - BAD: "Partner with {website.name} today" – too generic and salesy.
-
-# 8. VOICE & TONE:
-#    - Take a stance. Don't sit on the fence. Be provocative when appropriate.
-#    - Use short, punchy sentences alongside longer explanations.
-#    - Use rhetorical questions to engage readers.
-#    - NEVER sound like a textbook, academic paper, or student essay.
-
-# 9. HUMANIFICATION (Make it Feel Real):
-#    - Optionally include a short, relatable example of a lesson learned or challenge overcome.
-#    - Vary the story EVERY time—do NOT repeat the same phrase across blogs.
-#    - ✅ GOOD APPROACHES (adapt to the topic):
-#      * Technical/Software: "Our team spent hours troubleshooting because we overlooked a small configuration error..."
-#      * Creative/Design: "We once invested time in a concept that looked great but confused our users..."
-#      * Strategic/Planning: "We learned this the hard way when we launched without defining clear success metrics..."
-#      * Operational/Process: "We had to redo work because different teams used different definitions..."
-#    - 🔒 CRITICAL: Use "we" or "our team" – this is a COMPANY blog, not a personal diary.
-#    - The story should feel natural to the topic, not forced.
-#    - Use contractions (don't, can't, it's) to sound conversational.
-#    - Write at a 9th-grade reading level. Simple, everyday language.
-
-# ================================================================================
-# STRUCTURE & FORMATTING REQUIREMENTS:
-# ================================================================================
-
-# 10. Word Count: Minimum 900 words. Be comprehensive. Write at least 6-8 detailed sections.
-#     - Expand each section with thorough explanations, examples, and actionable insights.
-#     - Do NOT use filler or fluff – add genuine value, depth, and detail.
-#     - For technical topics: include step-by-step explanations.
-#     - For strategic topics: include frameworks, processes, or case studies.
-#     - For educational topics: include practical tips and real-world applications.
-#     - If you're writing under 900 words, you're not being comprehensive enough – ADD MORE SUBSTANCE.
-
-# 11. Headings: Use <h2> for main sections and <h3> for sub-sections. Do NOT use <h1>.
-
-# 12. Short paragraphs: 2-4 sentences each. Vary section lengths and layout styles.
-
-# 13. Bullet points: Use <ul> and <li> for lists of tips, steps, or key points.
-
-# 14. If the website offers multiple distinct services (as seen in the KEY TOPICS), present them as a clear, scannable bulleted list (<ul>) in one of the main sections.
-
-# 15. Table: If the topic relates to statistics, metrics, trends, or growth (including trends/growth in 2026), you MUST include a clean HTML table.
-
-# 16. Q&A SECTION:
-#     - Include 4-5 specific questions that actual customers or readers would ask.
-#     - Use the live search data to identify common questions people are asking.
-#     - Format as Q&A with bold questions and clear, concise answers.
-
-# 17. CONCLUSION & CALL TO ACTION:
-#     - Summarize the key takeaway in 1-2 sentences.
-#     - End with a SPECIFIC, VALUE-DRIVEN CTA:
-#       ✅ "Partner with {website.name} for a free [specific offer] today."
-#       ✅ "Contact {website.name} to [solve specific problem]."
-#       ✅ "Explore {website.name}'s [specific service] to [achieve specific goal]."
-#       ❌ NEVER use generic "Contact us" or "Learn more" – be specific.
-
-# ================================================================================
-# SEO & OUTPUT REQUIREMENTS:
-# ================================================================================
-
-# 18. Meta Title: Use the same blog title. MUST be between 55 to 60 characters.
-
-# 19. Meta Description: MUST be exactly between 155 and 160 characters.
-
-# 20. Category: Assign the most appropriate professional category (e.g., "Artificial Intelligence", "Web Development", "Digital Marketing", "Business Strategy", "Technology", "Finance", "Health", etc.).
-
-# 21. Tags: Include 4-6 relevant tags/keywords.
-
-# Format Requirements:
-# Return ONLY a valid JSON object with these exact keys:
-# {{
-#   "title": "...(55-60 characters)...",
-#   "meta_description": "...(155-160 characters)...",
-#   "category": "...",
-#   "tags": ["tag1", "tag2", ...],
-#   "excerpt": "...(2-3 sentence preview)...",
-#   "body": "...(full blog post in plain HTML using <h2>, <h3>, <p>, <ul>, <li>)..."
-# }}
-
-# Do NOT include any markdown code block formatting (like ```json ... ```). Return ONLY the raw JSON."""
-
-
-    user_prompt = f"""Write a complete, authoritative, high-impact, and SEO-optimized blog post for {website.name}.
-
-    TOPIC: {idea.title}
-    ADDITIONAL CONTEXT FROM ADMIN: {idea.context or "None provided."}
-    TARGET TAGS/KEYWORDS: {", ".join(idea.meta_tags) if idea.meta_tags else "Auto-select relevant keywords"}
-
-    ================================================================================
-    LIVE SEARCH DATA (REQUIRED – You MUST use at least 2 specific facts/stats from this):
-    ================================================================================
-    {live_data}
-
-    ================================================================================
-    CRITICAL: USE THE WEBSITE'S STYLE GUIDE
-    ================================================================================
-    The System Prompt contains the website's style guide (tone, voice, vocabulary, 
-    heading patterns, and CTA style) extracted from crawling the website.
-
-    🔒 FOLLOW THIS INSTRUCTION:
-    1. The STYLE GUIDE in the System Prompt is your PRIMARY source for writing style.
-    2. FOLLOW the System Prompt's style guide STRICTLY – it contains the website's actual voice.
-    3. The rules below (VOICE & PERSONALITY REQUIREMENTS) are SECONDARY – they provide structural guidance.
-    4. If there's a conflict, ALWAYS follow the System Prompt's style guide first.
-    5. This ensures EVERY blog matches the website's UNIQUE writing style.
-
-    YOU ARE WRITING FOR: {website.name}
-    THEIR INDUSTRY: {website.industry}
-    THEIR TOPICS: {", ".join(website.topics) if website.topics else "General content"}
-    ================================================================================
-
-    ================================================================================
-    VOICE & PERSONALITY REQUIREMENTS (CRITICAL – FOLLOW STRICTLY):
-    ================================================================================
-
-    You are NOT a neutral content writer. You are a CONFIDENT INDUSTRY CONSULTANT who has seen what works and what doesn't. Take a stance. Don't sit on the fence.
-
-    1. THE HOOK (First 2-3 sentences):
-    - MUST start with a BOLD, COUNTER-INTUITIVE, or PROVOCATIVE statement.
-    - Use ONE of these hook formulas:
-        a) Metaphor: "Your [topic] is not a [X]. It's more like a [Y] that [does Z]."
-        b) Contradiction: "Most [people/companies] think [common belief]. They couldn't be more wrong."
-        c) Bold Statement: "The [X] you've been told doesn't work. Here's what actually does."
-        d) Vivid Imagery: "Imagine [visual scenario]. That's exactly what [topic] feels like."
-    - ❌ NEVER start with: "Have you ever wondered...", "In today's world...", "In this blog post..."
-
-    2. BOLD OPINION / CHALLENGING THE STATUS QUO (Conditional):
-    - ONLY include a bold, opinionated section if the topic naturally allows for a debatable stance.
-    - If the topic is purely educational, technical, or news-based, SKIP this section entirely and write a straightforward, informative article.
-    - DO NOT force an opinion into every blog. It looks contrived and repetitive.
-    - If included:
-        * DO NOT use "I think", "I disagree", "Here's my honest take" – this is a COMPANY blog.
-        * Use collective voice: "Our team has found...", "In our experience...", "At {website.name}, we've seen..."
-        * 🔒 IMPORTANT: Weave the opinion naturally into the narrative. Do NOT use a dedicated heading like "Challenging the Status Quo" – it looks forced and repetitive.
-        * Example: "Most companies assume X. Through our work with clients, we've found that Y actually drives better results."
-    - If NOT included: Write a clear, informative, and valuable blog without taking a provocative stance.
-
-    3. AUTHORITY & DATA:
-    - MUST include at least 2-3 specific statistics, study findings, or data points.
-    - ALWAYS name the source: "According to [Source]...", "[Organization] reports..."
-    - Use the LIVE SEARCH DATA to find recent stats. Weave them into the narrative naturally.
-
-    4. INDUSTRY-SPECIFIC TERMINOLOGY:
-    - Use the exact terminology that professionals in that industry use.
-    - Use the LIVE SEARCH DATA to find these terms.
-    - NEVER use generic language when specific terms exist.
-    - 🔒 CRITICAL: Do NOT copy terms from examples. Only use terms found in the LIVE SEARCH DATA or the website's own content (topics, industry, style guide).
-
-    5. DIAGNOSTIC DEPTH:
-    - Don't just say "poor X" – give 3-4 SPECIFIC, ACTIONABLE examples of problems.
-    - For each problem, describe: WHAT happens, WHO it affects, and WHY it matters.
-    - Use the LIVE SEARCH DATA and the website's industry context to find REAL problems people face.
-    - Example format: "[Specific practice/field] is often mishandled. When [specific action] happens repeatedly, [specific negative consequence] occurs."
-    - 🔒 CRITICAL: Do NOT copy generic examples. Generate problems specific to THIS industry and topic from the LIVE SEARCH DATA.
-
-    6. PUNCHY QUOTES:
-    - Include at least 2-3 short, punchy sentences (under 12 words) throughout the article.
-    - These should be bold, quotable statements that readers will want to share.
-    - Create your OWN punchy lines based on the topic – don't copy from examples.
-    - Formula: Take a key insight from your article and compress it into 6-10 words.
-    - 🔒 IMPORTANT: Do NOT create a dedicated "Punchy Insights" or "Key Takeaways" section. Weave these punchy lines naturally into the narrative – as standalone bold sentences or pull quotes.
-
-    7. BRAND INTEGRATION:
-    - Mention "{website.name}" naturally as the SOLUTION to the problems you've diagnosed.
-    - The brand mention should feel like a natural next step, not a sales pitch.
-    - GOOD: "At {website.name}, we help [industry] teams [solve specific problem]."
-    - GOOD: "Explore {website.name}'s [specific service] to [solve the specific problem you just diagnosed]."
-    - GOOD: "To talk through what a more reliable [topic] model could look like for your team, reach out to {website.name}."
-    - BAD: "Partner with {website.name} today" – too generic and salesy.
-
-    8. VOICE & TONE:
-    - Take a stance. Don't sit on the fence. Be provocative when appropriate.
-    - Use short, punchy sentences alongside longer explanations.
-    - Use rhetorical questions to engage readers.
-    - NEVER sound like a textbook, academic paper, or student essay.
-
-    9. HUMANIFICATION (Make it Feel Real):
-    - Optionally include a short, relatable example of a lesson learned or challenge overcome.
-    - Vary the story EVERY time—do NOT repeat the same phrase across blogs.
-    - ✅ GOOD APPROACHES (adapt to the topic):
-        * Technical/Software: "Our team spent hours troubleshooting because we overlooked a small configuration error..."
-        * Creative/Design: "We once invested time in a concept that looked great but confused our users..."
-        * Strategic/Planning: "We learned this the hard way when we launched without defining clear success metrics..."
-        * Operational/Process: "We had to redo work because different teams used different definitions..."
-    - 🔒 CRITICAL: Use "we" or "our team" – this is a COMPANY blog, not a personal diary.
-    - The story should feel natural to the topic, not forced.
-    - Use contractions (don't, can't, it's) to sound conversational.
-    - Write at a 9th-grade reading level. Simple, everyday language.
-
-
-   ================================================================================
-STRUCTURE & FORMATTING: MATCH THE WEBSITE'S ACTUAL PATTERN
+================================================================================
+WRITING INSTRUCTIONS
 ================================================================================
 
-10. CRITICAL: FOLLOW THE WEBSITE'S STRUCTURAL PATTERN (WITH EXAMPLE)
+1. STUDY THE REFERENCE SAMPLES ABOVE:
+   Carefully analyze all samples to understand:
+   - How they open (hook style, first paragraph pattern)
+   - How they structure content (headings, subheadings, paragraph length)
+   - How they use formatting (bold text, bullet points, lists, tables)
+   - Their sentence length and vocabulary (simple/complex, formal/casual)
+   - How they integrate CTAs and brand mentions
+   - Their overall tone and voice (professional, conversational, authoritative)
 
-    The website's style guide shows they use THIS EXACT PATTERN:
+2. WRITE A NEW BLOG POST ABOUT "{idea.title}" THAT:
+   - Matches the EXACT writing style of the reference samples
+   - Uses the SAME structural patterns (follow the format observed)
+   - Has the SAME tone and voice
+   - Uses SIMILAR vocabulary (not copying, but using the same style)
+   - Is 900-1200 words long
+   - Is SEO-optimized (meta title 55-60 chars, meta description 155-160 chars)
 
-    ✅ CORRECT PATTERN (Follow this):
-    <h2>Heading Here</h2>
-    <p>Opening paragraph explaining the concept in 2-3 sentences.</p>
-    <p><strong>Key point or benefit in bold</strong> followed by the explanation in regular text. This is how they emphasize important concepts without using bullet points. Every subpoint is written inside a paragraph with bold text for emphasis.</p>
-    <p>Another paragraph continuing the explanation. <strong>Another bold key phrase</strong> with the explanation following naturally. The entire section flows as narrative text, not as a list.</p>
+3. KEY PRINCIPLES TO FOLLOW:
+   - If the samples use bold text inside paragraphs → DO THE SAME
+   - If they use bullet points → USE bullet points
+   - If they use short paragraphs → USE short paragraphs
+   - If they use long, flowing paragraphs → USE long paragraphs
+   - If they use questions as headings → USE questions as headings
+   - If they start with bold statements → START with bold statements
+   - If they use "we" or "our team" → USE "we" and "our team"
+   - If they mention the brand naturally → MENTION the brand naturally
 
-    ❌ WRONG PATTERN (DO NOT use):
-    <h2>Heading Here</h2>
-    <p>Some text...</p>
-    <ul>
-      <li><strong>Subpoint 1</strong>: Explanation...</li>
-      <li><strong>Subpoint 2</strong>: Explanation...</li>
-    </ul>
+4. AVOID:
+   - AI buzzwords (game changer, paradigm shift, seismic shift, leverage, synergy)
+   - Generic, robotic language
+   - Copying content directly (plagiarism)
+   - Inconsistent tone
 
-    🔒 INSTRUCTION:
-    - NEVER use <ul> or <li> for subpoints.
-    - NEVER use numbered lists for benefits or features.
-    - ALWAYS use <strong> inside <p> tags for key phrases.
-    - ALWAYS write in flowing paragraphs.
-    - Match the exact pattern above – it's what the website uses.
+5. CONTENT QUALITY:
+   - Informative and valuable to readers
+   - Plagiarism-free
+   - Naturally conversational (not robotic)
+   - Free of AI-sounding phrases
 
-11. Word Count: MUST be between 900 and 1200 words.
-    - Expand each section with thorough explanations, examples, and reasoning.
-    - Write at least 6-8 detailed sections.
-    - Each section should have 3-5 paragraphs.
+================================================================================
+HUMANIFICATION: CONTENT QUALITY & AUTHORITY (GENERIC PRINCIPLES)
+================================================================================
 
-12. Paragraph Structure:
-    - Write in complete paragraphs (3-5 sentences each).
-    - Use bold text (<strong>) for key phrases, benefits, or takeaways.
-    - Let the text flow naturally from one concept to the next.
-    - Do NOT use bullet points anywhere.
+🔒 CRITICAL: This is a COMPANY blog. It should sound like a HUMAN expert, not a generic promotional piece.
 
-13. Q&A SECTION:
-    - Include 3-4 questions that actual customers or readers would ask.
-    - Format as Q&A with bold questions and clear, concise answers in paragraph form.
+FOLLOW THESE GENERIC PRINCIPLES (DO NOT copy examples – apply them to YOUR topic):
 
-14. CONCLUSION & CALL TO ACTION:
-    - Summarize the key takeaway in 1-2 paragraphs.
-    - End with a SPECIFIC, VALUE-DRIVEN CTA in paragraph form.
+1. THE HOOK MUST BE BOLD:
+   - Start with a counter-intuitive statement or bold opinion.
+   - Challenge a common belief in your industry.
+   - Formula: "Most [people/companies] think [common belief]. They couldn't be more wrong."
+   - OR: "[Common industry practice] is a waste of time. Here's what actually works."
+   - Apply this formula to YOUR topic. DO NOT copy the example – adapt it.
 
-15. Formatting Rules:
-    - Use <h2> for main section headings.
-    - Use <p> for all paragraphs.
-    - Use <strong> for bold text inside paragraphs.
-    - DO NOT use <ul>, <ol>, or <li> anywhere in the article.
+2. INCLUDE REAL DATA:
+   - MUST include at least 1-2 specific statistics from credible sources.
+   - Use the LIVE SEARCH DATA to find recent stats.
+   - Weave them naturally into the narrative.
+   - Formula: "According to [Source], [statistic]. That's why [your point]."
 
-    ================================================================================
-    SEO & OUTPUT REQUIREMENTS:
-    ================================================================================
+3. INCLUDE AN UNPOPULAR OPINION:
+   - Take a stance that challenges common industry assumptions.
+   - Formula: "Here's the thing most people miss..." or "The truth is, [common belief] is wrong."
+   - Make it specific to YOUR industry.
 
-    18. Meta Title: Use the same blog title. MUST be between 55 to 60 characters.
+4. INCLUDE A FAILURE STORY:
+   - Use "we" or "our team" – NOT "I".
+   - Formula: "We once worked with a client who [problem]. We fixed it by [solution]."
+   - OR: "Our team made a mistake early on. We learned [lesson]."
+   - Make it relevant to YOUR industry.
 
-    19. Meta Description: MUST be exactly between 155 and 160 characters.
+5. USE SPECIFIC EXAMPLES:
+   - Replace generic terms with concrete, actionable details.
+   - Instead of "good design" → explain WHAT good design means in YOUR context.
+   - Instead of "fast speed" → give a specific number or benchmark.
+   - Instead of "user-friendly" → explain WHAT makes it user-friendly.
 
-    20. Category: Assign the most appropriate professional category (e.g., "Artificial Intelligence", "Web Development", "Digital Marketing", "Business Strategy", "Technology", "Finance", "Health", etc.).
+6. INCLUDE PUNCHY QUOTES:
+   - At least 1-2 short, memorable sentences.
+   - Formula: Take a key insight from your article and compress it into 6-10 words.
+   - It should be something a reader would want to share.
 
-    21. Tags: Include 4-6 relevant tags/keywords.
+7. CALL TO ACTION MUST BE SPECIFIC:
+   - Include a specific offer or value.
+   - Formula: "Partner with {website.name} for a [specific benefit]."
+   - DO NOT use generic "Contact us" – tell them WHAT they get.
 
-    Format Requirements:
-    Return ONLY a valid JSON object with these exact keys:
-    {{
-    "title": "...(55-60 characters)...",
-    "meta_description": "...(155-160 characters)...",
-    "category": "...",
-    "tags": ["tag1", "tag2", ...],
-    "excerpt": "...(2-3 sentence preview)...",
-    "body": "...(full blog post in plain HTML using <h2>, <h3>, <p>, <ul>, <li>)..."
-    }}
+8. USE THE REFERENCE SAMPLES:
+   - Study the REFERENCE SAMPLES provided earlier.
+   - Apply the SAME patterns (bold text, structure, voice) but with YOUR content.
+   - DO NOT copy the samples – learn the pattern and apply it to YOUR topic.
 
-    Do NOT include any markdown code block formatting (like ```json ... ```). Return ONLY the raw JSON."""
+================================================================================
+OUTPUT FORMAT
+================================================================================
+Return ONLY a valid JSON object with these exact keys:
+{{
+  "title": "...(55-60 characters)...",
+  "meta_description": "...(155-160 characters)...",
+  "category": "...",
+  "tags": ["tag1", "tag2", ...],
+  "excerpt": "...(2-3 sentence preview)...",
+  "body": "...(full blog post in plain HTML using the EXACT pattern from reference samples)"
+}}
+
+Do NOT include any markdown code block formatting. Return ONLY the raw JSON."""
+
     try:
-        # Call OpenAI directly (no Gemini check)
         response = client.chat.completions.create(
-            model=MODEL,  # 'gpt-4o-mini'
+            model=MODEL,
             messages=[
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt},
             ],
-            max_tokens=4000,
+            max_tokens=2000,
             temperature=0.7,
             response_format={"type": "json_object"},
         )
@@ -904,25 +823,45 @@ STRUCTURE & FORMATTING: MATCH THE WEBSITE'S ACTUAL PATTERN
 
 
 def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> dict:
-    """Generates platform-specific social media content."""
-    limits = {
-        'instagram': 'Under 150 words. Casual, emoji-rich, 3-5 hashtags.',
-        'linkedin': 'Under 200 words. Professional tone. No emojis. Hook first line.',
-        'facebook': 'Under 120 words. Conversational. Include a question to drive comments.',
-        'youtube': 'Video description: 150-200 words. Include timestamps section and subscribe CTA.',
-        'twitter': 'Under 280 characters. Punchy. One insight.',
-    }
-    
-    instructions = limits.get(platform, 'Under 200 words, platform-appropriate.')
+    """Generates platform-specific social media content using user-provided samples."""
     system_prompt = build_system_prompt(website)
     
-    user_prompt = f"""Write a {platform.title()} post for {website.name}.
+    # Get user-uploaded samples for this platform
+    style_reference = get_style_reference_samples(website, platform)
+    
+    limits = {
+        'instagram': '150-200 characters. Casual, emoji-rich, 3-5 hashtags.',
+        'linkedin': '200-300 words. Professional tone. No emojis. Hook first line.',
+        'youtube': '150-200 words. Include timestamps and subscribe CTA.',
+        'facebook': '100-150 words. Conversational. Include a question.',
+        'twitter': '280 characters. Punchy. One insight.',
+    }
+    
+    user_prompt = f"""Write a {platform.title()} post about "{idea.title}" for {website.name}.
 
+================================================================================
+REFERENCE SAMPLES (Study these to understand the writing style)
+================================================================================
+{style_reference}
+
+================================================================================
+TASK DETAILS
+================================================================================
+PLATFORM: {platform.title()}
 TOPIC: {idea.title}
-ADMIN CONTEXT: {idea.context or "None"}
-FORMAT RULES: {instructions}
+FORMAT RULES: {limits.get(platform, 'Platform-appropriate')}
 
-Return JSON:
+================================================================================
+WRITING INSTRUCTIONS
+================================================================================
+1. Study the reference samples to understand the style
+2. Write a {platform.title()} post that matches the EXACT style
+3. Follow the format rules
+4. Return JSON with title, body, excerpt, tags
+
+================================================================================
+OUTPUT FORMAT
+================================================================================
 {{
   "title": "...(internal label)...",
   "body": "...(the actual post text)...",
@@ -930,13 +869,11 @@ Return JSON:
   "tags": ["hashtag1", "hashtag2"],
   "meta_description": ""
 }}
-
-Return ONLY the JSON."""
+"""
 
     try:
-        # Call OpenAI directly (no Gemini check)
         response = client.chat.completions.create(
-            model=MODEL,  # 'gpt-4o-mini'
+            model=MODEL,
             messages=[
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt},
@@ -1699,3 +1636,75 @@ Return ONLY a valid JSON object with these keys. Do NOT include markdown code bl
             "brand_colors": ["#6366f1", "#4f46e5", "#f5f3ff", "#1f2937", "#a5b4fc"],
             "avg_read_time": "3.5m"
         }
+
+
+def generate_suggested_ideas(website):
+    """
+    Uses GPT to generate 4 suggested content ideas (title, platform)
+    based on the website's crawled topics, industry, and tone.
+    """
+    topics_str = ", ".join(website.topics) if website.topics else "General marketing, SEO, and business growth"
+    prompt = f"""You are a content strategy generator for Cadence.
+Analyze this website context:
+- Name: {website.name}
+- Industry: {website.industry or "Technology & Marketing"}
+- Tone: {website.tone or "Professional"}
+- Core Topics: {topics_str}
+
+Generate 4 fresh, engaging, and trending content ideas for the year 2026.
+Make sure they are highly specific to the business, and utilize modern trends (like ChatGPT, Perplexity, AI search, GEO, SGE, voice agents, etc. if relevant to their industry).
+
+Return EXACTLY a JSON object with a single key "ideas" containing a list of 4 objects. Each object must have:
+1. "title": A catchy headline/topic.
+2. "platform": One of "blog", "linkedin", "instagram", "youtube" (choose platforms appropriate for the topics).
+
+Return ONLY valid JSON. No code blocks or markdown."""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{'role': 'user', 'content': prompt}],
+            max_tokens=500,
+            temperature=0.7,
+            response_format={"type": "json_object"},
+        )
+        import json
+        data = json.loads(response.choices[0].message.content)
+        ideas = data.get("ideas", [])
+        
+        from content.models import ContentIdea
+        created_ideas = []
+        for item in ideas:
+            title = item.get("title")
+            platform = item.get("platform", "blog").lower()
+            if platform not in ['blog', 'linkedin', 'instagram', 'facebook', 'youtube']:
+                platform = 'blog'
+            if title:
+                idea = ContentIdea.objects.create(
+                    website=website,
+                    title=title,
+                    platform=platform,
+                    status='pending'
+                )
+                created_ideas.append(idea)
+        return created_ideas
+    except Exception as e:
+        logger.error(f"Failed to generate dynamic ideas: {e}")
+        # Fallback to hardcoded ones based on industry
+        from content.models import ContentIdea
+        fallbacks = [
+            ("How to Get Your Business Ready for Search Generative Experience (SGE) in 2026", "blog"),
+            ("SEO vs GEO: Optimizing for AI Search Engines like Perplexity and ChatGPT", "linkedin"),
+            ("Why Voice Search and AI Agents are Changing Digital Marketing", "blog"),
+            ("5 AI tools every marketer needs to master this year", "instagram")
+        ]
+        created_ideas = []
+        for title, plat in fallbacks:
+            idea = ContentIdea.objects.create(
+                website=website,
+                title=title,
+                platform=plat,
+                status='pending'
+            )
+            created_ideas.append(idea)
+        return created_ideas

@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ipware import get_client_ip
 
-from .models import Website, SocialConnection, ScrapeResult
-from .serializers import WebsiteSerializer, SocialConnectionSerializer, ScrapeResultSerializer
+from .models import Website, SocialConnection, ScrapeResult, SampleContent
+from .serializers import WebsiteSerializer, SocialConnectionSerializer, ScrapeResultSerializer, SampleContentSerializer
 from .tasks import crawl_website_task
 from logs.models import ActivityLog
 from accounts.permissions import IsAdminOrSuperAdmin, IsSuperAdmin
@@ -17,14 +17,25 @@ class WebsiteListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        show_deleted = self.request.query_params.get('trash') == 'true'
         # Super admin sees all; admin sees only their own
         if user.role == 'super_admin':
-            return Website.objects.all().prefetch_related('social_connections')
-        return Website.objects.filter(owner=user).prefetch_related('social_connections')
+            qs = Website.objects.all().prefetch_related('social_connections')
+        else:
+            qs = Website.objects.filter(owner=user).prefetch_related('social_connections')
+        return qs.filter(is_deleted=show_deleted)
 
     def perform_create(self, serializer):
         ip, _ = get_client_ip(self.request)
-        website = serializer.save(owner=self.request.user)
+        has_samples = self.request.data.get('has_samples', False)
+        scrape_status = 'done' if has_samples else 'pending'
+        needs_crawl = not has_samples
+
+        website = serializer.save(
+            owner=self.request.user,
+            scrape_status=scrape_status,
+            needs_crawl=needs_crawl
+        )
         ActivityLog.objects.create(
             actor=self.request.user, actor_name=self.request.user.get_full_name(),
             action='website_add', target_description=website.name,
@@ -84,14 +95,19 @@ class WebsiteDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         ip, _ = get_client_ip(self.request)
+        hard = self.request.query_params.get('hard') == 'true'
         ActivityLog.objects.create(
             actor=self.request.user,
             actor_name=self.request.user.get_full_name(),
-            action='website_delete',
+            action='website_delete_permanent' if hard else 'website_delete',
             target_description=instance.name,
             ip_address=ip
         )
-        instance.delete()
+        if hard:
+            instance.delete()
+        else:
+            instance.is_deleted = True
+            instance.save(update_fields=['is_deleted'])
 
 
 class TriggerCrawlView(APIView):
@@ -180,3 +196,39 @@ class WebsitePagesListView(generics.ListAPIView):
 
     def get_queryset(self):
         return ScrapeResult.objects.filter(website_id=self.kwargs['pk'])
+
+
+class SampleContentView(generics.ListCreateAPIView):
+    """List and create samples for a website."""
+    serializer_class = SampleContentSerializer
+    permission_classes = [IsAdminOrSuperAdmin]
+    
+    def get_queryset(self):
+        return SampleContent.objects.filter(website_id=self.kwargs['pk'])
+    
+    def perform_create(self, serializer):
+        website = Website.objects.get(pk=self.kwargs['pk'])
+        instance = serializer.save(website=website)
+        
+        website.scrape_status = 'done'
+        website.needs_crawl = False
+        website.save(update_fields=['scrape_status', 'needs_crawl'])
+        
+        ip, _ = get_client_ip(self.request)
+        
+        # Log activity
+        ActivityLog.objects.create(
+            actor=self.request.user,
+            actor_name=self.request.user.get_full_name(),
+            action='samples_uploaded',
+            target_description=f"Uploaded {instance.platform} sample for {website.name}",
+            ip_address=ip
+        )
+
+
+class SampleContentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a sample."""
+    serializer_class = SampleContentSerializer
+    permission_classes = [IsAdminOrSuperAdmin]
+    queryset = SampleContent.objects.all()
+    lookup_url_kwarg = 'sample_pk'
