@@ -62,7 +62,15 @@ def crawl_website_task(self, website_id: int):
         from content.generator import summarize_website_style, analyze_website_context
         from .crawler import build_advanced_style_guide
         
-        style_summary = summarize_website_style(result['structure_summary'])
+        try:
+            style_summary = summarize_website_style(result['structure_summary'])
+        except Exception as e:
+            logger.error(f"Task style summary generation error: {e}")
+            style_summary = (
+                "Write in a professional, clear, and engaging tone. Structure the content logically with an introduction, "
+                "subheadings, and clear call-to-actions. Keep the paragraphs concise and use bullet points for readability. "
+                "Target key audience interests and write in a brand-consistent voice."
+            )
         
         try:
             analysis = analyze_website_context(result['structure_summary'])
@@ -109,8 +117,11 @@ def crawl_website_task(self, website_id: int):
             website.contact_phone = scraped_phones[0]
             
         if scraped_logo and not website.logo_url:
-            from .crawler import download_and_save_logo
-            website.logo_url = download_and_save_logo(website, scraped_logo)
+            try:
+                from .crawler import download_and_save_logo
+                website.logo_url = download_and_save_logo(website, scraped_logo)
+            except Exception as e:
+                logger.error(f"Failed to download and save logo: {e}")
             
         website.save(update_fields=[
             'scrape_summary', 'scrape_status', 'last_crawled', 
@@ -128,4 +139,7 @@ def crawl_website_task(self, website_id: int):
     except Exception as exc:
         logger.error(f"Crawl failed for website {website_id}: {exc}")
         Website.objects.filter(pk=website_id).update(scrape_status='failed')
+        from django.conf import settings
+        if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False) or self.request.called_directly:
+            return {'status': 'failed', 'error': str(exc)}
         raise self.retry(exc=exc, countdown=60)

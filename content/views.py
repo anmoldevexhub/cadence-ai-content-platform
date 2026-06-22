@@ -206,8 +206,8 @@ class ScheduleDraftView(APIView):
 
     def post(self, request, pk):
         draft = ContentDraft.objects.get(pk=pk)
-        if draft.status != 'approved':
-            return Response({'detail': 'Draft must be approved first.'}, status=400)
+        if draft.status not in ['draft', 'approved', 'scheduled']:
+            return Response({'detail': 'Draft must be in draft, approved, or scheduled status first.'}, status=400)
         
         scheduled_for = request.data.get('scheduled_for')
         if not scheduled_for:

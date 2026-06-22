@@ -122,6 +122,13 @@ class SampleContentTests(TestCase):
 
     def test_build_system_prompt(self):
         """Test minimal system prompt structure."""
+        SampleContent.objects.create(
+            website=self.website,
+            platform='blog',
+            title='Test Blog Sample',
+            content='Sample blog content.',
+            is_active=True
+        )
         prompt = build_system_prompt(self.website)
         self.assertIn(self.website.name, prompt)
         self.assertIn("Write in the same style as the samples", prompt)

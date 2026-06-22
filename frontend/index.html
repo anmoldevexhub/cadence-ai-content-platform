@@ -19,22 +19,22 @@
         <div><div class="brand-name" style="font-size:18px">Cadence</div><div class="muted tsm">AI Content Generation Dashboard</div></div>
       </div>
       <div class="row gap2">
-        <div class="segmented" id="ixRole"><button data-role="admin">Admin</button><button data-role="super">Super Admin</button></div>
-        <button class="icon-btn btn-secondary" data-action="toggle-theme" style="border:1px solid var(--border-strong)"><i data-lucide="sun-moon"></i></button>
-        <a class="btn btn-primary" href="login.html"><i data-lucide="arrow-right"></i> Launch app</a>
+        <button class="icon-btn btn-secondary" data-action="toggle-theme" style="border:1px solid var(--border-strong);margin-right:4px"><i data-lucide="sun-moon"></i></button>
+        <a class="btn btn-secondary" href="login.html"><i data-lucide="log-in"></i> Sign in</a>
+        <a class="btn btn-primary" href="signup.html"><i data-lucide="user-plus"></i> Register</a>
       </div>
     </header>
 
     <section class="ix-hero">
-      <span class="badge badge-primary mb4"><i data-lucide="sparkles"></i> Design prototype · UI only · mock data</span>
+      <span class="badge badge-primary mb4"><i data-lucide="sparkles"></i> Django Backend Active · Dynamic User Roles</span>
       <h1>The AI content engine for multi-site teams.</h1>
-      <p>Cadence crawls each client website, drafts blogs, LinkedIn, YouTube &amp; Instagram posts, then auto-publishes a full week of approved content. This is the complete front-end — every screen, two roles, light &amp; dark.</p>
-      <div class="row gap3 wrap mt5">
-        <a class="btn btn-primary btn-lg" href="dashboard.html"><i data-lucide="layout-dashboard"></i> Open dashboard</a>
-        <a class="btn btn-secondary btn-lg" href="website-workspace.html?site=northwind"><i data-lucide="sparkles"></i> Try content generation</a>
+      <p>Cadence crawls client websites, drafts blogs, LinkedIn, YouTube &amp; Instagram posts, and auto-publishes approved content. Register as an Admin or Super Admin below to explore the role-specific dashboards.</p>
+      <div class="row gap3 wrap mt5" style="justify-content:center">
+        <a class="btn btn-primary btn-lg" href="login.html"><i data-lucide="log-in"></i> Sign in to Dashboard</a>
+        <a class="btn btn-secondary btn-lg" href="signup.html"><i data-lucide="user-plus"></i> Create Account</a>
       </div>
       <div class="ix-tips">
-        <span><i data-lucide="repeat"></i> Toggle <b>Admin / Super Admin</b> in the top bar of any page</span>
+        <span><i data-lucide="shield-check"></i> Super Admins unlock system-wide "Administration" views</span>
         <span><i data-lucide="moon"></i> Toggle <b>light / dark</b> with the theme button</span>
       </div>
     </section>
@@ -63,10 +63,7 @@
   <script>
   (function () {
     const C = window.Cadence, I = C.icon;
-    // reflect current role in the index toggle (uses shared handlers via app.js? app.js wires [data-role] only in shell). Wire here:
-    function syncRole(){ document.querySelectorAll("#ixRole button").forEach(b=>b.classList.toggle("active", b.dataset.role===C.store.role)); }
-    document.querySelectorAll("#ixRole button").forEach(b=>b.addEventListener("click",()=>{ C.store.role=b.dataset.role; syncRole(); C.toast({type:"info",title:b.dataset.role==="super"?"Previewing as Super Admin":"Previewing as Admin"}); }));
-    syncRole();
+
 
     const pages = [
       { t:"Login", d:"Branded split sign-in with social placeholders", href:"login.html", icon:"log-in", tile:"blog", tag:"Auth" },

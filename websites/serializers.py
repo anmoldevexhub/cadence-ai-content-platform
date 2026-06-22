@@ -33,7 +33,7 @@ class WebsiteSerializer(serializers.ModelSerializer):
             'last_crawled', 'social_connections', 'style_guide', 'needs_crawl',
             'contact_email', 'contact_phone', 'logo_url', 'logo_upload', 'is_deleted'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'owner']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     def create(self, validated_data):
         logo_upload = validated_data.pop('logo_upload', None)

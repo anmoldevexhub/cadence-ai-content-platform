@@ -54,7 +54,8 @@ window.MOCK = (function () {
   // Helper for synchronous API requests
   function requestSync(url, method = 'GET', body = null) {
     const xhr = new XMLHttpRequest();
-    xhr.open(method, '/api' + url, false); // false makes it synchronous
+    const cleanUrl = method === 'GET' ? (url + (url.includes('?') ? '&' : '?') + '_=' + Date.now()) : url;
+    xhr.open(method, '/api' + cleanUrl, false); // false makes it synchronous
     
     const token = localStorage.getItem('cadence.access_token');
     if (token) {
@@ -117,11 +118,29 @@ window.MOCK = (function () {
     const me = requestSync('/auth/me/');
     if (!me) return defaultMock;
 
-    const meName = (me.first_name || me.last_name) ? `${me.first_name} ${me.last_name}`.trim() : me.username;
-    const meInitials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || me.username.substring(0, 2).toUpperCase();
+    // Sync localStorage settings with the backend profile data
+    if (me.first_name || me.last_name) {
+      localStorage.setItem("cadence.settings.name", ((me.first_name || '') + ' ' + (me.last_name || '')).trim());
+    }
+    if (me.email) {
+      localStorage.setItem("cadence.settings.email", me.email);
+    }
+    if (me.job_title) {
+      localStorage.setItem("cadence.settings.jobTitle", me.job_title);
+    }
+    if (me.timezone) {
+      localStorage.setItem("cadence.settings.timezone", me.timezone);
+    }
+    if (me.bio) {
+      localStorage.setItem("cadence.settings.bio", me.bio);
+    }
+
+    const meName = localStorage.getItem("cadence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
+    const meEmail = localStorage.getItem("cadence.settings.email") || me.email || '';
+    const meInitials = (((me.first_name && me.first_name[0]) || '') + ((me.last_name && me.last_name[0]) || '')).toUpperCase() || (me.username ? me.username.substring(0, 2).toUpperCase() : 'U');
     const userObj = {
       name: meName,
-      email: me.email,
+      email: meEmail,
       initials: meInitials,
       color: me.avatar_color || '#6366f1',
       role: me.role === 'super_admin' ? 'super' : 'admin'
@@ -226,8 +245,8 @@ window.MOCK = (function () {
     if (me.role === 'super_admin') {
       const usersRes = requestSync('/auth/users/') || [];
       admins = usersRes.map(u => {
-        const name = (u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}`.trim() : u.username;
-        const initials = ((u.first_name ? u.first_name[0] : '') + (u.last_name ? u.last_name[0] : '')).toUpperCase() || u.username.substring(0, 2).toUpperCase();
+        const name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username || '';
+        const initials = (((u.first_name && u.first_name[0]) || '') + ((u.last_name && u.last_name[0]) || '')).toUpperCase() || (u.username ? u.username.substring(0, 2).toUpperCase() : 'U');
         return {
           id: u.id,
           name: name,
@@ -321,11 +340,19 @@ window.MOCK = (function () {
       if (publishedSeries[i] > 0) {
         engagementSeries[i] = Number((engagementSeries[i] / publishedSeries[i]).toFixed(1));
       } else {
-        // Fallback baseline for initial state
-        publishedSeries[i] = i * 2 + 3;
-        engagementSeries[i] = Number((3.0 + i * 0.3).toFixed(1));
+        publishedSeries[i] = 0;
+        engagementSeries[i] = 0;
       }
-      approvalRateSeries[i] = 80 + (i * 2) + (i % 3);
+      const weekContent = content.filter(c => {
+        const createdDate = new Date(c.created_at || nowObj);
+        const diffMs = nowObj - createdDate;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const weekIndex = 7 - Math.floor(diffDays / 7);
+        return weekIndex === i;
+      });
+      const weekTotal = weekContent.length;
+      const weekApproved = weekContent.filter(c => c.status === 'Published' || c.status === 'Scheduled').length;
+      approvalRateSeries[i] = weekTotal > 0 ? Math.round((weekApproved / weekTotal) * 100) : 0;
     }
 
     const dynamicSeries = {
@@ -355,10 +382,24 @@ window.MOCK = (function () {
 
   } catch (err) {
     console.error("Failed to load backend mock data proxy", err);
+    const savedName = localStorage.getItem("cadence.settings.name");
+    const savedEmail = localStorage.getItem("cadence.settings.email");
     const finalResult = {
       ...defaultMock,
       site: (id) => defaultMock.websites.find(w => w.id === id)
     };
+    if (savedName) {
+      finalResult.users.admin.name = savedName;
+      finalResult.users.super.name = savedName;
+      const parts = savedName.split(/\s+/);
+      const initials = (((parts[0] && parts[0][0]) || '') + ((parts[1] && parts[1][0]) || '')).toUpperCase() || 'U';
+      finalResult.users.admin.initials = initials;
+      finalResult.users.super.initials = initials;
+    }
+    if (savedEmail) {
+      finalResult.users.admin.email = savedEmail;
+      finalResult.users.super.email = savedEmail;
+    }
     document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return finalResult;
   }

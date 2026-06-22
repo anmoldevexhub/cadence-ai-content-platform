@@ -12,7 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'username', 'first_name', 'last_name',
                   'full_name', 'role', 'is_active', 'avatar_color',
                   'initials', 'website_count', 'last_login_display',
-                  'date_joined']
+                  'date_joined', 'job_title', 'timezone', 'bio']
         read_only_fields = ['date_joined']
 
     def get_full_name(self, obj):
@@ -33,7 +33,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = CustomUser
-        fields = ['email', 'username', 'first_name', 'last_name',
+        fields = ['id', 'email', 'username', 'first_name', 'last_name',
                   'password', 'role', 'avatar_color']
 
     def create(self, validated_data):

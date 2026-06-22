@@ -61,6 +61,15 @@
             <div class="input-group"><span class="lead"><i data-lucide="mail"></i></span>
               <input class="input" id="email" type="email" placeholder="you@company.com" autocomplete="email" /></div>
           </div>
+          <div class="field">
+            <label class="label" for="role">Account Role</label>
+            <div class="input-group"><span class="lead"><i data-lucide="shield"></i></span>
+              <select class="select" id="role">
+                <option value="admin">Admin (Manage client websites)</option>
+                <option value="super">Super Admin (Manage system/workspace)</option>
+              </select>
+            </div>
+          </div>
           <div class="field" style="margin-bottom:var(--s4)">
             <label class="label" for="pw">Password</label>
             <div class="input-group"><span class="lead"><i data-lucide="lock"></i></span>
@@ -85,6 +94,7 @@
       e.preventDefault();
       const name = document.getElementById("name");
       const email = document.getElementById("email");
+      const role = document.getElementById("role");
       const pw = document.getElementById("pw");
       let ok = true;
       [name, email, pw].forEach(f => f.closest(".field").classList.remove("has-error"));
@@ -96,11 +106,11 @@
       const btn = e.target.querySelector("button[type=submit]");
       btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Creating account…'; lucide.createIcons();
       try {
-        await CadenceAPI.signup(name.value, email.value, pw.value);
+        await CadenceAPI.signup(name.value, email.value, pw.value, role.value);
         // Automatically login
         await CadenceAPI.login(email.value, pw.value);
-        Cadence.toast({ type: "success", title: "Account created", desc: "Let's add your first website." });
-        setTimeout(() => location.href = "add-website.html", 1000);
+        Cadence.toast({ type: "success", title: "Account created", desc: "Redirecting to your dashboard…" });
+        setTimeout(() => location.href = "dashboard.html", 1000);
       } catch (err) {
         console.error(err);
         btn.disabled = false; btn.innerHTML = 'Create account <i data-lucide="arrow-right"></i>'; lucide.createIcons();

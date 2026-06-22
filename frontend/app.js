@@ -71,7 +71,8 @@
         ${NAV_ADMIN.map(navItem).join("")}
       </div>` : "";
 
-    const user = role === "super" ? window.MOCK.users.super : window.MOCK.users.admin;
+    const usersObj = window.MOCK?.users || {};
+    const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#6366f1" };
 
     return `
       <div class="sidebar__brand">
@@ -105,8 +106,6 @@
             <div class="menu-head"><div class="nm">${user.name}</div><div class="em">${user.email}</div></div>
             <div class="menu-sep"></div>
             <a class="menu-item" href="settings.html">${I("user")}Profile</a>
-            <a class="menu-item" href="settings.html">${I("credit-card")}Billing &amp; plan</a>
-            <a class="menu-item" href="settings.html">${I("bell")}Notifications</a>
             <div class="menu-sep"></div>
             <a class="menu-item danger" href="login.html">${I("log-out")}Sign out</a>
           </div>
@@ -116,6 +115,8 @@
 
   function buildTopbar() {
     const role = store.role;
+    const usersObj = window.MOCK?.users || {};
+    const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#6366f1" };
     return `
       <button class="icon-btn sidebar-toggle" data-action="toggle-sidebar" aria-label="Menu">${I("menu")}</button>
       <label class="topbar__search">
@@ -124,10 +125,6 @@
         <kbd>⌘K</kbd>
       </label>
       <div class="topbar__actions">
-        <div class="segmented" role="group" aria-label="Role">
-          <button data-role="admin" class="${role === "admin" ? "active" : ""}">${I("user")}Admin</button>
-          <button data-role="super" class="${role === "super" ? "active" : ""}">${I("shield")}Super Admin</button>
-        </div>
         <div class="dropdown">
           <button class="icon-btn" data-menu="notifs" aria-label="Notifications">${I("bell")}<span class="dot"></span></button>
           <div class="menu" id="notifs" style="min-width:320px">
@@ -143,7 +140,7 @@
         <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle theme">${I("sun-moon")}</button>
         <div class="dropdown">
           <button class="icon-btn" data-menu="topuser" aria-label="Account" style="width:auto;padding:3px;border-radius:99px">
-            <span class="avatar avatar-sm" style="background:${(role==='super'?window.MOCK.users.super:window.MOCK.users.admin).color}">${localStorage.getItem("cadence.settings.avatar") ? `<img src="${localStorage.getItem("cadence.settings.avatar")}" alt="User">` : (role==='super'?window.MOCK.users.super:window.MOCK.users.admin).initials}</span>
+            <span class="avatar avatar-sm" style="background:${user.color}">${localStorage.getItem("cadence.settings.avatar") ? `<img src="${localStorage.getItem("cadence.settings.avatar")}" alt="User">` : user.initials}</span>
           </button>
           <div class="menu" id="topuser">
             <a class="menu-item" href="settings.html">${I("user")}Profile</a>

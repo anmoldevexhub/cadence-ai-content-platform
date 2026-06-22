@@ -49,7 +49,7 @@
                   <div class="field"><label class="label">Full name</label><input class="input" id="pName"/></div>
                   <div class="field"><label class="label">Email</label><input class="input" id="pEmail" type="email"/></div>
                   <div class="field"><label class="label">Job title</label><input class="input" id="pJobTitle" value="Content Manager"/></div>
-                  <div class="field"><label class="label">Timezone</label><select class="select" id="pTimezone"><option>(GMT-08:00) Pacific Time</option><option selected>(GMT+00:00) London</option><option>(GMT+01:00) Berlin</option></select></div>
+                  <div class="field"><label class="label">Timezone</label><select class="select" id="pTimezone"><option>(GMT-08:00) Pacific Time</option><option>(GMT+00:00) London</option><option>(GMT+01:00) Berlin</option><option selected>(GMT+05:30) India (Kolkata)</option></select></div>
                 </div>
                 <div class="field" style="margin-bottom:0"><label class="label">Bio</label><textarea class="textarea" id="pBio">Managing content for specialty brands at Cadence.</textarea></div>
               </div>
@@ -149,13 +149,22 @@
       return;
     }
     const C = window.Cadence, M = window.MOCK, I = C.icon;
-    const u = (C.store.role === "super" ? M.users.super : M.users.admin) || M.users.admin || {};
+    const usersObj = M.users || {};
+    const u = (C.store.role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || {};
+
+    const getPlatIcon = (name) => {
+      if (M && typeof M.platMeta === 'function') {
+        const meta = M.platMeta(name);
+        return meta ? meta.icon : 'file-text';
+      }
+      return 'file-text';
+    };
 
     // Load initial profile data
-    document.getElementById("pName").value = u.name;
-    document.getElementById("pEmail").value = u.email;
+    document.getElementById("pName").value = localStorage.getItem("cadence.settings.name") || u.name || "";
+    document.getElementById("pEmail").value = localStorage.getItem("cadence.settings.email") || u.email || "";
     document.getElementById("pJobTitle").value = localStorage.getItem("cadence.settings.jobTitle") || "Content Manager";
-    document.getElementById("pTimezone").value = localStorage.getItem("cadence.settings.timezone") || "(GMT+00:00) London";
+    document.getElementById("pTimezone").value = localStorage.getItem("cadence.settings.timezone") || "(GMT+05:30) India (Kolkata)";
     document.getElementById("pBio").value = localStorage.getItem("cadence.settings.bio") || "Managing content for specialty brands at Cadence.";
 
     // Load scheduler data
@@ -216,7 +225,13 @@
 
     function applyRole() { document.querySelectorAll(".super-only").forEach(e => e.classList.toggle("hide", C.store.role !== "super")); }
     applyRole();
-    window.addEventListener("rolechange", () => { applyRole(); if (C.store.role !== "super" && document.querySelector('.set-link[data-s=billing]').classList.contains('active')) switchTo("profile"); });
+    window.addEventListener("rolechange", () => {
+      applyRole();
+      const billingLink = document.querySelector('.set-link[data-s=billing]');
+      if (C.store.role !== "super" && billingLink && billingLink.classList.contains('active')) {
+        switchTo("profile");
+      }
+    });
 
     // settings nav
     function switchTo(s) {
@@ -268,7 +283,7 @@
     });
 
     document.getElementById("postTimes").innerHTML = times.map(([n,t,tm])=>`
-      <div class="chan-conn"><span class="icon-tile tile-${t}">${I(M.platMeta(n).icon)}</span>
+      <div class="chan-conn"><span class="icon-tile tile-${t}">${I(getPlatIcon(n))}</span>
         <div style="flex:1"><div class="fw6">${n}</div><div class="muted tsm">Default daily posting time</div></div>
         <input class="input post-time-input" data-platform="${t}" type="time" value="${tm}" style="width:130px"/></div>`).join("");
 
@@ -290,7 +305,7 @@
     function renderConnections() {
       document.getElementById("connList").innerHTML = conns.map((c) => `
         <div class="chan-conn">
-          <span class="icon-tile tile-${c.key}">${I(M.platMeta(c.name === "X / Twitter" ? "Blog" : c.name).icon)}</span>
+          <span class="icon-tile tile-${c.key}">${I(getPlatIcon(c.name === "X / Twitter" ? "Blog" : c.name))}</span>
           <div class="cc-meta">
             <div class="cc-nm">${c.name}</div>
             <div class="cc-st">${c.status}</div>
@@ -453,6 +468,8 @@
       });
       
       // --- Always save to localStorage first (non-blocking) ---
+      localStorage.setItem("cadence.settings.name", name);
+      localStorage.setItem("cadence.settings.email", email);
       localStorage.setItem("cadence.settings.jobTitle", jobTitle);
       localStorage.setItem("cadence.settings.timezone", timezone);
       localStorage.setItem("cadence.settings.bio", bio);
@@ -479,7 +496,10 @@
           body: JSON.stringify({
             first_name: firstName,
             last_name: lastName,
-            email: email
+            email: email,
+            job_title: jobTitle,
+            timezone: timezone,
+            bio: bio
           })
         });
         // Refresh local user cache from backend

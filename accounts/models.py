@@ -18,6 +18,10 @@ class CustomUser(AbstractUser):
         on_delete=models.SET_NULL, related_name='created_users'
     )
     avatar_color = models.CharField(max_length=7, default='#6366f1')
+    job_title = models.CharField(max_length=100, default='Content Manager')
+    timezone = models.CharField(max_length=100, default='(GMT+05:30) India (Kolkata)')
+    bio = models.TextField(blank=True, default='Managing content for specialty brands at Cadence.')
+    deleted_at = models.DateTimeField(null=True, blank=True)  # soft-delete / trash
     
     class Meta:
         db_table = 'accounts_user'

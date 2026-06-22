@@ -680,8 +680,9 @@
             return `<span class="badge ${styleClass}" style="text-transform:uppercase;font-size:10px">${name}</span>`;
           }).join(" ") + `</div>`;
       }
-      const coverStyle = coverImage ? ` style="background-image: url('${coverImage}'); background-size: cover; background-position: center; border: none; height: 220px;"` : '';
-      const coverContent = coverImage ? '' : I("image","style='width:28px;height:28px'");
+      const coverHTML = coverImage 
+        ? `<img class="bp-cover-img" src="${coverImage}" style="width:100%; height:auto; border-radius:var(--r-md); margin-bottom:var(--s4); display:block; border:none;" />` 
+        : `<div class="bp-cover">${I("image","style='width:28px;height:28px'")}</div>`;
 
       const dateObj = createdAt ? new Date(createdAt) : new Date();
       const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -726,7 +727,7 @@
 
       return `<div class="bp preview-wrapper-${site.id}"><div class="bp-kicker">Article</div><h2>${title}</h2>
         ${bylineHTML}
-        <div class="bp-cover"${coverStyle}>${coverContent}</div>
+        ${coverHTML}
         ${blogBody}
         ${tagsHTML}</div>`;
     }

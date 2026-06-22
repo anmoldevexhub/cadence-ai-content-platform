@@ -3,17 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard · Cadence</title>
-  <script>
-    (function() {
-      const role = localStorage.getItem("cadence.role") || "admin";
-      if (role === "super") {
-        window.location.replace("super-dashboard.html");
-      } else {
-        window.location.replace("admin-dashboard.html");
-      }
-    })();
-  </script>
+  <title>Super Admin Dashboard · Cadence</title>
   <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -28,15 +18,15 @@
     <div class="backdrop" id="backdrop"></div>
     <div class="main">
       <header class="topbar" id="topbar"></header>
-      <main class="content" data-screen-label="Dashboard">
+      <main class="content" data-screen-label="Super Admin Dashboard">
 
         <div class="breadcrumbs">
           <a href="dashboard.html">Home</a>
         </div>
         <div class="page-head">
           <div class="ph-text">
-            <h1 class="page-title" id="greeting">Good morning, Maya</h1>
-            <p class="page-sub">Here's what's happening across your websites this week.</p>
+            <h1 class="page-title" id="greeting">Good morning, Devon</h1>
+            <p class="page-sub">System-wide overview and website controls.</p>
           </div>
           <div class="ph-actions">
             <a class="btn btn-secondary" href="add-website.html" id="addBtn"></a>
@@ -46,6 +36,44 @@
 
         <!-- Stat cards -->
         <div class="grid grid-4" id="stats" style="margin-bottom:var(--s6)"></div>
+
+        <!-- Administration Section (Super Admin only) -->
+        <div class="card" style="margin-bottom:var(--s6)">
+          <div class="card__header">
+            <div>
+              <h3>System Administration</h3>
+              <div class="sub">Workspace management and system logs</div>
+            </div>
+          </div>
+          <div class="card__body" style="padding:var(--s4)">
+            <div class="grid grid-3 gap4" id="administrationSection">
+              <a class="qa-item" href="admins.html">
+                <span class="icon-tile tile-blog" style="background:var(--primary-soft);color:var(--primary)"><i data-lucide="users"></i></span>
+                <span style="flex:1">
+                  <span class="qa-t">Admins &amp; Roles</span>
+                  <span class="qa-d">Manage users, permissions, and audit logs.</span>
+                </span>
+                <i data-lucide="arrow-right" class="qa-arrow"></i>
+              </a>
+              <a class="qa-item" href="all-websites.html">
+                <span class="icon-tile tile-linkedin" style="background:var(--success-soft);color:var(--success)"><i data-lucide="globe"></i></span>
+                <span style="flex:1">
+                  <span class="qa-t">All Websites</span>
+                  <span class="qa-d">Review and configure all websites in the workspace.</span>
+                </span>
+                <i data-lucide="arrow-right" class="qa-arrow"></i>
+              </a>
+              <a class="qa-item" href="admins.html?tab=logs">
+                <span class="icon-tile tile-instagram" style="background:var(--warning-soft);color:var(--warning)"><i data-lucide="history"></i></span>
+                <span style="flex:1">
+                  <span class="qa-t">Activity Audit Trail</span>
+                  <span class="qa-d">System-wide audit trail of website &amp; content updates.</span>
+                </span>
+                <i data-lucide="arrow-right" class="qa-arrow"></i>
+              </a>
+            </div>
+          </div>
+        </div>
 
         <div class="grid" style="grid-template-columns: 1.55fr 1fr; align-items:start; margin-bottom:var(--s6)">
           <!-- Chart -->
@@ -252,7 +280,6 @@
           },
         },
       });
-      // settle layout race without depending on rAF (throttled when tab hidden)
       setTimeout(() => { if (chart) chart.resize(); }, 90);
     }
     drawChart();
@@ -267,7 +294,6 @@
   </script>
 
   <style>
-    /* dashboard-specific */
     .qa-item { display:flex; align-items:center; gap:var(--s3); padding:11px; border:1px solid var(--border); border-radius:var(--r-md); transition:.12s; }
     .qa-item:hover { background:var(--bg-subtle); border-color:var(--border-strong); }
     .qa-t { display:block; font-weight:600; }

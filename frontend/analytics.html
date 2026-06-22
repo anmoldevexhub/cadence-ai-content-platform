@@ -127,14 +127,6 @@
         <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up">${I("trending-up")} ${s.d} <span class="muted">vs prev.</span></div></div>`).join("");
 
       // Renders top content table
-      const staticFallback = [
-        ["Lisbon in 48 hours — the locals' itinerary","Atlas Travel","#db2777","YouTube","48.2k","12.4%","Jun 8"],
-        ["5 signs your beans are past their prime","Northwind Coffee","#b45309","Instagram","31.1k","9.8%","Jun 6"],
-        ["Why progressive overload beats motivation","Lumen Fitness","#0ea5e9","LinkedIn","22.7k","7.1%","Jun 5"],
-        ["7 Low-Light Houseplants That Thrive","Verdant Home","#16a34a","Blog","18.9k","6.2%","Jun 3"],
-        ["The underrated European winter cities","Atlas Travel","#db2777","Blog","16.4k","5.9%","Jun 1"],
-      ];
-
       let top = publishedContent.length ? publishedContent.map(c => {
         const siteObj = M.websites.find(w => w.id === c.site) || { name: 'General', color: '#6366f1' };
         const idInt = parseInt(c.id) || 1;
@@ -153,7 +145,7 @@
           engagement,
           dateStr
         ];
-      }) : (siteId === "all" ? staticFallback : []);
+      }) : [];
 
       if (publishedContent.length) {
         top.sort((a, b) => parseFloat(b[5]) - parseFloat(a[5]));
@@ -198,16 +190,16 @@
       });
 
       for (let i = 0; i < 8; i++) {
-        if (publishedSeries[i] === 0) {
-          publishedSeries[i] = i + 1;
-          engagementSeries[i] = Number((3.0 + i * 0.4).toFixed(1));
-        } else {
+        if (publishedSeries[i] > 0) {
           engagementSeries[i] = Number((engagementSeries[i] / publishedSeries[i]).toFixed(1));
+        } else {
+          publishedSeries[i] = 0;
+          engagementSeries[i] = 0;
         }
         if (totalSeries[i] > 0) {
           approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
         } else {
-          approvalRateSeries[i] = 80 + (i * 2);
+          approvalRateSeries[i] = 0;
         }
       }
 
@@ -218,13 +210,6 @@
         }
       });
       let totalPlatform = Object.values(byPlatform).reduce((a,b)=>a+b,0);
-      if (totalPlatform === 0) {
-        byPlatform.Blog = 5;
-        byPlatform.LinkedIn = 3;
-        byPlatform.YouTube = 2;
-        byPlatform.Instagram = 1;
-        totalPlatform = 11;
-      }
 
       // Rebuild charts
       const t = tc();
@@ -235,7 +220,7 @@
       charts.vol = new Chart(vctx,{type:"line",data:{labels:M.weeks,datasets:[{data:publishedSeries,borderColor:t.primary,backgroundColor:grad,fill:true,tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:baseOpts(t)});
 
       charts.plat = new Chart(document.getElementById("platChart"),{type:"doughnut",data:{labels:Object.keys(byPlatform),datasets:[{data:Object.values(byPlatform),backgroundColor:[t.blog,t.linkedin,t.youtube,t.instagram],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:"64%",plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}}}});
-      document.getElementById("platLegend").innerHTML=Object.entries(byPlatform).map(([k,v],i)=>`<div class="pl-row"><span class="lg-dot" style="background:${[t.blog,t.linkedin,t.youtube,t.instagram][i]}"></span><span class="pl-name">${k}</span><span class="pl-val mono">${Math.round(v/totalPlatform*100)}%</span></div>`).join("");
+      document.getElementById("platLegend").innerHTML=Object.entries(byPlatform).map(([k,v],i)=>`<div class="pl-row"><span class="lg-dot" style="background:${[t.blog,t.linkedin,t.youtube,t.instagram][i]}"></span><span class="pl-name">${k}</span><span class="pl-val mono">${totalPlatform > 0 ? Math.round(v/totalPlatform*100) : 0}%</span></div>`).join("");
 
       charts.appr = new Chart(document.getElementById("apprChart"),{type:"line",data:{labels:M.weeks,datasets:[{data:approvalRateSeries,borderColor:t.success,backgroundColor:"transparent",tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:{...baseOpts(t),scales:{...baseOpts(t).scales,y:{...baseOpts(t).scales.y,min:50,max:100,ticks:{color:t.text,callback:v=>v+"%"}}}}});
 

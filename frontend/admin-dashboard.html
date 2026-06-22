@@ -3,17 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard · Cadence</title>
-  <script>
-    (function() {
-      const role = localStorage.getItem("cadence.role") || "admin";
-      if (role === "super") {
-        window.location.replace("super-dashboard.html");
-      } else {
-        window.location.replace("admin-dashboard.html");
-      }
-    })();
-  </script>
+  <title>Admin Dashboard · Cadence</title>
   <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -252,7 +242,6 @@
           },
         },
       });
-      // settle layout race without depending on rAF (throttled when tab hidden)
       setTimeout(() => { if (chart) chart.resize(); }, 90);
     }
     drawChart();
@@ -267,7 +256,6 @@
   </script>
 
   <style>
-    /* dashboard-specific */
     .qa-item { display:flex; align-items:center; gap:var(--s3); padding:11px; border:1px solid var(--border); border-radius:var(--r-md); transition:.12s; }
     .qa-item:hover { background:var(--bg-subtle); border-color:var(--border-strong); }
     .qa-t { display:block; font-weight:600; }

@@ -26,6 +26,6 @@ urlpatterns = [
     path('api/websites/', include('websites.urls')),
     path('api/content/', include('content.urls')),
     path('api/logs/', include('logs.urls')),
-    # Serve frontend — redirect root to static index.html
-    path('', RedirectView.as_view(url='/static/index.html', permanent=False), name='home'),
+    # Serve frontend — redirect root to static login.html
+    path('', RedirectView.as_view(url='/static/login.html', permanent=False), name='home'),
 ]

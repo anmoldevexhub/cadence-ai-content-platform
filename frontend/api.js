@@ -50,13 +50,17 @@
       headers['Content-Type'] = 'application/json';
     }
 
+    if (!options.method || options.method.toUpperCase() === 'GET') {
+      options.cache = 'no-store';
+    }
+
     options.headers = headers;
 
     try {
       const response = await fetch(API_BASE + url, options);
 
       // Handle token expiration / invalid token (401)
-      if (response.status === 401) {
+      if (response.status === 401 && !url.includes('/auth/login/')) {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
           headers['Authorization'] = `Bearer ${localStorage.getItem(ACCESS_KEY)}`;
@@ -139,6 +143,17 @@
     const access = localStorage.getItem(ACCESS_KEY);
     if (!access) {
       redirectToLogin();
+    } else {
+      const role = localStorage.getItem('cadence.role') || 'admin';
+      const path = window.location.pathname;
+      const isSuperOnly = ['super-dashboard.html', 'admins.html', 'all-websites.html'].some(p => path.includes(p));
+      const isAdminOnly = ['admin-dashboard.html'].some(p => path.includes(p));
+      
+      if (isSuperOnly && role !== 'super') {
+        window.location.replace('admin-dashboard.html');
+      } else if (isAdminOnly && role === 'super') {
+        window.location.replace('super-dashboard.html');
+      }
     }
   }
 
@@ -171,7 +186,7 @@
       return data;
     },
 
-    async signup(name, email, password) {
+    async signup(name, email, password, role = 'admin') {
       // Split name into first and last name
       const nameParts = name.trim().split(/\s+/);
       const firstName = nameParts[0] || '';
@@ -186,7 +201,7 @@
           first_name: firstName,
           last_name: lastName,
           password,
-          role: 'admin', // Default signup is normal Admin
+          role: role === 'super' ? 'super_admin' : 'admin',
           avatar_color: '#6366f1'
         })
       });
@@ -430,6 +445,13 @@
       });
     },
 
+    async updateAdmin(id, data) {
+      return await request(`/auth/users/${id}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(data)
+      });
+    },
+
     // Helper to fetch and sync all MOCK data variables
     async syncMockData(websiteId = null) {
       try {
@@ -544,9 +566,10 @@
         // Set user details
         const me = this.getUser();
         if (me) {
-          const name = me.first_name + ' ' + me.last_name;
-          const initials = (me.first_name[0] || '') + (me.last_name[0] || '');
-          const mappedUser = { name, email: me.email, initials, color: me.avatar_color || '#6366f1', role: me.role === 'super_admin' ? 'super' : 'admin' };
+          const name = localStorage.getItem("cadence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
+          const email = localStorage.getItem("cadence.settings.email") || me.email || '';
+          const initials = (((me.first_name && me.first_name[0]) || '') + ((me.last_name && me.last_name[0]) || '')).toUpperCase() || (me.username ? me.username.substring(0, 2).toUpperCase() : 'U');
+          const mappedUser = { name, email, initials, color: me.avatar_color || '#6366f1', role: me.role === 'super_admin' ? 'super' : 'admin' };
           
           if (me.role === 'super_admin') {
             window.MOCK.users.super = mappedUser;
