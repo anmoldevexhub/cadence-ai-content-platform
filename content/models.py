@@ -57,6 +57,7 @@ class ContentDraft(models.Model):
     tags = models.JSONField(default=list)
     word_count = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    banner_settings = models.JSONField(default=dict, blank=True)  # Store banner customization settings
     
     # Review tracking
     reviewed_by = models.ForeignKey(

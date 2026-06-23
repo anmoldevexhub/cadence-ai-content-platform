@@ -330,3 +330,40 @@ class WebsiteSoftDeleteAPITests(APITestCase):
         
         # Ensure it is deleted from DB
         self.assertFalse(Website.objects.filter(id=self.website.id).exists())
+
+    def test_create_website_with_existing_active_domain_fails(self):
+        data = {
+            'name': 'New Site',
+            'domain': 'testcoffee.com',
+            'url': 'https://testcoffee.com',
+            'industry': 'General',
+            'tone': 'Professional',
+            'topics': []
+        }
+        response = self.client.post('/api/websites/', data, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('domain', response.json())
+
+    def test_create_website_with_existing_soft_deleted_domain_succeeds(self):
+        # Soft delete the existing site first
+        self.website.is_deleted = True
+        self.website.save()
+
+        data = {
+            'name': 'New Site',
+            'domain': 'testcoffee.com',
+            'url': 'https://testcoffee.com',
+            'industry': 'General',
+            'tone': 'Professional',
+            'topics': []
+        }
+        response = self.client.post('/api/websites/', data, format='json')
+        self.assertEqual(response.status_code, 201)
+        
+        # Verify the new website is created and active
+        new_site_id = response.json()['id']
+        new_site = Website.objects.get(id=new_site_id)
+        self.assertFalse(new_site.is_deleted)
+        
+        # Verify the old soft-deleted website is hard-deleted to prevent conflict
+        self.assertFalse(Website.objects.filter(id=self.website.id).exists())

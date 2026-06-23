@@ -748,134 +748,212 @@ def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
     
     # Get user-uploaded samples (NOT from crawler)
     style_reference = get_style_reference_samples(website, 'blog')
-    
-    user_prompt = f"""Write a blog post about "{idea.title}" for {website.name}.
 
-================================================================================
-REFERENCE SAMPLES (Study these to understand the writing style)
-================================================================================
+    target_keywords = (
+    ", ".join(idea.meta_tags)
+    if idea.meta_tags
+    else "Auto-select relevant keywords"
+    )
+    
+    user_prompt = f"""
+You are a senior content strategist, editor, and SEO writer.
+
+Write an ORIGINAL blog post for {website.name}.
+
+INPUT
+
+Topic: {idea.title}
+Context: {idea.context or "None provided"}
+Target Keywords: {target_keywords}
+
+Reference Samples:
 {style_reference}
 
-================================================================================
-TASK DETAILS
-================================================================================
-TOPIC: {idea.title}
-ADDITIONAL CONTEXT FROM ADMIN: {idea.context or "None provided."}
-TARGET KEYWORDS: {", ".join(idea.meta_tags) if idea.meta_tags else "Auto-select relevant keywords"}
-
-LIVE SEARCH DATA (Use relevant facts/stats from this):
+Verified Search Data:
 {live_data}
 
-================================================================================
-WRITING INSTRUCTIONS
-================================================================================
+GOAL
 
-1. STUDY THE REFERENCE SAMPLES ABOVE:
-   Carefully analyze all samples to understand:
-   - How they open (hook style, first paragraph pattern)
-   - How they structure content (headings, subheadings, paragraph length)
-   - How they use formatting (bold text, bullet points, lists, tables)
-   - Their sentence length and vocabulary (simple/complex, formal/casual)
-   - How they integrate CTAs and brand mentions
-   - Their overall tone and voice (professional, conversational, authoritative)
+Create an editorial-quality blog that feels written by an experienced human writer.
 
-2. WRITE A NEW BLOG POST ABOUT "{idea.title}" THAT:
-   - Matches the EXACT writing style of the reference samples
-   - Uses the SAME structural patterns (follow the format observed)
-   - Has the SAME tone and voice
-   - Uses SIMILAR vocabulary (not copying, but using the same style)
-   - Is 900-1200 words long
-   - Is SEO-optimized (meta title 55-60 chars, meta description 155-160 chars)
+Study the reference samples and learn:
 
-3. KEY PRINCIPLES TO FOLLOW:
-   - If the samples use bold text inside paragraphs → DO THE SAME
-   - If they use bullet points → USE bullet points
-   - If they use short paragraphs → USE short paragraphs
-   - If they use long, flowing paragraphs → USE long paragraphs
-   - If they use questions as headings → USE questions as headings
-   - If they start with bold statements → START with bold statements
-   - If they use "we" or "our team" → USE "we" and "our team"
-   - If they mention the brand naturally → MENTION the brand naturally
+* tone
+* formatting
+* pacing
+* reading level
+* CTA placement
 
-4. AVOID:
-   - AI buzzwords (game changer, paradigm shift, seismic shift, leverage, synergy)
-   - Generic, robotic language
-   - Copying content directly (plagiarism)
-   - Inconsistent tone
+Learn patterns only.
+Do not imitate wording.
 
-5. CONTENT QUALITY:
-   - Informative and valuable to readers
-   - Plagiarism-free
-   - Naturally conversational (not robotic)
-   - Free of AI-sounding phrases
+CONTENT
 
-================================================================================
-HUMANIFICATION: CONTENT QUALITY & AUTHORITY (GENERIC PRINCIPLES)
-================================================================================
+* Length: 900–1300 words
+* Match search intent
+* Use clear H2/H3 headings
+* Keep paragraph lengths varied
+* Each section must contribute new information
+* Prefer practical insight over broad explanation
+* Use operational examples where useful
+* Explain ideas through situations, observations, and outcomes
+* Do not force examples into every section
 
-🔒 CRITICAL: This is a COMPANY blog. It should sound like a HUMAN expert, not a generic promotional piece.
+INTRODUCTION
 
-FOLLOW THESE GENERIC PRINCIPLES (DO NOT copy examples – apply them to YOUR topic):
+Start close to the reader's real problem.
 
-1. THE HOOK MUST BE BOLD:
-   - Start with a counter-intuitive statement or bold opinion.
-   - Challenge a common belief in your industry.
-   - Formula: "Most [people/companies] think [common belief]. They couldn't be more wrong."
-   - OR: "[Common industry practice] is a waste of time. Here's what actually works."
-   - Apply this formula to YOUR topic. DO NOT copy the example – adapt it.
+Choose one:
 
-2. INCLUDE REAL DATA:
-   - MUST include at least 1-2 specific statistics from credible sources.
-   - Use the LIVE SEARCH DATA to find recent stats.
-   - Weave them naturally into the narrative.
-   - Formula: "According to [Source], [statistic]. That's why [your point]."
+* business observation
+* practical problem
+* realistic situation
 
-3. INCLUDE AN UNPOPULAR OPINION:
-   - Take a stance that challenges common industry assumptions.
-   - Formula: "Here's the thing most people miss..." or "The truth is, [common belief] is wrong."
-   - Make it specific to YOUR industry.
+Do NOT begin with:
 
-4. INCLUDE A FAILURE STORY:
-   - Use "we" or "our team" – NOT "I".
-   - Formula: "We once worked with a client who [problem]. We fixed it by [solution]."
-   - OR: "Our team made a mistake early on. We learned [lesson]."
-   - Make it relevant to YOUR industry.
+* broad industry statements
+* definitions
+* future predictions
+* "In today's world"
+* "Every day, businesses..."
+* "AI is changing..."
+* "Imagine a world..."
 
-5. USE SPECIFIC EXAMPLES:
-   - Replace generic terms with concrete, actionable details.
-   - Instead of "good design" → explain WHAT good design means in YOUR context.
-   - Instead of "fast speed" → give a specific number or benchmark.
-   - Instead of "user-friendly" → explain WHAT makes it user-friendly.
+SECTION FLOW
 
-6. INCLUDE PUNCHY QUOTES:
-   - At least 1-2 short, memorable sentences.
-   - Formula: Take a key insight from your article and compress it into 6-10 words.
-   - It should be something a reader would want to share.
+Do not use one fixed structure across the entire article.
 
-7. CALL TO ACTION MUST BE SPECIFIC:
-   - Include a specific offer or value.
-   - Formula: "Partner with {website.name} for a [specific benefit]."
-   - DO NOT use generic "Contact us" – tell them WHAT they get.
+Different sections may use:
 
-8. USE THE REFERENCE SAMPLES:
-   - Study the REFERENCE SAMPLES provided earlier.
-   - Apply the SAME patterns (bold text, structure, voice) but with YOUR content.
-   - DO NOT copy the samples – learn the pattern and apply it to YOUR topic.
+* observation → explanation
+* problem → impact
+* example → learning
+* situation → outcome
+* insight → recommendation
 
-================================================================================
-OUTPUT FORMAT
-================================================================================
-Return ONLY a valid JSON object with these exact keys:
+Some sections may:
+
+* be short
+* focus on one idea
+* skip examples
+
+Prioritize natural reading flow over perfect symmetry.
+
+Do NOT expose internal writing labels.
+
+Never output headings or phrases such as:
+
+* Situation
+* Explanation
+* Outcome
+* Insight
+* Example
+* Implementation Advice
+* Call to Action
+
+Use them internally only.
+
+SPECIFICITY
+
+Avoid generic actors:
+
+* a company
+* businesses
+* organizations
+
+Prefer:
+
+* teams
+* departments
+* workflows
+* operational situations
+
+Describe:
+
+* what changed
+* why it mattered
+* what happened next
+
+LANGUAGE
+
+Write in clear business English.
+
+Target approximately Grade 7–9 reading level.
+
+Prefer:
+
+* common words
+* shorter sentences
+* direct explanations
+
+If a simpler word works, use it.
+
+Avoid:
+
+* academic tone
+* motivational tone
+* corporate jargon
+* abstract language
+* dramatic technology framing
+
+Avoid repeated words such as:
+leverage
+optimize
+enhance
+transform
+facilitate
+streamline
+robust
+innovation
+impactful
+cutting-edge
+powerful
+seamless
+revolutionize
+significant
+groundbreaking
+
+AUTHORITY
+
+Use statistics only from Verified Search Data.
+
+Never invent numbers.
+
+If no verified data exists:
+use examples instead.
+
+SEO
+
+* Use target keywords naturally
+* Include related concepts naturally
+* Avoid keyword stuffing
+* Prioritize readability
+
+BRAND
+
+Mention {website.name} only if naturally relevant.
+Maximum one mention.
+
+CTA
+
+End with practical next steps.
+
+Do not sound promotional.
+
+OUTPUT
+
+Return ONLY valid JSON.
+
 {{
-  "title": "...(55-60 characters)...",
-  "meta_description": "...(155-160 characters)...",
-  "category": "...",
-  "tags": ["tag1", "tag2", ...],
-  "excerpt": "...(2-3 sentence preview)...",
-  "body": "...(full blog post in plain HTML using the EXACT pattern from reference samples)"
+"title":"",
+"meta_description":"",
+"category":"",
+"tags":[],
+"excerpt":"",
+"body":"clean HTML only"
 }}
+"""
 
-Do NOT include any markdown code block formatting. Return ONLY the raw JSON."""
 
     try:
         response = client.chat.completions.create(
@@ -910,46 +988,49 @@ def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> 
     style_reference = get_style_reference_samples(website, platform)
     
     limits = {
-        'instagram': '150-200 characters. Casual, emoji-rich, 3-5 hashtags.',
-        'linkedin': '200-300 words. Professional tone. No emojis. Hook first line.',
-        'youtube': '150-200 words. Include timestamps and subscribe CTA.',
-        'facebook': '100-150 words. Conversational. Include a question.',
-        'twitter': '280 characters. Punchy. One insight.',
+        'instagram': '150-200 characters. Casual, emoji-rich. Include 3-5 relevant hashtags at the end of the post body.',
+        'linkedin': '200-300 words. Professional tone. No emojis. Hook first line. Include 3-5 relevant hashtags at the end of the post body.',
+        'youtube': '150-200 words. Include timestamps, subscribe CTA, and 3-5 relevant hashtags at the end of the post body.',
+        'facebook': '100-150 words. Conversational. Include a question. Include 3-5 relevant hashtags at the end of the post body.',
+        'twitter': '280 characters. Punchy. One insight. Include 1-2 relevant hashtags at the end.',
     }
     
     user_prompt = f"""Write a {platform.title()} post about "{idea.title}" for {website.name}.
-
-================================================================================
-REFERENCE SAMPLES (Study these to understand the writing style)
-================================================================================
-{style_reference}
-
-================================================================================
-TASK DETAILS
-================================================================================
-PLATFORM: {platform.title()}
-TOPIC: {idea.title}
-FORMAT RULES: {limits.get(platform, 'Platform-appropriate')}
-
-================================================================================
-WRITING INSTRUCTIONS
-================================================================================
-1. Study the reference samples to understand the style
-2. Write a {platform.title()} post that matches the EXACT style
-3. Follow the format rules
-4. Return JSON with title, body, excerpt, tags
-
-================================================================================
-OUTPUT FORMAT
-================================================================================
-{{
-  "title": "...(internal label)...",
-  "body": "...(the actual post text)...",
-  "excerpt": "...(same as body for social)...",
-  "tags": ["hashtag1", "hashtag2"],
-  "meta_description": ""
-}}
-"""
+ 
+ ================================================================================
+ REFERENCE SAMPLES (Study these to understand the writing style)
+ ================================================================================
+ {style_reference}
+ 
+ ================================================================================
+ TASK DETAILS
+ ================================================================================
+ PLATFORM: {platform.title()}
+ TOPIC: {idea.title}
+ FORMAT RULES: {limits.get(platform, 'Platform-appropriate')}
+ 
+ ================================================================================
+ WRITING INSTRUCTIONS
+ ================================================================================
+ 1. Study the reference samples to understand the style
+ 2. Write a {platform.title()} post that matches the EXACT style
+ 3. Follow the format rules
+ 4. Ensure the body text ends with 3-5 relevant hashtags based on the content (e.g. #WebDevelopment #Devexhub).
+ 5. Do NOT include any empty hashtags (like "#" or "# ") or malformed tags. Every hashtag must contain a real word.
+ 6. The "tags" array in the JSON output must contain these same hashtags (without the leading "#" symbol, e.g. ["WebDevelopment", "Devexhub"]).
+ 7. Return JSON with title, body, excerpt, tags
+ 
+ ================================================================================
+ OUTPUT FORMAT
+ ================================================================================
+ {{
+   "title": "...(internal label)...",
+   "body": "...(the actual post text)...",
+   "excerpt": "...(same as body for social)...",
+   "tags": ["hashtag1", "hashtag2"],
+   "meta_description": ""
+ }}
+ """
 
     try:
         response = client.chat.completions.create(
@@ -1444,8 +1525,7 @@ def build_svg_from_data(data: dict, website=None) -> str:
     <path d="M -5 10 L 2 8 M -3 20 L 4 18 M -1 30 L 6 28" stroke="#94a3b8" stroke-width="2.5"/>
     <rect x="80" y="-10" width="5" height="55" rx="1.5" fill="#0f172a" transform="rotate(-45 80 -10)"/>
   </g>
-
-  {badges_svg_str}
+{badges_svg_str}
 
   <rect x="0" y="740" width="1200" height="60" fill="#0a122c"/>
   {footer_svg}
@@ -1454,36 +1534,67 @@ def build_svg_from_data(data: dict, website=None) -> str:
     return svg
 
 
-def generate_dalle_prompt_via_gpt(title: str, category: str, excerpt: str) -> str:
+def generate_dalle_prompt_via_gpt(title: str, category: str, excerpt: str, website=None) -> str:
     """Uses GPT-4o to write a highly creative, custom DALL-E 3 image generation prompt for the blog post."""
-    prompt = f"""You are an expert creative director. You need to write a detailed, highly descriptive prompt for DALL-E 3 to generate a premium, professional corporate blog banner image for the following article:
+    primary_color = "#00537e"
+    secondary_color = "#008bf2"
+    email = "info@devexhub.com"
+    phone = "+91 98759 05952"
+    domain = "devexhub.com"
+    
+    if website:
+        if website.brand_colors and isinstance(website.brand_colors, list):
+            if len(website.brand_colors) > 0:
+                primary_color = website.brand_colors[0]
+            if len(website.brand_colors) > 1:
+                secondary_color = website.brand_colors[1]
+        if website.contact_email:
+            email = website.contact_email
+        if website.contact_phone:
+            phone = website.contact_phone
+        if website.domain:
+            domain = website.domain
 
-ARTICLE TITLE: {title}
-ARTICLE CATEGORY: {category}
-ARTICLE EXCERPT: {excerpt}
+    prompt = f"""You are a professional creative director and graphic designer.
+Your task is to write ONE highly detailed, descriptive DALL-E 3 prompt to generate a PREMIUM WEBSITE BLOG HERO BANNER.
 
-Your task is to describe a complete visual composition that is highly relevant, eye-catching, modern, and directly reflects the blog content.
+You must design the banner specifically for this blog post:
+- Blog Title: "{title}"
+- Blog Category: "{category}"
+- Blog Excerpt: "{excerpt}"
 
-Guidelines for the DALL-E 3 Prompt:
-1. Dynamic Visual Theme & Composition:
-   - Describe a completely unique background style, layout pattern, and color palette tailored specifically to the blog title and content.
-   - Do NOT suggest the same blue curves or white backgrounds repeatedly. Give each topic a visually distinct layout.
-   - For example:
-     * If the topic is AI decision making, describe a futuristic digital grid, circuit paths, complex decision node maps, or intelligent interfaces in bright, high-tech colors.
-     * If the topic is Power BI or data dashboarding, describe modern business graphs, sleek metric panels, and interactive console components.
-     * If the topic is a complete guide or tutorial, describe a clean structured visual metaphor.
-2. Canvas Size:
-   - The banner canvas size must be 1200 x 800 px (landscape).
-3. Text layout:
-   - On the left or center-left, there should be space displaying the article title in clean, modern typography.
-   - A short description under the title.
-   - A premium "Read More" button at the bottom-left.
-   - Describe these text elements and tell DALL-E to render them clearly and with correct spelling.
-4. Branding space:
-   - Leave the top-right corner empty and blank (do NOT draw any logo or write logo text there) so we can paste the logo overlay in Python.
-5. The overall image must look premium, modern, clean, and professional. Avoid cartoonish, cluttered, or generic designs.
+CRITICAL BRANDING DETAILS:
+- Brand Colors: Primary: "{primary_color}", Secondary: "{secondary_color}"
+- Contact Info for Footer: Email: "{email}", Phone: "{phone}", Website: "{domain}"
+- Call-To-Action (CTA) Text: "Read More"
 
-Return ONLY the detailed, descriptive DALL-E 3 prompt text. Do not write any markdown code block formatting or explanations. Just return the prompt itself."""
+DALL-E 3 PROMPT GENERATION INSTRUCTIONS:
+
+Generate a DALL-E 3 prompt describing a banner with the following layout, content, and quality requirements:
+
+1. THE COMPOSITION & LAYOUT:
+   - It is a split layout banner optimized for a website hero.
+   - Left side: A clean, solid background (white, soft cream, or a very light brand-aligned gradient) containing the typography panel.
+   - Right side: A stunning, high-quality, premium 3D illustration or mockup that visually represents the core topic of the article.
+   - Center/Right (Topic Interpretation): Visually communicate the article topic using clean SaaS graphics, glassmorphism UI/UX dashboard panels, high-end isometric technology visuals, or stylized characters/workflows. Avoid literal or cheap stock-photo tropes.
+   - **CONDITIONAL RULE FOR COMPARISONS**: If the title "{title}" implies a comparison (e.g. SEO vs AEO vs GEO, or A vs B), design the right-side illustration as a LEFT vs RIGHT split comparison using contrasting visual identities, with a clear center separator, while maintaining unified branding.
+
+2. THE TYPOGRAPHY (LEFT SIDE):
+   - Headline: Instruct DALL-E 3 to write the exact title "{title}" in large, bold, clean, professional sans-serif typography.
+   - Subtitle: Generate a short supporting subtitle (maximum 10 words, e.g., explaining the core value) and instruct DALL-E to render it clearly under the headline.
+   - CTA Section: Include a modern, rounded pill-shaped button at the bottom of the text panel that says "Read More" with a small arrow icon.
+
+3. BRAND INTEGRATION & EMPTY SPACES:
+   - Leave the TOP-LEFT corner of the banner clean, empty, and blank of any content so that the company logo can be overlaid there later in post-processing. Do NOT write any text or render a logo yourself in this area.
+   - Footer: Include a minimal, elegant footer strip at the very bottom of the banner containing: "{email} | {phone} | {domain}" in clean, small, readable typography with subtle vertical separators.
+
+4. VISUAL STYLE & DEPTH:
+   - The style should feel like a premium SaaS or luxury business website hero.
+   - Use soft gradients, realistic lighting, ambient glow effects, frosted glass, and premium shadows.
+   - Ensure the image has rich depth and clean art direction, feeling like a modern, professional campaign or magazine cover.
+   - Strictly avoid clutter, stock-photo appearances, excessive/generic icons, or low-detail artwork.
+
+Output ONLY the final DALL-E 3 prompt. Do not add any extra explanation or markdown formatting."""
 
     try:
         response = client.chat.completions.create(
@@ -1495,7 +1606,7 @@ Return ONLY the detailed, descriptive DALL-E 3 prompt text. Do not write any mar
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.warning(f"Failed to generate custom DALL-E prompt using GPT: {e}")
-        return f"A premium, professional, modern corporate blog banner for '{title}' (Category: {category}). {excerpt}. Clean typography on the left with title, description, and button. Beautiful illustration representing the topic on the right. Top-right area is empty. Clean, eye-catching, modern design."
+        return f"A premium, professional, modern corporate blog banner for '{title}' (Category: {category}). {excerpt}. Clean typography on the left with title, description, and button. Beautiful illustration representing the topic on the right. Top-left area is empty. Clean, eye-catching, modern design."
 
 
 def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", website=None) -> str:
@@ -1512,7 +1623,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
     from PIL import Image, ImageDraw
 
     # 1. Generate dynamic, highly descriptive DALL-E prompt based on title/content using GPT-4o
-    image_prompt = generate_dalle_prompt_via_gpt(title, category, excerpt)
+    image_prompt = generate_dalle_prompt_via_gpt(title, category, excerpt, website=website)
     logger.info(f"Custom DALL-E prompt generated: {image_prompt[:200]}...")
 
     # Extract corporate logo dynamically if website is provided
@@ -1593,10 +1704,10 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
                     new_w = int(logo_w * (new_h / logo_h))
                     logo_resized = logo.resize((new_w, new_h), Image.Resampling.LANCZOS)
                     
-                    # Coordinates in top-right with margins
+                    # Coordinates in top-left with margins
                     margin_x = int(bg_w * 0.05)
                     margin_y = int(bg_h * 0.05)
-                    paste_x = bg_w - new_w - margin_x
+                    paste_x = margin_x
                     paste_y = margin_y
                     
                     # Draw a white card behind the logo to ensure visibility
@@ -1638,121 +1749,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
 </svg>"""
         return svg
 
-    # 3. Fallback to normal layout planning if gpt-image-1-mini failed/isn't used
-    prompt = f"""You are an expert graphic designer. You are designing a blog cover layout for:
-BLOG TITLE: {title}
-BLOG CATEGORY: {category}
-BLOG EXCERPT/SUMMARY: {excerpt}
-
-Based on this category, title, and excerpt summary, you must plan the cover illustration. We support three visual themes:
-- "theme1" (SEO / Digital Marketing / Business / Growth): Light right side, blue/indigo curved gradient sidebar on the left.
-- "theme2" (Artificial Intelligence / Technology / Machine Learning): Dark high-tech theme with a neon purple-to-pink glowing curved sidebar.
-- "theme3" (Web Development / Coding / Full Stack / PHP / software engineering): White background on the left, dark blue/indigo curved sidebar on the right.
-
-Your task is to analyze the title, category, and excerpt to select the best theme and provide structured details for rendering that are highly relevant to the actual blog content.
-
-Return a JSON object with the following keys:
-1. "theme": Select "theme1", "theme2", or "theme3".
-   - Select "theme2" for AI, machine learning, agents, or deep learning.
-   - Select "theme3" for coding, web development, PHP, full stack, database, or engineering.
-   - Select "theme1" for SEO, marketing, business, growth, or any general topics.
-2. "title_lines": Break the title into 2-4 short lines (each line under 28 characters) so it fits inside the left column beautifully.
-   Each line in "title_lines" is an object:
-   {{
-     "text": "The line text",
-     "type": "plain" | "boxed" | "accent"
-   }}
-   - "boxed": wraps the text in a styled rectangle border (use for key keywords, max 1 boxed line per title).
-   - "accent": uses the secondary highlight color (light blue or purple).
-   - "plain": uses the standard text color (white or dark blue depending on the theme).
-3. "subtext": A concise 1-2 sentence description summarizing the value of the post (max 120 characters total).
-4. "cta_text": The button text, e.g. "READ MORE", "LEARN MORE", "EXPLORE NOW".
-5. "laptop_screen": An object representing what is shown on the laptop:
-   - "title": A short bold title (1-2 words, e.g., "SEO", "AI", "CODE", "PHP", "ML") to display.
-   - "subtitle": A tiny subtitle (2-3 words, e.g. "Search Analytics", "Neural Network", "Full Stack").
-6. "badges": A list of exactly 4 floating badge cards. Each badge represents a relevant tool, technology, or concept:
-   - For example:
-     - For Web Dev: "HTML/CSS", "JavaScript", "PHP", "React", "NodeJS", "MySQL", "GitHub".
-     - For AI: "ChatGPT", "Gemini", "Perplexity", "Claude", "LLMs", "Agents", "NLP".
-     - For SEO: "Google", "Rankings", "Keywords", "Analytics", "Audits", "Content".
-   Each badge is an object:
-   {{
-     "label": "Badge label (max 12 chars)",
-     "color": "A hex color code for the badge icon (e.g. #3b82f6, #ec4899, #10b981)"
-   }}
-
-Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{'role': 'user', 'content': prompt}],
-            max_tokens=800,
-            temperature=0.4,
-            response_format={"type": "json_object"},
-        )
-
-        import json
-        data = json.loads(response.choices[0].message.content.strip())
-        svg_content = build_svg_from_data(data, website=website)
-        if svg_content:
-            return svg_content
-    except Exception as e:
-        logger.warning(f"GPT SVG cover planning failed: {e}. Falling back to local heuristic.")
-
-    # Heuristic Fallback
-    try:
-        import json
-        theme = "theme1"
-        cat_lower = category.lower() if category else ""
-        title_lower = title.lower() if title else ""
-        if any(k in cat_lower or k in title_lower for k in ["ai", "agent", "machine learning", "intelligence", "neural", "gpt"]):
-            theme = "theme2"
-        elif any(k in cat_lower or k in title_lower for k in ["web", "develop", "php", "code", "programming", "sql", "html", "css", "js", "javascript", "stack"]):
-            theme = "theme3"
-
-        words = title.split()
-        lines = []
-        curr = []
-        curr_len = 0
-        for w in words:
-            if curr_len + len(w) + 1 > 24:
-                lines.append(" ".join(curr))
-                curr = [w]
-                curr_len = len(w)
-            else:
-                curr.append(w)
-                curr_len += len(w) + 1
-        if curr:
-            lines.append(" ".join(curr))
-
-        title_lines = []
-        for i, line in enumerate(lines[:4]):
-            ltype = "boxed" if i == 1 else ("accent" if i == 3 else "plain")
-            title_lines.append({"text": line, "type": ltype})
-
-        fallback_data = {
-            "theme": theme,
-            "title_lines": title_lines,
-            "subtext": f"A detailed guide to {title}.",
-            "cta_text": "READ MORE",
-            "laptop_screen": {
-                "title": "DEVEX",
-                "subtitle": "Knowledge Base"
-            },
-            "badges": [
-                {"label": "Devex Hub", "color": "#0ea5e9"},
-                {"label": "Success", "color": "#10b981"},
-                {"label": "Learning", "color": "#f59e0b"},
-                {"label": "Growth", "color": "#8b5cf6"}
-            ]
-        }
-        return build_svg_from_data(fallback_data, website=website)
-    except Exception as fallback_err:
-        logger.error(f"Fallback SVG generation also failed: {fallback_err}")
-    return ""
-
-    # 4. Fallback to normal layout planning if gpt-image-1-mini failed/isn't used
+    # Fallback to normal layout planning if gpt-image-1 failed
     prompt = f"""You are an expert graphic designer. You are designing a blog cover layout for:
 BLOG TITLE: {title}
 BLOG CATEGORY: {category}

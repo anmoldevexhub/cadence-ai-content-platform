@@ -23,6 +23,7 @@ class WebsiteSerializer(serializers.ModelSerializer):
     owner_email = serializers.EmailField(source='owner.email', read_only=True)
     owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
     logo_upload = serializers.CharField(required=False, write_only=True)
+    domain = serializers.CharField(max_length=200)
     
     class Meta:
         model = Website
@@ -33,9 +34,22 @@ class WebsiteSerializer(serializers.ModelSerializer):
             'last_crawled', 'social_connections', 'style_guide', 'needs_crawl',
             'contact_email', 'contact_phone', 'logo_url', 'logo_upload', 'is_deleted'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'owner']
+
+    def validate_domain(self, value):
+        domain_val = value.strip()
+        qs = Website.objects.filter(domain=domain_val, is_deleted=False)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError("website with this domain already exists.")
+        return domain_val
 
     def create(self, validated_data):
+        domain = validated_data.get('domain')
+        if domain:
+            Website.objects.filter(domain=domain, is_deleted=True).delete()
+
         logo_upload = validated_data.pop('logo_upload', None)
         logo_url = validated_data.get('logo_url', '')
         instance = super().create(validated_data)
@@ -52,6 +66,10 @@ class WebsiteSerializer(serializers.ModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
+        domain = validated_data.get('domain')
+        if domain:
+            Website.objects.filter(domain=domain, is_deleted=True).exclude(pk=instance.pk).delete()
+
         logo_upload = validated_data.pop('logo_upload', None)
         logo_url = validated_data.get('logo_url', None)
         
