@@ -72,7 +72,7 @@
       </div>` : "";
 
     const usersObj = window.MOCK?.users || {};
-    const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#6366f1" };
+    const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#095075" };
 
     return `
       <div class="sidebar__brand">
@@ -116,7 +116,7 @@
   function buildTopbar() {
     const role = store.role;
     const usersObj = window.MOCK?.users || {};
-    const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#6366f1" };
+    const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#095075" };
     return `
       <button class="icon-btn sidebar-toggle" data-action="toggle-sidebar" aria-label="Menu">${I("menu")}</button>
       <label class="topbar__search">
@@ -126,7 +126,7 @@
       </label>
       <div class="topbar__actions">
         <div class="dropdown">
-          <button class="icon-btn" data-menu="notifs" aria-label="Notifications">${I("bell")}<span class="dot"></span></button>
+          <button class="icon-btn" data-menu="notifs" aria-label="Notifications">${I("bell")}${(window.MOCK?.notifications || []).length > 0 ? `<span class="badge-count">${window.MOCK.notifications.length}</span>` : ''}</button>
           <div class="menu" id="notifs" style="min-width:320px">
             <div class="row-between" style="padding:8px 10px 10px"><strong>Notifications</strong><a class="tsm" style="color:var(--primary)" href="#">Mark all read</a></div>
             <div class="menu-sep"></div>
@@ -169,30 +169,47 @@
   }
 
   function wireShell() {
+    if (window._shellWired) return;
+    window._shellWired = true;
+
     // dropdown menus
-    document.querySelectorAll("[data-menu]").forEach(trigger => {
-      trigger.addEventListener("click", (e) => {
+    document.addEventListener("click", (e) => {
+      const trigger = e.target.closest("[data-menu]");
+      if (trigger) {
         e.stopPropagation();
         const menu = document.getElementById(trigger.dataset.menu);
-        if (!menu) return;
-        const willOpen = !menu.classList.contains("open");
-        closeAllMenus(menu);
-        menu.classList.toggle("open", willOpen);
-      });
+        if (menu) {
+          const willOpen = !menu.classList.contains("open");
+          closeAllMenus(menu);
+          menu.classList.toggle("open", willOpen);
+        }
+      } else {
+        closeAllMenus();
+      }
     });
-    document.addEventListener("click", () => closeAllMenus());
 
     // theme toggle
-    document.querySelectorAll('[data-action="toggle-theme"]').forEach(b =>
-      b.addEventListener("click", (e) => { e.stopPropagation(); toggleTheme(); }));
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest('[data-action="toggle-theme"]');
+      if (b) {
+        e.stopPropagation();
+        toggleTheme();
+      }
+    });
 
     // role toggle
-    document.querySelectorAll("[data-role]").forEach(b =>
-      b.addEventListener("click", () => setRole(b.dataset.role)));
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-role]");
+      if (b) {
+        e.stopPropagation();
+        setRole(b.dataset.role);
+      }
+    });
 
     // sign out logic
-    document.querySelectorAll('a[href="login.html"]').forEach(a => {
-      a.addEventListener("click", (e) => {
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[href="login.html"]');
+      if (a) {
         e.preventDefault();
         if (window.CadenceAPI) {
           window.CadenceAPI.logout();
@@ -202,12 +219,18 @@
           localStorage.removeItem('cadence.user');
           location.href = 'login.html';
         }
-      });
+      }
     });
 
     // sidebar (mobile)
-    document.querySelectorAll('[data-action="toggle-sidebar"]').forEach(b =>
-      b.addEventListener("click", (e) => { e.stopPropagation(); toggleSidebar(); }));
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest('[data-action="toggle-sidebar"]');
+      if (b) {
+        e.stopPropagation();
+        toggleSidebar();
+      }
+    });
+
     const bd = document.getElementById("backdrop");
     if (bd) bd.addEventListener("click", toggleSidebar);
   }

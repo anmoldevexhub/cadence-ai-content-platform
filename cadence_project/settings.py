@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-7@a76p_2jwkh0i$jg44pof%ibg40kt(u@w@dlces6bc-cus3f%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -175,8 +175,9 @@ SIMPLE_JWT = {
 }
 
 
+# At the bottom of settings.py
+BASE_URL = 'http://localhost:8006'  # For production, use your domain
 
-# Celery Configuration
 # Celery Configuration
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
@@ -187,20 +188,8 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'protocol': 2   # Force RESP2 protocol for Redis 5.0
 }
-
-
-# # Celery Configuration
-# # Celery Configuration
-# CELERY_BROKER_URL = 'redis://localhost:6379/0'
-# CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-# CELERY_BROKER_TRANSPORT_OPTIONS = {
-#     'protocol': 2,   # Force RESP2 protocol (for Redis < 6)
-# }
-# CELERY_ACCEPT_CONTENT = ['json']
-# CELERY_TASK_SERIALIZER = 'json'
-# CELERY_RESULT_SERIALIZER = 'json'
-# CELERY_TIMEZONE = TIME_ZONE
-
-# Enable these for development if you want synchronous tasks (no worker needed)
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
+
+
+

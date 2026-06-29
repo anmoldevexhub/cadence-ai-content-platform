@@ -47,12 +47,27 @@
       <div class="chan-bar"><i style="width:${Math.round(v/chanMax*100)}%;background:${col}"></i></div></div>`).join("");
 
   /* ---------- calendar week ---------- */
-  const days = M.schedule.days, today = "Wed";
+  const todayIndex = new Date().getDay();
+  const days = M.schedule.days;
+  const today = days[todayIndex === 0 ? 6 : todayIndex - 1];
+
+  window.previewDraftFromWeekChip = function(draftId) {
+    const d = siteContent.find(x => String(x.id) === String(draftId));
+    if (!d) return;
+    document.getElementById("largePreviewTitle").textContent = d.title;
+    document.getElementById("largePreviewSub").textContent = `${d.platform} · Draft details`;
+    const bodyContainer = document.getElementById("largePreviewBody");
+    if (bodyContainer) {
+      bodyContainer.innerHTML = previewHTML(d.platform, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+    }
+    C.openModal("largePreviewModal");
+  };
+
   document.getElementById("wsWeek").innerHTML = days.map(d => {
     const items = siteContent.filter(c => c.day === d && c.status !== "Draft");
     return `<div class="week-col ${d===today?'is-today':''}"><div class="week-day"><span>${d}</span>${d===today?'<span class="badge badge-primary txs">Today</span>':''}</div>
       <div class="week-items">${items.length ? items.map(c => { const p = M.platMeta(c.platform);
-        return `<div class="week-chip" title="${c.title}"><span class="icon-tile tile-${p.tile}" style="width:22px;height:22px;border-radius:6px">${I(p.icon,"style='width:12px;height:12px'")}</span>
+        return `<div class="week-chip" title="${c.title}" style="border-left: 3px solid ${p.color}; cursor: pointer;" onclick="window.previewDraftFromWeekChip('${c.id}')"><span class="icon-tile tile-${p.tile}" style="width:20px;height:20px;border-radius:4px">${I(p.icon,"style='width:11px;height:11px'")}</span>
           <span class="wc-txt"><span class="wc-time">${c.time}</span><span class="wc-site">${c.platform}</span></span></div>`; }).join("") : '<div class="week-empty">—</div>'}</div></div>`;
   }).join("");
 
@@ -60,7 +75,7 @@
   const published = siteContent.filter(c => c.status === "Published").concat(
     siteContent.filter(c => c.status === "Approved" || c.status === "Scheduled")
   );
-  function coverGrad(plat) { return ({Blog:"linear-gradient(135deg,#6366f1,#4338ca)",LinkedIn:"linear-gradient(135deg,#0a66c2,#063b73)",YouTube:"linear-gradient(135deg,#dc2626,#7f1d1d)",Instagram:"linear-gradient(135deg,#f09433,#bc1888)"})[plat]; }
+  function coverGrad(plat) { return ({Blog:"linear-gradient(135deg,#095075,#053046)",LinkedIn:"linear-gradient(135deg,#0a66c2,#063b73)",YouTube:"linear-gradient(135deg,#dc2626,#7f1d1d)",Instagram:"linear-gradient(135deg,#f09433,#bc1888)"})[plat]; }
   function renderPub(filter) {
     const list = published.filter(c => filter === "all" || c.platform === filter);
     const grid = document.getElementById("pubGrid");
@@ -480,7 +495,10 @@
     const refreshBtn = document.getElementById("refreshIdeaQueue");
     if (refreshBtn) {
       refreshBtn.disabled = true;
-      refreshBtn.querySelector("i").style.animation = "spin 1s linear infinite";
+      const refreshIcon = refreshBtn.querySelector("i") || refreshBtn.querySelector("svg");
+      if (refreshIcon) {
+        refreshIcon.style.animation = "spin 1s linear infinite";
+      }
     }
     if (showLoader) {
       document.getElementById("ideaQueue").innerHTML = `
@@ -505,7 +523,10 @@
       ideaQueueLoading = false;
       if (refreshBtn) {
         refreshBtn.disabled = false;
-        refreshBtn.querySelector("i").style.animation = "";
+        const refreshIcon = refreshBtn.querySelector("i") || refreshBtn.querySelector("svg");
+        if (refreshIcon) {
+          refreshIcon.style.animation = "";
+        }
       }
     }
   }
@@ -521,7 +542,12 @@
       const q = ideaQueue[+b.dataset.q];
       const titleInput = document.getElementById("ideaTitle");
       if (titleInput) {
-        titleInput.value = q.title;
+        const currentVal = titleInput.value.trim();
+        if (currentVal) {
+          titleInput.value = currentVal + "\n" + q.title;
+        } else {
+          titleInput.value = q.title;
+        }
         titleInput.focus();
       }
       curChan = q.chan;
@@ -733,22 +759,34 @@
     }
     if (plat === "LinkedIn") {
       const txt = (typeof body === "string" ? body : SAMPLE.LinkedIn);
+      const coverHTML = coverImage 
+        ? `<div class="li-cover" style="margin-top:var(--s3); border-radius:var(--r-sm); overflow:hidden; border:1px solid var(--border);"><img src="${coverImage}" style="width:100%; height:auto; display:block;" /></div>` 
+        : "";
       return `<div class="li"><div class="li-top"><span class="avatar li-av" style="background:${site.color}">${site.short}</span>
         <div style="flex:1"><div class="li-nm">${site.name}</div><div class="li-hl">${site.industry}</div><div class="li-time">Just now · ${I("globe","style='width:11px;height:11px'")}</div></div>${I("more-horizontal")}</div>
-        <div class="li-body" style="white-space: pre-wrap;">${txt}</div>
+        <div class="li-body" style="white-space: pre-wrap;">${txt}${coverHTML}</div>
         <div class="li-react"><span class="row" style="gap:2px"><span style="background:var(--linkedin);color:#fff;width:16px;height:16px;border-radius:99px;display:grid;place-items:center;font-size:9px">👍</span></span> 248 · 32 comments</div>
         <div class="li-bar"><button>${I("thumbs-up")} Like</button><button>${I("message-circle")} Comment</button><button>${I("repeat-2")} Repost</button><button>${I("send")} Send</button></div></div>`;
     }
     if (plat === "Instagram") {
       const txt = (typeof body === "string" ? body : SAMPLE.Instagram.cap);
+      const imgStyle = coverImage 
+        ? `style="background-image: url('${coverImage}'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: var(--bg-subtle);"`
+        : "";
+      const imgContent = coverImage 
+        ? "" 
+        : I("image", "style='width:32px;height:32px'");
       return `<div class="ig"><div class="ig-top"><span class="ig-av"><span style="color:${site.color}">${site.short}</span></span><span class="ig-nm">${site.id}</span>${I("more-horizontal")}</div>
-        <div class="ig-img">${I("image","style='width:32px;height:32px'")}<span class="ig-tag">${title.slice(0,28)}</span></div>
+        <div class="ig-img" ${imgStyle}>${imgContent}<span class="ig-tag">${title.slice(0,28)}</span></div>
         <div class="ig-actions">${I("heart")}${I("message-circle")}${I("send")}<span class="sp">${I("bookmark")}</span></div>
         <div class="ig-likes">1,204 likes</div><div class="ig-cap"><b>${site.id}</b> ${txt}</div></div>`;
     }
     if (plat === "YouTube") {
       const txt = (typeof body === "string" ? body : SAMPLE.YouTube.desc);
-      return `<div class="yt"><div class="yt-thumb"><span class="play">${I("play")}</span><span class="dur">8:42</span></div>
+      const thumbStyle = coverImage 
+        ? `style="background-image: url('${coverImage}'); background-size: cover; background-position: center;"`
+        : "";
+      return `<div class="yt"><div class="yt-thumb" ${thumbStyle}><span class="play">${I("play")}</span><span class="dur">8:42</span></div>
         <div class="yt-info"><span class="avatar yt-av" style="background:${site.color}">${site.short}</span>
         <div><div class="yt-t">${title}</div><div class="yt-ch">${site.name} · ${txt.substring(0, 80)}...</div></div></div></div>`;
     }
@@ -757,10 +795,29 @@
   /* ----- draft model ----- */
   let drafts = M.content.filter(c => c.site === site.id);
   let filter = "all";
+  let selectedDraftId = null;
 
   function statusPill(s) { return `<span class="badge badge-${s.toLowerCase()}">${s}</span>`; }
 
-  function draftCard(d) {
+  function draftListItem(d, isActive) {
+    const p = M.platMeta(d.chan);
+    const activeClass = isActive ? "active" : "";
+    const displayTitle = d.title.length > 40 ? d.title.substring(0, 37) + "..." : d.title;
+    
+    return `<div class="draft-list-item ${activeClass}" data-list-id="${d.id}">
+      <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+      <div class="dli-meta">
+        <div class="dli-title" title="${d.title}">${displayTitle}</div>
+        <div class="dli-sub">
+          <span>${d.chan}</span>
+          <span class="dli-dot">·</span>
+          ${statusPill(d.status)}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function draftPreviewContent(d) {
     const p = M.platMeta(d.chan);
     const actions = d.status === "Draft"
       ? `<button class="btn btn-ghost btn-sm" data-act="reject" data-id="${d.id}">${I("x")} Reject</button>
@@ -773,19 +830,58 @@
          <button class="btn btn-primary btn-sm" data-act="schedule" data-id="${d.id}">${I("calendar-plus")} Schedule</button>`
       : `<span class="muted tsm row gap2">${I("check-check","style='width:15px;height:15px;color:var(--success)'")} ${d.status==='Scheduled'?'Scheduled':'Live'}</span><span class="spacer"></span>
          <button class="btn btn-ghost btn-sm" data-act="view" data-id="${d.id}">${I("eye")} View</button>`;
-    return `<div class="draft" data-card="${d.id}">
-      <div class="draft__head"><span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
-        <div class="d-meta"><div class="d-title">${d.title}</div><div class="d-sub">${d.chan} · AI draft ${statusPill(d.status)}</div></div>
-        <button class="icon-btn btn-sm" data-act="more" data-id="${d.id}">${I("more-vertical")}</button></div>
-      <div class="draft__body">${previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date)}</div>
-      <div class="draft__foot">${actions}</div></div>`;
+         
+    return `<div class="draft-preview-card" data-card="${d.id}">
+      <div class="draft-preview-head">
+        <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+        <div class="dp-meta">
+          <div class="dp-title">${d.title}</div>
+          <div class="dp-sub">${d.chan} · AI draft ${statusPill(d.status)}</div>
+        </div>
+        <button class="icon-btn btn-sm" data-act="maximize" data-id="${d.id}" title="View in large screen" style="margin-right:4px;">${I("maximize-2")}</button>
+        <button class="icon-btn btn-sm" data-act="more" data-id="${d.id}">${I("more-vertical")}</button>
+      </div>
+      <div class="draft-preview-body draft__body">
+        ${previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date)}
+      </div>
+      <div class="draft-preview-foot draft__foot">
+        ${actions}
+      </div>
+    </div>`;
   }
 
   function renderDrafts() {
     const list = drafts.filter(d => filter === "all" || d.status === filter);
     const wrap = document.getElementById("draftList");
-    if (!list.length) { wrap.innerHTML = `<div class="empty card" style="padding:var(--s9)"><div class="empty-art">${I("sparkles")}</div><h3>No ${filter==='all'?'':filter.toLowerCase()+' '}drafts</h3><p>Use the composer to generate AI content for this website.</p></div>`; C.refreshIcons(); return; }
-    wrap.innerHTML = list.map(draftCard).join("");
+    const previewContainer = document.getElementById("draftPreviewContent");
+    
+    if (!list.length) {
+      wrap.innerHTML = `<div class="empty card" style="padding:var(--s9)"><div class="empty-art">${I("sparkles")}</div><h3>No ${filter==='all'?'':filter.toLowerCase()+' '}drafts</h3><p>Use the composer to generate AI content for this website.</p></div>`;
+      if (previewContainer) {
+        previewContainer.innerHTML = `<div class="empty card" style="padding:var(--s9); border-style:dashed;"><div class="empty-art">${I("sparkles")}</div><h3>No draft selected</h3><p>Create a draft first or change filter to see preview.</p></div>`;
+      }
+      C.refreshIcons();
+      return;
+    }
+
+    // Determine active draft selection
+    let activeDraft = list.find(d => d.id === selectedDraftId);
+    if (!activeDraft) {
+      // Default to first item of list
+      activeDraft = list[0];
+      selectedDraftId = activeDraft ? activeDraft.id : null;
+    }
+
+    wrap.innerHTML = list.map(d => draftListItem(d, d.id === selectedDraftId)).join("");
+    
+    if (previewContainer) {
+      if (activeDraft) {
+        previewContainer.innerHTML = draftPreviewContent(activeDraft);
+      } else {
+        previewContainer.innerHTML = `<div class="empty card" style="padding:var(--s9); border-style:dashed;"><div class="empty-art">${I("sparkles")}</div><h3>No draft selected</h3><p>Select a draft from the list to preview its details.</p></div>`;
+      }
+    }
+    
     C.refreshIcons();
     wireDraftActions();
   }
@@ -793,7 +889,8 @@
   function wireDraftActions() {
     document.querySelectorAll("[data-act]").forEach(b => {
       if (b._wired) return; b._wired = true;
-      b.addEventListener("click", async () => {
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation();
         const id = b.dataset.id, act = b.dataset.act, d = drafts.find(x => x.id === id);
         if (!d) return;
         if (act === "approve") {
@@ -815,28 +912,45 @@
             C.toast({ type: "info", title: "Draft rejected" });
             await M.syncMockData(site.id);
             if (C.mountShell) C.mountShell();
+            if (selectedDraftId === id) selectedDraftId = null;
             renderDrafts();
           } catch (err) {
             C.toast({ type: "error", title: "Rejection failed", desc: err.message });
           }
         }
         else if (act === "schedule") {
-          try {
-            const schedDate = new Date();
-            schedDate.setDate(schedDate.getDate() + 1); // schedule for tomorrow
-            await CadenceAPI.scheduleDraft(d.id, schedDate.toISOString());
-            d.status = "Scheduled";
-            C.toast({ type: "success", title: "Scheduled for tomorrow" });
-            renderDrafts();
-          } catch (err) {
-            C.toast({ type: "error", title: "Scheduling failed", desc: err.message });
-          }
+          document.getElementById("schedDraftId").value = d.id;
+          
+          // Default to tomorrow at the current time
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          
+          const yyyy = tomorrow.getFullYear();
+          const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+          const dd = String(tomorrow.getDate()).padStart(2, '0');
+          const hh = String(tomorrow.getHours()).padStart(2, '0');
+          const min = String(tomorrow.getMinutes()).padStart(2, '0');
+          
+          document.getElementById("schedDate").value = `${yyyy}-${mm}-${dd}`;
+          document.getElementById("schedTime").value = `${hh}:${min}`;
+          
+          C.openModal("scheduleModal");
         }
         else if (act === "regen") {
           await regenerate(d);
         }
         else if (act === "edit" || act === "view") {
           openEdit(d);
+        }
+        else if (act === "maximize") {
+          document.getElementById("largePreviewTitle").textContent = d.title;
+          document.getElementById("largePreviewSub").textContent = `${d.chan} · AI draft preview`;
+          
+          const bodyContainer = document.getElementById("largePreviewBody");
+          if (bodyContainer) {
+            bodyContainer.innerHTML = previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+          }
+          C.openModal("largePreviewModal");
         }
         else if (act === "more") {
           if (confirm("Move this draft to trash?")) {
@@ -846,6 +960,7 @@
               C.toast({ type: "success", title: "Draft moved to trash" });
               await M.syncMockData(site.id);
               if (C.mountShell) C.mountShell();
+              if (selectedDraftId === id) selectedDraftId = null;
               renderDrafts();
             } catch (err) {
               C.toast({ type: "error", title: "Delete failed", desc: err.message });
@@ -854,11 +969,22 @@
         }
       });
     });
+
+    document.querySelectorAll(".draft-list-item").forEach(item => {
+      if (item._wired) return;
+      item._wired = true;
+      item.addEventListener("click", () => {
+        selectedDraftId = item.dataset.listId;
+        renderDrafts();
+      });
+    });
   }
 
   async function regenerate(d) {
     const card = document.querySelector(`[data-card="${d.id}"] .draft__body`);
-    card.innerHTML = genLoadingHTML(); C.refreshIcons();
+    if (card) {
+      card.innerHTML = genLoadingHTML(); C.refreshIcons();
+    }
     try {
       await CadenceAPI.regenerateDraft(d.id);
       await window.MOCK.syncMockData(site.id);
@@ -878,7 +1004,13 @@
 
   /* ----- generate new draft ----- */
   async function startGenerate() {
-    const title = document.getElementById("ideaTitle").value.trim() || `New ${curChan} post about ${site.name}`;
+    const rawVal = document.getElementById("ideaTitle").value.trim();
+    const titles = rawVal.split('\n').map(t => t.trim()).filter(t => t.length > 0);
+    
+    if (titles.length === 0) {
+      titles.push(`New ${curChan} post about ${site.name}`);
+    }
+    
     const btn = document.getElementById("genBtn");
     btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Generating…'; C.refreshIcons();
     
@@ -887,24 +1019,38 @@
     document.querySelectorAll("#wsPanels .tab-panel").forEach(pp => pp.classList.toggle("active", pp.dataset.panel === "generate"));
 
     try {
-      const idea = await CadenceAPI.submitIdea(site.id, title, curChan.toLowerCase());
-      await CadenceAPI.generateContent(idea.id);
+      // Generate each title sequentially
+      for (const title of titles) {
+        const idea = await CadenceAPI.submitIdea(site.id, title, curChan.toLowerCase());
+        await CadenceAPI.generateContent(idea.id);
+      }
       
       await window.MOCK.syncMockData(site.id);
       drafts = window.MOCK.content.filter(x => x.site === site.id);
+      
+      if (drafts.length > 0) {
+        let maxIdDraft = drafts[0];
+        drafts.forEach(d => {
+          if (parseInt(d.id) > parseInt(maxIdDraft.id)) {
+            maxIdDraft = d;
+          }
+        });
+        selectedDraftId = maxIdDraft.id;
+      }
       
       filter = "all";
       document.querySelectorAll("#draftFilter button").forEach(x => x.classList.toggle("active", x.dataset.f === "all"));
       renderDrafts();
       await loadIdeaQueue();
       
-      C.toast({ type: "success", title: "Draft ready", desc: `${curChan} content generated` });
+      const successMsg = titles.length > 1 ? `${titles.length} drafts generated` : `${curChan} content generated`;
+      C.toast({ type: "success", title: "Draft ready", desc: successMsg });
       document.getElementById("ideaTitle").value = "";
     } catch (err) {
       console.error(err);
       C.toast({ type: "error", title: "Generation failed", desc: err.message });
     } finally {
-      btn.disabled = false; btn.innerHTML = I("sparkles") + "Generate"; C.refreshIcons();
+      btn.disabled = false; btn.innerHTML = I("sparkles") + " Generate with AI"; C.refreshIcons();
     }
   }
   document.getElementById("genBtn").addEventListener("click", startGenerate);
@@ -1114,6 +1260,7 @@
     if (tbLink) {
       tbLink.addEventListener("click", (e) => {
         e.preventDefault();
+        restoreSelection();
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
@@ -1122,6 +1269,7 @@
           if (selectedText.length > 0) {
             const url = prompt("Enter the link URL (e.g., https://google.com):");
             if (url) {
+              restoreSelection();
               document.execCommand("createLink", false, url);
             }
           } else {
@@ -1129,6 +1277,7 @@
             if (linkText) {
               const url = prompt("Enter the link URL (e.g., https://google.com):");
               if (url) {
+                restoreSelection();
                 const a = document.createElement("a");
                 a.href = url;
                 a.textContent = linkText;
@@ -1151,8 +1300,10 @@
     if (tbImg) {
       tbImg.addEventListener("click", (e) => {
         e.preventDefault();
+        restoreSelection();
         const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
         if (url) {
+          restoreSelection();
           document.execCommand("insertImage", false, url);
           document.getElementById("editBodyRich").focus();
         } else if (url === "") {
@@ -1169,6 +1320,7 @@
         if (file) {
           const reader = new FileReader();
           reader.onload = (event) => {
+            restoreSelection();
             const base64 = event.target.result;
             document.execCommand("insertImage", false, base64);
             document.getElementById("editBodyRich").focus();
@@ -1259,6 +1411,49 @@
     C.closeModal("editModal");
   });
 
+  const confirmScheduleBtn = document.getElementById("confirmSchedule");
+  if (confirmScheduleBtn) {
+    confirmScheduleBtn.addEventListener("click", async () => {
+      const draftId = document.getElementById("schedDraftId").value;
+      const dateVal = document.getElementById("schedDate").value;
+      const timeVal = document.getElementById("schedTime").value || "09:00";
+      
+      if (!draftId) {
+        C.toast({ type: "warning", title: "No draft selected" });
+        return;
+      }
+      if (!dateVal) {
+        C.toast({ type: "warning", title: "Please select a date" });
+        return;
+      }
+      
+      const [yyyy, mm, dd] = dateVal.split("-").map(Number);
+      const [hh, min] = timeVal.split(":").map(Number);
+      const targetDate = new Date(yyyy, mm - 1, dd, hh, min, 0, 0);
+      
+      confirmScheduleBtn.disabled = true;
+      try {
+        await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        
+        // Find draft in our local drafts list and update status
+        const d = drafts.find(x => x.id == draftId);
+        if (d) {
+          d.status = "Scheduled";
+        }
+        
+        await window.MOCK.syncMockData(site.id);
+        drafts = window.MOCK.content.filter(x => x.site === site.id);
+        renderDrafts();
+        C.toast({ type: "success", title: "Draft scheduled", desc: `Scheduled for ${dateVal} at ${timeVal}` });
+        C.closeModal("scheduleModal");
+      } catch (err) {
+        C.toast({ type: "error", title: "Scheduling failed", desc: err.message });
+      } finally {
+        confirmScheduleBtn.disabled = false;
+      }
+    });
+  }
+
   /* ----- hero / tab buttons that jump to generate ----- */
   document.querySelectorAll("[data-tab=generate]").forEach(b => b.addEventListener("click", () => {
     document.querySelectorAll(".ws-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "generate"));
@@ -1312,6 +1507,20 @@
     }
     else if (e.target.closest(".bp-cover")) {
       const bg = e.target.closest(".bp-cover").style.backgroundImage;
+      if (bg && bg !== "none") {
+        const src = bg.replace(/^url\(['"]?/, "").replace(/['"]?\)$/, "");
+        openImageLightbox(src);
+      }
+    }
+    else if (e.target.closest(".ig-img")) {
+      const bg = e.target.closest(".ig-img").style.backgroundImage;
+      if (bg && bg !== "none") {
+        const src = bg.replace(/^url\(['"]?/, "").replace(/['"]?\)$/, "");
+        openImageLightbox(src);
+      }
+    }
+    else if (e.target.closest(".yt-thumb")) {
+      const bg = e.target.closest(".yt-thumb").style.backgroundImage;
       if (bg && bg !== "none") {
         const src = bg.replace(/^url\(['"]?/, "").replace(/['"]?\)$/, "");
         openImageLightbox(src);

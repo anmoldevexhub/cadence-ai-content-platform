@@ -202,7 +202,7 @@
           last_name: lastName,
           password,
           role: role === 'super' ? 'super_admin' : 'admin',
-          avatar_color: '#6366f1'
+          avatar_color: '#095075'
         })
       });
     },
@@ -309,7 +309,7 @@
     async connectSocial(id, platform, makeWebhookUrl) {
       return await request(`/websites/${id}/social/`, {
         method: 'POST',
-        body: JSON.stringify({ platform, make_webhook_url: makeWebhookUrl || 'https://hook.us1.make.com/demo' })
+        body: JSON.stringify({ platform, make_webhook_url: makeWebhookUrl || '' })
       });
     },
 
@@ -465,7 +465,7 @@
             name: w.name,
             url: w.domain,
             short: w.name[0].toUpperCase(),
-            color: w.color || '#6366f1',
+            color: w.color || '#095075',
             industry: w.industry || 'Tech',
             owner: w.owner_name || 'Admin User',
             status: w.status === 'active' ? 'Active' : w.status === 'paused' ? 'Paused' : 'Draft',
@@ -569,7 +569,7 @@
           const name = localStorage.getItem("cadence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
           const email = localStorage.getItem("cadence.settings.email") || me.email || '';
           const initials = (((me.first_name && me.first_name[0]) || '') + ((me.last_name && me.last_name[0]) || '')).toUpperCase() || (me.username ? me.username.substring(0, 2).toUpperCase() : 'U');
-          const mappedUser = { name, email, initials, color: me.avatar_color || '#6366f1', role: me.role === 'super_admin' ? 'super' : 'admin' };
+          const mappedUser = { name, email, initials, color: me.avatar_color || '#095075', role: me.role === 'super_admin' ? 'super' : 'admin' };
           
           if (me.role === 'super_admin') {
             window.MOCK.users.super = mappedUser;

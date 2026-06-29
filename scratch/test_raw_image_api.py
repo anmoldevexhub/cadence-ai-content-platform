@@ -11,7 +11,7 @@ from content.generator import client
 try:
     print("Testing client.images.generate with gpt-image-1-mini...")
     response = client.images.generate(
-        model="gpt-image-1",
+        model="gpt-image-1-mini",
         prompt="A simple blue circle",
         n=1,
         size="1024x1024"

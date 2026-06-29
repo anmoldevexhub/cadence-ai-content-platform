@@ -193,9 +193,9 @@
       const board = document.getElementById("board");
       board.innerHTML = M.schedule.days.map(d => {
         const items = cards.filter(c => c.day === d && visible(c)).sort((a,b) => a.time.localeCompare(b.time));
-        return `<div class="cal-col ${d===today?'is-today':''}" data-day="${d}">
+        return `<div class="cal-col" data-day="${d}">
           <div class="cal-head"><div><div class="cal-dow">${d}</div><div class="cal-date">${months[weekDates[daysOfWeek.indexOf(d)].getMonth()] || 'Jun'} ${dates[d]}</div></div>
-            ${d===today?'<span class="badge badge-primary txs">Today</span>':''}<span class="cal-count">${items.length}</span></div>
+            <span class="cal-count">${items.length}</span></div>
           <div class="cal-slots" data-day="${d}">
             ${items.map(cardHTML).join("") || `<div class="cal-empty" data-add-day="${d}">${I("plus")}<span>Drop or add</span></div>`}
           </div></div>`;
@@ -309,7 +309,7 @@
     // auto-schedule: take approved drafts and distribute
     document.getElementById("autoBtn").addEventListener("click", async function () {
       this.disabled = true; this.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Scheduling…'; lucide.createIcons();
-      const approved = cards.filter(c => c.status === "Approved");
+      const approved = M.content.filter(c => c.status === "Approved" && userSiteIds.includes(String(c.site)));
       const days = M.schedule.days;
       
       try {
@@ -355,15 +355,18 @@
 
     .cal-board { display:grid; grid-template-columns:repeat(7,1fr); gap:var(--s3); align-items:start; }
     @media (max-width:1200px){ .cal-board { grid-template-columns:repeat(7,minmax(150px,1fr)); overflow-x:auto; padding-bottom:var(--s3); } }
-    .cal-col { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-lg); min-height:420px; display:flex; flex-direction:column; }
-    .cal-col.is-today { border-color:var(--primary); box-shadow:0 0 0 1px var(--primary); }
-    .cal-head { display:flex; align-items:center; gap:8px; padding:var(--s3) var(--s3); border-bottom:1px solid var(--border); }
+    .cal-col { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-lg); height:520px; display:flex; flex-direction:column; }
+    .cal-head { display:flex; align-items:center; gap:8px; padding:var(--s3) var(--s3); border-bottom:1px solid var(--border); flex-shrink:0; }
     .cal-dow { font-weight:700; font-size:var(--fs-md); }
     .cal-date { font-size:var(--fs-xs); color:var(--text-muted); }
     .cal-count { margin-left:auto; background:var(--bg-subtle); color:var(--text-muted); font-size:var(--fs-xs); font-weight:700; min-width:20px; height:20px; border-radius:99px; display:grid; place-items:center; padding:0 6px; }
-    .cal-slots { padding:var(--s3); display:flex; flex-direction:column; gap:var(--s3); flex:1; min-height:80px; transition:background .12s; border-radius:0 0 var(--r-lg) var(--r-lg); }
+    .cal-slots { padding:var(--s3); display:flex; flex-direction:column; gap:var(--s3); flex:1; overflow-y:auto; transition:background .12s; border-radius:0 0 var(--r-lg) var(--r-lg); scrollbar-width:thin; scrollbar-color:var(--border-strong) transparent; }
+    .cal-slots::-webkit-scrollbar { width:6px; }
+    .cal-slots::-webkit-scrollbar-track { background:transparent; }
+    .cal-slots::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:99px; }
+    .cal-slots::-webkit-scrollbar-thumb:hover { background:var(--text-faint); }
     .cal-slots.drop-on { background:var(--primary-soft); outline:2px dashed var(--primary); outline-offset:-4px; }
-    .cal-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:10px; cursor:grab; box-shadow:var(--sh-xs); transition:box-shadow .12s, transform .08s; }
+    .cal-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:10px; cursor:grab; box-shadow:var(--sh-xs); transition:box-shadow .12s, transform .08s; flex-shrink:0; }
     .cal-card:hover { box-shadow:var(--sh-md); }
     .cal-card.dragging { opacity:.4; }
     .cal-card:active { cursor:grabbing; }

@@ -1,9 +1,13 @@
-import django, os
+import os
+import sys
+import django
+
+sys.path.append(os.getcwd())
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cadence_project.settings')
 django.setup()
 
 from accounts.models import CustomUser
-from content.models import BlogPost, Category
+from content.models import ContentDraft, ContentIdea
 from websites.models import Website
 
 print("=== Users ===")
@@ -15,10 +19,11 @@ print(f"\n=== Websites: {Website.objects.count()} ===")
 for w in Website.objects.all()[:5]:
     print(f"  {w.id}: {w.name} | {w.url}")
 
-print(f"\n=== Categories: {Category.objects.count()} ===")
-for c in Category.objects.all()[:5]:
-    print(f"  {c.id}: {c.name}")
+print(f"\n=== Content Ideas: {ContentIdea.objects.count()} ===")
+for ci in ContentIdea.objects.all()[:5]:
+    print(f"  {ci.id}: {ci.title} | {ci.platform}")
 
-print(f"\n=== Blog Posts: {BlogPost.objects.count()} ===")
-for b in BlogPost.objects.all()[:5]:
-    print(f"  {b.id}: {b.title[:60]}")
+print(f"\n=== Content Drafts: {ContentDraft.objects.count()} ===")
+for d in ContentDraft.objects.all()[:5]:
+    print(f"  {d.id}: {d.title[:60]}")
+

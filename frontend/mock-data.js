@@ -17,8 +17,8 @@ window.MOCK = (function () {
 
   const defaultMock = {
     users: {
-      admin: { name: "Maya Chen", email: "maya@cadence.io", initials: "MC", color: "#6366f1", role: "admin" },
-      super: { name: "Devon Park", email: "devon@cadence.io", initials: "DP", color: "#9333ea", role: "super" },
+      admin: { name: "Maya Chen", email: "maya@cadence.io", initials: "MC", color: "#095075", role: "admin" },
+      super: { name: "Devon Park", email: "devon@cadence.io", initials: "DP", color: "#1e8fc6", role: "super" },
     },
     websites: [],
     content: [],
@@ -142,7 +142,7 @@ window.MOCK = (function () {
       name: meName,
       email: meEmail,
       initials: meInitials,
-      color: me.avatar_color || '#6366f1',
+      color: me.avatar_color || '#095075',
       role: me.role === 'super_admin' ? 'super' : 'admin'
     };
 
@@ -161,7 +161,7 @@ window.MOCK = (function () {
         name: w.name,
         url: w.domain,
         short: w.name[0].toUpperCase(),
-        color: w.color || "#6366f1",
+        color: w.color || "#095075",
         industry: w.industry || "General",
         owner: w.owner_name || "Admin",
         status: w.status === 'active' ? 'Active' : w.status === 'paused' ? 'Paused' : 'Draft',
@@ -236,7 +236,7 @@ window.MOCK = (function () {
 
     // 5. Populate approvals queue
     const approvals = content.filter(c => c.status === "Draft").map(c => {
-      const w = websites.find(s => s.id === c.site) || websites[0] || { name: "Unknown", color: "#6366f1", short: "U" };
+      const w = websites.find(s => s.id === c.site) || websites[0] || { name: "Unknown", color: "#095075", short: "U" };
       return { ...c, siteName: w.name, siteColor: w.color, siteShort: w.short };
     });
 
@@ -252,7 +252,7 @@ window.MOCK = (function () {
           name: name,
           email: u.email,
           initials: initials,
-          color: u.avatar_color || '#6366f1',
+          color: u.avatar_color || '#095075',
           websites: u.role === 'super_admin' ? ["All websites"] : ["Assigned websites"],
           status: u.is_active ? "Active" : "Disabled",
           role: u.role === 'super_admin' ? "Super Admin" : "Admin",
@@ -282,7 +282,7 @@ window.MOCK = (function () {
       return {
         who: log.actor_name || "AI Engine",
         initials: actorInitials,
-        color: "#6366f1",
+        color: "#095075",
         action: log.action.replace('_', ' '),
         target: log.target_description || "",
         time: timeStr,
@@ -290,11 +290,29 @@ window.MOCK = (function () {
       };
     });
 
-    // 8. Notifications derived from pending approvals
-    const notifications = [
-      { text: `<b>${approvals.length} drafts</b> are waiting for your approval`, time: "Just now", icon: "check-check", tile: "blog", href: "approvals.html" }
-    ];
-    if (activity.length > 0) {
+    // 8. Notifications derived from pending approvals (respecting notification preferences)
+    let notificationsPref;
+    try {
+      notificationsPref = JSON.parse(localStorage.getItem("cadence.settings.notifications"));
+    } catch(e) {}
+
+    const notifications = [];
+    
+    // Index 0 controls "Draft ready for approval" in-app notifications (default to true)
+    const showDraftNotif = (!notificationsPref || !notificationsPref[0] || notificationsPref[0].inapp !== false);
+    if (showDraftNotif && approvals.length > 0) {
+      notifications.push({ 
+        text: `<b>${approvals.length} drafts</b> are waiting for your approval`, 
+        time: "Just now", 
+        icon: "check-check", 
+        tile: "blog", 
+        href: "approvals.html" 
+      });
+    }
+
+    // Index 4 controls "Mentions & comments / Recent activity" in-app notifications (default to true)
+    const showActivityNotif = (!notificationsPref || !notificationsPref[4] || notificationsPref[4].inapp !== false);
+    if (showActivityNotif && activity.length > 0) {
       notifications.push({
         text: `Recent activity: <b>${activity[0].who}</b> ${activity[0].action} ${activity[0].target}`,
         time: activity[0].time,

@@ -20,16 +20,14 @@
       <main class="content" data-screen-label="Settings" style="max-width:1180px">
 
         <div class="breadcrumbs"><a href="dashboard.html">Home</a><i data-lucide="chevron-right"></i><span class="cur">Settings</span></div>
-        <div class="page-head"><div class="ph-text"><h1 class="page-title">Settings</h1><p class="page-sub">Manage your profile, connections, scheduling and plan.</p></div></div>
+        <div class="page-head"><div class="ph-text"><h1 class="page-title">Settings</h1><p class="page-sub">Manage your profile, connections, and scheduling.</p></div></div>
 
         <div class="set-layout">
           <!-- Settings nav -->
           <nav class="set-nav" id="setNav">
             <button class="set-link active" data-s="profile"><i data-lucide="user"></i> Profile</button>
-            <button class="set-link" data-s="notifications"><i data-lucide="bell"></i> Notifications</button>
             <button class="set-link" data-s="scheduler"><i data-lucide="calendar-clock"></i> Scheduler</button>
             <button class="set-link" data-s="connections"><i data-lucide="link"></i> Connections</button>
-            <button class="set-link super-only" data-s="billing"><i data-lucide="credit-card"></i> Billing &amp; plan</button>
           </nav>
 
           <div class="set-content">
@@ -60,13 +58,7 @@
               </div>
             </section>
 
-            <!-- NOTIFICATIONS -->
-            <section class="set-panel" data-panel="notifications">
-              <div class="card card-pad">
-                <h3 class="set-h">Notification preferences</h3>
-                <div id="notifList"></div>
-              </div>
-            </section>
+
 
             <!-- SCHEDULER -->
             <section class="set-panel" data-panel="scheduler">
@@ -92,40 +84,6 @@
                 <h3 class="set-h">Social platform connections</h3>
                 <p class="muted tsm" style="margin-top:-8px;margin-bottom:var(--s5)">Connect channels so Cadence can publish directly.</p>
                 <div id="connList" class="col gap3"></div>
-              </div>
-            </section>
-
-            <!-- BILLING -->
-            <section class="set-panel" data-panel="billing">
-              <div class="card mb5" style="overflow:hidden">
-                <div class="plan-banner">
-                  <div><div class="badge" style="background:rgba(255,255,255,.2);color:#fff;margin-bottom:8px">Current plan</div>
-                    <h3 style="font-size:var(--fs-2xl);color:#fff" id="planName">Scale</h3>
-                    <p style="color:rgba(255,255,255,.85);margin-top:4px" id="planLimits">Unlimited websites · 8 admins · 10k AI generations/mo</p></div>
-                  <div style="text-align:right"><div style="font-size:34px;font-weight:800;color:#fff;letter-spacing:-.03em" id="planPrice">$149<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span></div>
-                    <button class="btn btn-sm mt2" id="btnManagePlan" style="background:#fff;color:var(--primary)">Manage plan</button></div>
-                </div>
-                <div class="card__body">
-                  <div class="row-between mb2"><span class="fw6">AI generations this month</span><span class="muted tsm mono">6,420 / 10,000</span></div>
-                  <div class="progress"><i style="width:64%"></i></div>
-                  <div class="grid grid-3 mt5">
-                    <div><div class="muted tsm">Websites</div><div class="fw7 mono" style="font-size:var(--fs-lg)">6 / ∞</div></div>
-                    <div><div class="muted tsm">Admin seats</div><div class="fw7 mono" style="font-size:var(--fs-lg)">4 / 8</div></div>
-                    <div><div class="muted tsm">Next invoice</div><div class="fw7" style="font-size:var(--fs-lg)">Jul 1, 2026</div></div>
-                  </div>
-                </div>
-              </div>
-              <div class="card card-pad mb5">
-                <h3 class="set-h">Payment method</h3>
-                <div class="chan-conn"><span class="icon-tile tile-blog"><i data-lucide="credit-card"></i></span>
-                  <div style="flex:1"><div class="fw6" id="cardName">Visa ending 4242</div><div class="muted tsm" id="cardExpiry">Expires 09 / 2028</div></div>
-                  <button class="btn btn-secondary btn-sm" id="btnUpdateCard">Update</button></div>
-              </div>
-              <div class="card">
-                <div class="card__header"><h3>Billing history</h3></div>
-                <div class="table-wrap" style="border:none;border-radius:0">
-                  <table class="tbl"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody id="invBody"></tbody></table>
-                </div>
               </div>
             </section>
 
@@ -227,10 +185,6 @@
     applyRole();
     window.addEventListener("rolechange", () => {
       applyRole();
-      const billingLink = document.querySelector('.set-link[data-s=billing]');
-      if (C.store.role !== "super" && billingLink && billingLink.classList.contains('active')) {
-        switchTo("profile");
-      }
     });
 
     // settings nav
@@ -262,11 +216,14 @@
       return [title, desc, emailVal, inappVal];
     });
 
-    document.getElementById("notifList").innerHTML = `
-      <div class="notif-head"><span>Notification</span><span class="ctr">Email</span><span class="ctr">In-app</span></div>` +
-      notifs.map(([t,d,em,ip], idx)=>`<div class="notif-row"><div><div class="fw6">${t}</div><div class="muted tsm">${d}</div></div>
-        <span class="ctr"><label class="switch"><input type="checkbox" class="notif-email" data-idx="${idx}" ${em?'checked':''}/><span class="track"></span></label></span>
-        <span class="ctr"><label class="switch"><input type="checkbox" class="notif-inapp" data-idx="${idx}" ${ip?'checked':''}/><span class="track"></span></label></span></div>`).join("");
+    const notifList = document.getElementById("notifList");
+    if (notifList) {
+      notifList.innerHTML = `
+        <div class="notif-head"><span>Notification</span><span class="ctr">Email</span><span class="ctr">In-app</span></div>` +
+        notifs.map(([t,d,em,ip], idx)=>`<div class="notif-row"><div><div class="fw6">${t}</div><div class="muted tsm">${d}</div></div>
+          <span class="ctr"><label class="switch"><input type="checkbox" class="notif-email" data-idx="${idx}" ${em?'checked':''}/><span class="track"></span></label></span>
+          <span class="ctr"><label class="switch"><input type="checkbox" class="notif-inapp" data-idx="${idx}" ${ip?'checked':''}/><span class="track"></span></label></span></div>`).join("");
+    }
 
     // posting times
     const defaultTimes = [["Blog","blog","08:00"],["LinkedIn","linkedin","08:30"],["YouTube","youtube","17:00"],["Instagram","instagram","12:30"]];
@@ -283,9 +240,14 @@
     });
 
     document.getElementById("postTimes").innerHTML = times.map(([n,t,tm])=>`
-      <div class="chan-conn"><span class="icon-tile tile-${t}">${I(getPlatIcon(n))}</span>
-        <div style="flex:1"><div class="fw6">${n}</div><div class="muted tsm">Default daily posting time</div></div>
-        <input class="input post-time-input" data-platform="${t}" type="time" value="${tm}" style="width:130px"/></div>`).join("");
+      <div class="chan-conn">
+        <span class="icon-tile tile-${t}">${I(getPlatIcon(n))}</span>
+        <div class="cc-meta">
+          <div class="cc-nm">${n}</div>
+          <div class="cc-st">Default daily posting time</div>
+        </div>
+        <input class="input post-time-input" data-platform="${t}" type="time" value="${tm}" style="width:130px"/>
+      </div>`).join("");
 
     // connections
     const defaultConns = [
@@ -344,86 +306,12 @@
     }
     renderConnections();
 
-    // invoices
-    const inv = [["Jun 1, 2026","Scale plan — monthly","$149.00"],["May 1, 2026","Scale plan — monthly","$149.00"],["Apr 1, 2026","Scale plan — monthly","$149.00"]];
-    document.getElementById("invBody").innerHTML = inv.map(([d,desc,a])=>`<tr><td class="cell-muted">${d}</td><td class="cell-strong">${desc}</td><td class="mono">${a}</td><td><span class="badge badge-success">Paid</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm btn-download-invoice" data-date="${d}">${I("download")}</button></td></tr>`).join("");
-    
-    document.querySelectorAll(".btn-download-invoice").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const date = btn.dataset.date;
-        C.toast({ type: "success", title: "Downloading invoice", desc: `Invoice for ${date} downloaded successfully.` });
-      });
-    });
-
     // theme buttons
     document.getElementById("themeLight").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","light"); C.store.theme="light"; syncTheme(); window.dispatchEvent(new CustomEvent("themechange")); });
     document.getElementById("themeDark").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","dark"); C.store.theme="dark"; syncTheme(); window.dispatchEvent(new CustomEvent("themechange")); });
     function syncTheme(){ const d=C.store.theme==="dark"; document.getElementById("themeDark").classList.toggle("active",d); document.getElementById("themeLight").classList.toggle("active",!d); }
     syncTheme();
     window.addEventListener("themechange", syncTheme);
-
-    // card modal logic
-    const cardNameEl = document.getElementById("cardName");
-    const cardExpiryEl = document.getElementById("cardExpiry");
-    
-    cardNameEl.textContent = localStorage.getItem("cadence.settings.cardName") || "Visa ending 4242";
-    cardExpiryEl.textContent = localStorage.getItem("cadence.settings.cardExpiry") || "Expires 09 / 2028";
-    
-    document.getElementById("btnUpdateCard").addEventListener("click", () => {
-      document.getElementById("mCardNumber").value = cardNameEl.textContent;
-      document.getElementById("mCardExpiry").value = cardExpiryEl.textContent.replace("Expires ", "");
-      C.openModal("updateCardModal");
-    });
-    
-    document.getElementById("btnSaveCard").addEventListener("click", () => {
-      const newCard = document.getElementById("mCardNumber").value.trim() || "Visa ending 4242";
-      const newExpiry = document.getElementById("mCardExpiry").value.trim() || "09 / 2028";
-      
-      localStorage.setItem("cadence.settings.cardName", newCard);
-      localStorage.setItem("cadence.settings.cardExpiry", "Expires " + newExpiry);
-      
-      cardNameEl.textContent = newCard;
-      cardExpiryEl.textContent = "Expires " + newExpiry;
-      
-      C.closeModal("updateCardModal");
-      C.toast({ type: "success", title: "Payment method updated" });
-    });
-
-    // plan modal logic
-    const planNameEl = document.getElementById("planName");
-    const planPriceEl = document.getElementById("planPrice");
-    const planLimitsEl = document.getElementById("planLimits");
-    
-    const PLANS_METADATA = {
-      growth: { name: "Growth", price: "$49", limits: "5 websites · 3 admins · 2k AI generations/mo" },
-      scale: { name: "Scale", price: "$149", limits: "Unlimited websites · 8 admins · 10k AI generations/mo" },
-      enterprise: { name: "Enterprise", price: "$499", limits: "Unlimited websites · 20 admins · 50k AI generations/mo" }
-    };
-    
-    const activePlanKey = localStorage.getItem("cadence.settings.plan") || "scale";
-    const currentPlan = PLANS_METADATA[activePlanKey] || PLANS_METADATA.scale;
-    planNameEl.textContent = currentPlan.name;
-    planPriceEl.innerHTML = `${currentPlan.price}<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span>`;
-    planLimitsEl.textContent = currentPlan.limits;
-    
-    document.getElementById("btnManagePlan").addEventListener("click", () => {
-      document.getElementById("mPlanSelect").value = localStorage.getItem("cadence.settings.plan") || "scale";
-      C.openModal("managePlanModal");
-    });
-    
-    document.getElementById("btnSavePlan").addEventListener("click", () => {
-      const selectedPlanKey = document.getElementById("mPlanSelect").value;
-      const planInfo = PLANS_METADATA[selectedPlanKey];
-      
-      localStorage.setItem("cadence.settings.plan", selectedPlanKey);
-      
-      planNameEl.textContent = planInfo.name;
-      planPriceEl.innerHTML = `${planInfo.price}<span style="font-size:16px;font-weight:500;opacity:.8">/mo</span>`;
-      planLimitsEl.textContent = planInfo.limits;
-      
-      C.closeModal("managePlanModal");
-      C.toast({ type: "success", title: "Subscription updated", desc: `Switched to the ${planInfo.name} plan.` });
-    });
 
     // cancel button
     document.getElementById("btnCancel").addEventListener("click", () => {
@@ -545,67 +433,9 @@
     .ctr { text-align:center; }
     .notif-head .ctr { justify-self:center; }
     .notif-row .ctr { display:flex; justify-content:center; }
-    .plan-banner { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s6); background:linear-gradient(120deg,var(--primary),#9333ea); flex-wrap:wrap; }
+    .plan-banner { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s6); background:linear-gradient(120deg,var(--primary),#1e8fc6); flex-wrap:wrap; }
   </style>
-  <!-- Modal: Update Card -->
-  <div class="modal-overlay" id="updateCardModal">
-    <div class="modal">
-      <div class="modal__head">
-        <div class="mtxt">
-          <h3>Update payment method</h3>
-          <div class="sub">Enter your new credit card details.</div>
-        </div>
-        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal__body col gap3" style="display:flex; flex-direction:column; gap:16px;">
-        <div class="field">
-          <label class="label">Card number</label>
-          <input class="input" type="text" id="mCardNumber" placeholder="•••• •••• •••• 4242" value="Visa ending 4242" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
-        </div>
-        <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-          <div class="field">
-            <label class="label">Expiry date</label>
-            <input class="input" type="text" id="mCardExpiry" placeholder="MM / YYYY" value="09 / 2028" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
-          </div>
-          <div class="field">
-            <label class="label">CVC</label>
-            <input class="input" type="password" id="mCardCVC" placeholder="•••" value="123" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
-          </div>
-        </div>
-      </div>
-      <div class="modal__foot">
-        <button class="btn btn-ghost" data-close-modal>Cancel</button>
-        <button class="btn btn-primary" id="btnSaveCard"><i data-lucide="check"></i> Save Card</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Modal: Manage Plan -->
-  <div class="modal-overlay" id="managePlanModal">
-    <div class="modal">
-      <div class="modal__head">
-        <div class="mtxt">
-          <h3>Change subscription plan</h3>
-          <div class="sub">Choose a plan that fits your content needs.</div>
-        </div>
-        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
-      </div>
-      <div class="modal__body col gap3" style="display:flex; flex-direction:column; gap:16px; min-width:320px;">
-        <div class="field">
-          <label class="label">Select Plan</label>
-          <select class="select" id="mPlanSelect" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);">
-            <option value="growth">Growth — $49/mo (5 websites, 3 admins, 2k AI gens)</option>
-            <option value="scale" selected>Scale — $149/mo (Unlimited websites, 8 admins, 10k AI gens)</option>
-            <option value="enterprise">Enterprise — $499/mo (Unlimited websites, 20 admins, 50k AI gens)</option>
-          </select>
-        </div>
-      </div>
-      <div class="modal__foot">
-        <button class="btn btn-ghost" data-close-modal>Cancel</button>
-        <button class="btn btn-primary" id="btnSavePlan"><i data-lucide="check"></i> Update Plan</button>
-      </div>
-    </div>
-  </div>
 
   <div id="__bundler_thumbnail" hidden></div>
 </body>

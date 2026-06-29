@@ -241,8 +241,10 @@
       const p = M.platMeta(c.platform), w = M.site(c.site);
       return `<div class="pend-row">
         <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
-        <div style="flex:1;min-width:0"><div class="fw6" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.title}</div>
-          <div class="txs muted">${w.name} · ${c.platform}</div></div>
+        <div style="flex:1;min-width:0">
+          <div class="fw6" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);font-size:14px;">${c.title}</div>
+          <div class="txs muted" style="margin-top:2px;">${w.name} · ${c.platform}</div>
+        </div>
         <a class="btn btn-soft btn-sm" href="approvals.html">Review</a>
       </div>`;
     }).join("")}</div>` : `<div class="empty" style="padding:var(--s7)"><div class="empty-art">${I("check-check")}</div><h3>All caught up</h3><p>No drafts waiting for approval.</p></div>`;

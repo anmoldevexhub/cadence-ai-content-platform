@@ -86,7 +86,7 @@
                   </div>
                   <div class="field">
                     <label class="label" for="ideaTitle">Topic / title</label>
-                    <input class="input" id="ideaTitle" placeholder="e.g. The complete guide to pour-over coffee" />
+                    <textarea class="textarea" id="ideaTitle" placeholder="e.g. The complete guide to pour-over coffee&#10;Enter multiple titles, one per line..." style="height: 80px; resize: vertical;"></textarea>
                   </div>
                   <div class="field" style="margin-bottom:var(--s4)">
                     <label class="label" for="ideaNotes">Notes <span class="opt">(optional)</span></label>
@@ -111,7 +111,7 @@
               </div>
 
               <!-- Drafts -->
-              <div>
+              <div class="drafts-section">
                 <div class="row-between mb4">
                   <div><h2 style="font-size:var(--fs-xl)">Generated drafts</h2><div class="muted tsm">Review, edit and approve before scheduling</div></div>
                   <div class="seg-pills" id="draftFilter">
@@ -121,7 +121,18 @@
                     <button data-f="Scheduled">Scheduled</button>
                   </div>
                 </div>
-                <div id="draftList" class="col gap5"></div>
+                
+                <div class="drafts-split-container">
+                  <!-- Left Pane: Compact List -->
+                  <div class="drafts-list-pane">
+                    <div id="draftList" class="col gap2"></div>
+                  </div>
+                  
+                  <!-- Right Pane: Sticky Preview Details -->
+                  <div class="drafts-preview-pane">
+                    <div id="draftPreviewContent"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -337,11 +348,58 @@
     </div>
   </div>
 
+  <!-- Schedule draft modal -->
+  <div class="modal-overlay" id="scheduleModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Schedule draft</h3>
+          <div class="sub">Set the publishing date and time for this draft.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body">
+        <input type="hidden" id="schedDraftId" />
+        <div class="field">
+          <label class="label">Date</label>
+          <input class="input" type="date" id="schedDate" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);" />
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">Time</label>
+          <input class="input" type="time" id="schedTime" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);" />
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-ghost" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" id="confirmSchedule"><i data-lucide="calendar-plus"></i> Schedule</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete modal -->
   <div class="modal-overlay" id="delModal">
     <div class="modal">
       <div class="modal__head"><span class="icon-tile" style="background:var(--error-soft);color:var(--error)"><i data-lucide="alert-triangle"></i></span><div class="mtxt"><h3>Remove this website?</h3><div class="sub">This deletes all drafts, schedules and published history. This can't be undone.</div></div></div>
       <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-danger" id="confirmDeleteSiteBtn" data-close-modal>Remove website</button></div>
+    </div>
+  </div>
+
+  <!-- Large preview modal -->
+  <div class="modal-overlay" id="largePreviewModal">
+    <div class="modal lg" style="max-width: 960px; width: 95vw;">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3 id="largePreviewTitle">Preview Draft</h3>
+          <div class="sub" id="largePreviewSub">Full screen view</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding:var(--s6); overflow-y:auto; max-height:75vh;">
+        <div id="largePreviewBody"></div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-primary" data-close-modal>Close preview</button>
+      </div>
     </div>
   </div>
 

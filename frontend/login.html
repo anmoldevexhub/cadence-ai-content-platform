@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sign in to your Cadence workspace to generate, approve, and auto-schedule AI content across all your client websites." />
   <title>Sign in · Cadence</title>
   <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -10,6 +11,424 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Premium override styles for login page */
+    body {
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .auth {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .auth__brand {
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      padding: var(--s9) var(--s10);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: radial-gradient(circle at 10% 20%, rgba(9, 80, 117, 1) 0%, rgba(30, 143, 198, 1) 45%, rgba(5, 48, 70, 1) 90%);
+      background-size: 200% 200%;
+      animation: gradientShift 15s ease infinite;
+    }
+
+    /* Grid overlay on the brand panel */
+    .auth__brand::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.8;
+      z-index: 1;
+    }
+
+    /* Light rays / ambient glows on the brand panel */
+    .auth__brand::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: 
+      	radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 60%),
+      	radial-gradient(circle at 20% 80%, rgba(9, 80, 117, 0.4) 0%, transparent 50%);
+      z-index: 1;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .auth__brand > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+
+    .auth-logo .brand-mark {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .auth-hero {
+      margin-top: auto;
+      margin-bottom: auto;
+      max-width: 520px;
+    }
+
+    .auth-hero h2 {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #ffffff 0%, #e0e7ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: fadeInUp 0.8s ease-out;
+    }
+
+    .auth-hero p {
+      font-size: var(--fs-lg);
+      line-height: 1.6;
+      opacity: 0.9;
+      color: #e0e7ff;
+      margin-top: var(--s5);
+      animation: fadeInUp 1s ease-out;
+    }
+
+    .auth-points {
+      margin-top: var(--s8);
+      gap: var(--s5);
+      animation: fadeInUp 1.2s ease-out;
+    }
+
+    .auth-point {
+      font-size: var(--fs-md);
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .auth-point .pc {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+
+    .auth-point:hover .pc {
+      background: rgba(255, 255, 255, 0.25);
+      transform: scale(1.08);
+    }
+
+    /* Product Mockup visual */
+    .auth-visual {
+      position: absolute;
+      bottom: -60px;
+      right: -80px;
+      width: 480px;
+      transform: rotate(-6deg) translateY(40px);
+      opacity: 0.85;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1;
+    }
+
+    .auth-visual:hover {
+      transform: rotate(-4deg) translateY(20px) scale(1.02);
+      opacity: 1;
+      filter: drop-shadow(0 20px 40px rgba(0,0,0,0.3));
+    }
+
+    .dashboard-mockup {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: -20px 20px 50px rgba(0, 0, 0, 0.3), inset 0 0 2px rgba(255,255,255,0.2);
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Form Section styling */
+    .auth__form {
+      padding: var(--s10) var(--s9);
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: var(--s8);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+      transition: all 0.3s ease;
+      width: 100%;
+      max-width: 440px;
+    }
+
+    [data-theme="dark"] .auth-card {
+      background: rgba(30, 30, 40, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .auth-card:hover {
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.06);
+    }
+
+    .ac-head h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--text) 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .ac-head .sub {
+      font-size: var(--fs-md);
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Form Fields styling */
+    .field {
+      margin-bottom: var(--s5);
+    }
+
+    .field .label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .input-group {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-group .lead {
+      position: absolute;
+      left: 14px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      transition: color 0.2s ease;
+    }
+
+    .input-group .input {
+      width: 100%;
+      height: 48px;
+      padding: 0 var(--s4) 0 44px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: var(--fs-md);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .input-group .input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+      outline: none;
+    }
+
+    .input-group .input:focus + .lead {
+      color: var(--primary);
+    }
+
+    /* Custom Checkbox and Row styling */
+    .auth-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: var(--s4);
+      margin-bottom: var(--s6);
+    }
+
+    .auth-row a {
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 14px;
+      transition: opacity 0.2s ease;
+    }
+
+    .auth-row a:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .check input {
+      display: none;
+    }
+
+    .check .box {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      display: grid;
+      place-items: center;
+      transition: all 0.2s ease;
+    }
+
+    .check .box svg {
+      width: 12px;
+      height: 12px;
+      color: #fff;
+      transform: scale(0);
+      transition: transform 0.2s ease;
+    }
+
+    .check input:checked + .box {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .check input:checked + .box svg {
+      transform: scale(1);
+    }
+
+    /* Submit Button styling */
+    .btn-submit {
+      width: 100%;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary) 0%, #1e8fc6 100%);
+      color: #fff;
+      font-weight: 600;
+      font-size: var(--fs-md);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(9, 80, 117, 0.25);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(9, 80, 117, 0.35);
+      background: linear-gradient(135deg, #1e8fc6 0%, #07405e 100%);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-foot {
+      text-align: center;
+      margin-top: var(--s6);
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .auth-foot a {
+      color: var(--primary);
+      font-weight: 700;
+      transition: opacity 0.2s ease;
+    }
+
+    .auth-foot a:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+
+    .auth-theme {
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: all 0.2s ease;
+    }
+
+    .auth-theme:hover {
+      background: var(--bg-subtle);
+      transform: scale(1.05);
+    }
+
+    /* Responsiveness */
+    @media (max-width: 980px) {
+      .auth {
+        grid-template-columns: 1fr;
+      }
+      .auth__brand {
+        display: none;
+      }
+      .auth__form {
+        padding: var(--s8) var(--s5);
+      }
+      .auth-card {
+        padding: var(--s6);
+      }
+    }
+  </style>
 </head>
 <body>
   <div class="auth">
@@ -27,6 +446,9 @@
           <div class="auth-point"><span class="pc"><i data-lucide="calendar-check"></i></span> Approve once — it posts Monday to Sunday</div>
         </div>
       </div>
+      <div class="auth-visual">
+        <img class="dashboard-mockup" src="media/dashboard_mockup.png" alt="SaaS Dashboard" />
+      </div>
     </div>
 
     <!-- Form -->
@@ -37,18 +459,6 @@
           <h1>Welcome back</h1>
           <p class="sub">Sign in to your Cadence workspace.</p>
         </div>
-
-        <div class="social-row">
-          <button class="social-btn" type="button" onclick="Cadence.toast({type:'info',title:'Social login is a demo placeholder'})">
-            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z"/></svg>
-            Google
-          </button>
-          <button class="social-btn" type="button" onclick="Cadence.toast({type:'info',title:'Social login is a demo placeholder'})">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"/></svg>
-            GitHub
-          </button>
-        </div>
-        <div class="or-sep">or continue with email</div>
 
         <form id="loginForm" novalidate>
           <div class="field">
@@ -67,7 +477,7 @@
             <label class="check"><input type="checkbox" checked /><span class="box"><i data-lucide="check"></i></span> Remember me</label>
             <a href="forgot-password.html">Forgot password?</a>
           </div>
-          <button class="btn btn-primary btn-lg btn-block" type="submit">Sign in <i data-lucide="arrow-right"></i></button>
+          <button class="btn-submit" type="submit">Sign in <i data-lucide="arrow-right"></i></button>
         </form>
 
         <div class="auth-foot">Don't have an account? <a href="signup.html">Create one</a></div>

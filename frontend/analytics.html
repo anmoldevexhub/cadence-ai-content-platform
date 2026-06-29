@@ -77,7 +77,7 @@
 
     function tc() { const cs=getComputedStyle(document.documentElement); return {
       primary:cs.getPropertyValue("--primary").trim(), text:cs.getPropertyValue("--text-muted").trim(),
-      grid:cs.getPropertyValue("--border").trim(), blog:"#6366f1", linkedin:"#0a66c2", youtube:"#ef4444", instagram:"#d62976",
+      grid:cs.getPropertyValue("--border").trim(), blog:"#095075", linkedin:"#0a66c2", youtube:"#ef4444", instagram:"#d62976",
       success:cs.getPropertyValue("--success").trim() }; }
 
     function baseOpts(t){ return { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}},
@@ -128,7 +128,7 @@
 
       // Renders top content table
       let top = publishedContent.length ? publishedContent.map(c => {
-        const siteObj = M.websites.find(w => w.id === c.site) || { name: 'General', color: '#6366f1' };
+        const siteObj = M.websites.find(w => w.id === c.site) || { name: 'General', color: '#095075' };
         const idInt = parseInt(c.id) || 1;
         const reachVal = (idInt * 12.3 + 5.1).toFixed(1);
         const reach = `${reachVal}k`;

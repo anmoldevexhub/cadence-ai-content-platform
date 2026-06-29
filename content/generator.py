@@ -12,7 +12,7 @@ from .models import ContentIdea, ContentDraft
 logger = logging.getLogger(__name__)
 client = OpenAI(api_key=config('OPENAI_API_KEY'))
 
-MODEL = 'gpt-4o'   # cheapest OpenAI model, ~$0.15/1M input tokens
+MODEL = 'gpt-4o-mini'   # cheapest OpenAI model, ~$0.15/1M input tokens
 
 
 def summarize_website_style(structure_text: str) -> str:
@@ -262,8 +262,8 @@ Required JSON format:
         response = client.chat.completions.create(
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1400,
-            temperature=0.8,
+            max_tokens=500,
+            temperature=0.5,
             response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content.strip()
@@ -738,10 +738,9 @@ def generate_social_via_gemini(system_prompt: str, user_prompt: str) -> dict:
         raise ValueError("Invalid response format from Gemini")
 
 
+
 def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
-    """Generates a full blog post using user-uploaded samples for style."""
-    system_prompt = build_system_prompt(website, 'blog')
-    
+    """Generates a full blog post using a single prompt approach."""
     # Get live search data
     logger.info(f"Performing live search for topic: {idea.title}")
     live_data = search_live_data(idea.title)
@@ -750,17 +749,22 @@ def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
     style_reference = get_style_reference_samples(website, 'blog')
 
     target_keywords = (
-    ", ".join(idea.meta_tags)
-    if idea.meta_tags
-    else "Auto-select relevant keywords"
+        ", ".join(idea.meta_tags)
+        if idea.meta_tags
+        else "Auto-select relevant keywords"
     )
+
+    system_prompt = build_system_prompt(website, 'blog')
+    import json
     
     user_prompt = f"""
-You are a senior content strategist, editor, and SEO writer.
+You are a senior content strategist, editor, SEO specialist, and B2B technology writer.
 
 Write an ORIGINAL blog post for {website.name}.
 
+====================
 INPUT
+====================
 
 Topic: {idea.title}
 Context: {idea.context or "None provided"}
@@ -772,131 +776,381 @@ Reference Samples:
 Verified Search Data:
 {live_data}
 
-GOAL
+====================
+PRIMARY OBJECTIVE
+====================
 
-Create an editorial-quality blog that feels written by an experienced human writer.
+Create an editorial-quality article that feels genuinely written by an experienced practitioner.
 
-Study the reference samples and learn:
+The writing must feel:
 
-* tone
-* formatting
-* pacing
-* reading level
-* CTA placement
+• practical
+• natural
+• observational
+• useful
+• grounded in execution
+• written from experience rather than explanation
+
+The reader should feel:
+
+"This person has worked through these problems before."
+
+Study the reference samples to understand:
+
+• tone
+• formatting
+• pacing
+• reading level
+• CTA placement
 
 Learn patterns only.
-Do not imitate wording.
 
-CONTENT
+Never imitate:
 
-* Length: 900–1300 words
-* Match search intent
-* Use clear H2/H3 headings
-* Keep paragraph lengths varied
-* Each section must contribute new information
-* Prefer practical insight over broad explanation
-* Use operational examples where useful
-* Explain ideas through situations, observations, and outcomes
-* Do not force examples into every section
+• wording
+• sentence structures
+• examples
+• transitions
+• headings
+• metaphors
+• opening styles
 
-INTRODUCTION
+====================
+CONTENT REQUIREMENTS
+====================
 
-Start close to the reader's real problem.
+Length: 900–1300 words.
 
-Choose one:
+Requirements:
 
-* business observation
-* practical problem
-* realistic situation
+• Match search intent precisely.
+• Use H2 and H3 headings naturally.
+• Vary paragraph lengths.
+• Every section must introduce new information.
+• Prefer practical insight over broad explanation.
+• Focus on decisions, constraints, tradeoffs, and outcomes.
+• Use lists only when they genuinely improve clarity.
+• Avoid textbook writing.
+• Avoid encyclopedia-style explanations.
+• Avoid writing merely to fill sections.
 
-Do NOT begin with:
+The article should prioritize usefulness over completeness.
 
-* broad industry statements
-* definitions
-* future predictions
-* "In today's world"
-* "Every day, businesses..."
-* "AI is changing..."
-* "Imagine a world..."
+It is acceptable to leave obvious concepts unexplained if the audience would already understand them.
 
-SECTION FLOW
+====================
+INTRODUCTION RULES
+====================
 
-Do not use one fixed structure across the entire article.
+Start near a real problem.
 
-Different sections may use:
+Choose naturally from:
 
-* observation → explanation
-* problem → impact
-* example → learning
-* situation → outcome
-* insight → recommendation
+• workflow friction
+• operational bottlenecks
+• implementation mistakes
+• difficult decisions
+• recurring team challenges
+• observations from execution
+• customer or internal process issues
 
-Some sections may:
+The opening must feel immediate and relevant.
 
-* be short
-* focus on one idea
-* skip examples
+Never begin with:
 
-Prioritize natural reading flow over perfect symmetry.
+• definitions
+• industry overviews
+• historical summaries
+• future predictions
+• motivational framing
+• broad statements
 
-Do NOT expose internal writing labels.
+Forbidden openings:
 
-Never output headings or phrases such as:
+• "In today's digital world..."
+• "Technology is changing rapidly..."
+• "AI is transforming industries..."
+• "Every business today..."
+• "Organizations increasingly..."
+• "Imagine a world where..."
+• "As companies continue to grow..."
+• "The future of..."
 
-* Situation
-* Explanation
-* Outcome
-* Insight
-* Example
-* Implementation Advice
-* Call to Action
+The first paragraph should feel like it starts in the middle of a real conversation.
 
-Use them internally only.
+====================
+HEADINGS
+====================
 
+Avoid educational headings:
+
+• What Is X
+• Benefits Of X
+• Challenges Of X
+• Future Of X
+• Applications Of X
+• Key Features
+• Final Thoughts
+• Conclusion
+
+Prefer headings that communicate:
+
+• difficult choices
+• operational realities
+• implementation lessons
+• hidden constraints
+• tradeoffs
+• workflow consequences
+• mistakes teams repeatedly make
+• decisions that changed outcomes
+
+Headings should feel editorial, not instructional.
+
+====================
+ARTICLE STRUCTURE
+====================
+
+Never force this structure:
+
+Introduction
+→ Definition
+→ Features
+→ Benefits
+→ Challenges
+→ Conclusion
+
+Prefer natural structures:
+
+• observation → implication
+• challenge → consequence
+• decision → outcome
+• workflow → bottleneck
+• mistake → lesson
+• tradeoff → recommendation
+• implementation → adjustment
+
+Different sections should use different structures.
+
+Some sections may contain no examples.
+Some sections may contain no recommendations.
+Some sections may focus on a single observation.
+
+Natural variation is more important than structural balance.
+
+Do not make every section symmetrical.
+
+Natural variation is preferred.
+
+Never expose internal labels.
+
+Forbidden headings:
+
+• Example
+• Insight
+• Recommendation
+• Outcome
+• Situation
+• Lessons Learned
+• Implementation Advice
+• Call To Action
+
+Use these concepts internally only.
+
+NATURAL WRITING BEHAVIOR
+
+Do not force every section to contain:
+
+• a problem
+• a tradeoff
+• a recommendation
+• an example
+• a lesson
+
+Some sections may simply:
+
+• clarify a misconception
+• describe a constraint
+• compare approaches
+• explain a practical limitation
+• point out hidden costs
+• raise unanswered questions
+
+Human writers do not package every section into a complete teaching framework.
+
+Allow occasional ambiguity and unresolved tradeoffs when appropriate.
+
+
+====================
+HUMAN WRITING SIGNALS
+====================
+
+The article should occasionally include:
+
+• short paragraphs
+• incomplete explanatory symmetry
+• mild opinion grounded in experience
+• nuanced tradeoffs
+• practical observations
+• moments of uncertainty where appropriate
+
+Not every issue needs a perfect solution.
+
+Avoid presenting every topic as clean, obvious, or universally accepted.
+
+Allow room for:
+
+• competing approaches
+• contextual decisions
+• operational compromises
+
+This creates authenticity.
+
+====================
+EXPERIENCE SIGNALS
+====================
+
+Write as though the author has seen these situations repeatedly.
+
+Avoid explaining concepts from first principles unless necessary.
+
+Focus on:
+
+• execution realities
+• workflow constraints
+• organizational decisions
+• implementation friction
+• maintenance costs
+• unintended consequences
+• lessons from failures
+• adjustments made over time
+
+Readers should trust the writer because of practical understanding.
+
+Not because of authority claims.
+
+PERSONAL EXPERIENCE CLAIMS
+
+ABSOLUTE RULE:
+
+Never claim personal experience.
+
+Forbidden phrases:
+
+• In my experience
+• I have seen
+• I worked with
+• One team I worked with
+• We discovered
+• We implemented
+• Over the years
+• I have found
+
+Do not invent:
+
+• clients
+• projects
+• teams
+• deployments
+• case studies
+• firsthand observations
+
+If examples are necessary, describe common implementation patterns without implying direct involvement.
+
+The authority of the article must come from practical reasoning and operational understanding—not fabricated experience.
+
+====================
 SPECIFICITY
+====================
 
 Avoid generic actors:
 
-* a company
-* businesses
-* organizations
+• businesses
+• organizations
+• enterprises
+• companies
 
 Prefer:
 
-* teams
-* departments
-* workflows
-* operational situations
+• engineering teams
+• support teams
+• marketing operations
+• product managers
+• platform teams
+• development workflows
+• IT departments
+• customer success groups
+• revenue operations teams
 
-Describe:
+Whenever describing situations, explain:
 
-* what changed
-* why it mattered
-* what happened next
+• what changed
+• why it mattered
+• what constraints existed
+• what options were considered
+• what decisions followed
+• what happened afterward
 
+
+SUBJECT VARIETY
+
+Do not make teams the subject of every paragraph.
+
+Vary subjects naturally across the article:
+
+• workflows
+• approval processes
+• release cycles
+• infrastructure constraints
+• reporting structures
+• customer expectations
+• maintenance requirements
+• documentation gaps
+• data dependencies
+• operational realities
+• platform limitations
+• support processes
+• deployment patterns
+
+Avoid repetitive constructions such as:
+
+• Teams struggle with...
+• Teams often discover...
+• Teams should...
+• Teams frequently...
+• Teams must...
+
+Use a wider range of observations and actors.
+
+====================
 LANGUAGE
+====================
 
-Write in clear business English.
+Write in clear professional English.
 
-Target approximately Grade 7–9 reading level.
+Target readability:
+
+Grade 7–9.
 
 Prefer:
 
-* common words
-* shorter sentences
-* direct explanations
+• common vocabulary
+• shorter sentences
+• direct explanations
+• conversational clarity
 
-If a simpler word works, use it.
+Use simple words whenever possible.
 
 Avoid:
 
-* academic tone
-* motivational tone
-* corporate jargon
-* abstract language
-* dramatic technology framing
+• academic writing
+• motivational language
+• exaggerated marketing language
+• dramatic technology narratives
+• executive buzzwords
+• over-polished corporate copy
 
-Avoid repeated words such as:
+Avoid repeated use of:
+
 leverage
 optimize
 enhance
@@ -912,73 +1166,461 @@ seamless
 revolutionize
 significant
 groundbreaking
+synergy
+enable
+empower
+accelerate
+redefine
+next-generation
 
+====================
+TRANSITIONS
+====================
+
+Avoid generic AI transitions:
+
+• In practical terms
+• The fundamental difference
+• Looking ahead
+• In conclusion
+• As technology evolves
+• Despite these advantages
+• The future of
+• As organizations continue to grow
+• On the other hand
+• Furthermore
+• Moreover
+• Ultimately
+
+Transitions should emerge naturally.
+Sometimes no transition is better.
+
+ADDITIONAL TRANSITION RULES
+
+Avoid repetitive connective phrases such as:
+
+• On the other hand
+• For instance
+• Ultimately
+• In many cases
+• At the same time
+• In reality
+• Here are some steps
+• Here are some questions to consider
+• That said
+• Meanwhile
+• As a result
+• Therefore
+• In contrast
+
+Do not force transitions between every paragraph.
+
+Direct continuation is often more natural than explicit connectors.
+
+====================
+EXAMPLES
+====================
+
+Examples must include:
+
+• constraints
+• tradeoffs
+• decisions
+• consequences
+
+Never create fictional case studies.
+
+Avoid:
+
+• imaginary startups
+• invented companies
+• fabricated teams
+• fake statistics
+
+Avoid overused examples:
+
+• chatbots
+• recommendation engines
+• personalized emails
+• social media campaigns
+
+Unless genuinely central to the topic.
+
+If no meaningful example exists:
+
+Use observations instead.
+
+====================
 AUTHORITY
+====================
 
-Use statistics only from Verified Search Data.
+Use statistics ONLY from Verified Search Data.
 
-Never invent numbers.
+Never invent:
+
+• numbers
+• percentages
+• surveys
+• studies
+• reports
 
 If no verified data exists:
-use examples instead.
 
+Focus on:
+
+• operational realities
+• implementation experience
+• tradeoffs
+• practical reasoning
+
+====================
 SEO
+====================
 
-* Use target keywords naturally
-* Include related concepts naturally
-* Avoid keyword stuffing
-* Prioritize readability
+Requirements:
 
-BRAND
+• Use target keywords naturally.
+• Include semantically related concepts.
+• Avoid keyword stuffing.
+• Prioritize readability.
+• Optimize for humans first.
+• Align headings with search intent.
+• Write compelling metadata.
+• Keep keyword density natural.
 
-Mention {website.name} only if naturally relevant.
-Maximum one mention.
+Never sacrifice clarity for SEO.
 
-CTA
+====================
+BRAND MENTIONS
+====================
 
-End with practical next steps.
+Mention {website.name} only if genuinely relevant.
 
-Do not sound promotional.
+Maximum:
 
+ONE natural mention.
+
+No promotional language.
+
+No forced branding.
+
+====================
+CTA RULES
+====================
+
+The ending must feel useful.
+
+Prefer:
+
+• practical next steps
+• operational recommendations
+• implementation checklists
+• questions readers should ask internally
+
+Avoid:
+
+• Contact us today
+• Get started now
+• Transform your business
+• Reach out to our experts
+• Book a consultation
+• Unlock your potential
+
+The reader should leave with something actionable.
+
+====================
+ANTI-AI DETECTION RULES
+====================
+
+Avoid:
+
+• repetitive sentence openings
+• identical paragraph structures
+• perfect symmetry
+• predictable rhythms
+• over-explaining obvious ideas
+• excessive transitions
+• keyword repetition
+• emotional exaggeration
+
+Mix:
+
+• short sentences
+• medium sentences
+• longer explanatory sentences
+
+Occasionally use single-sentence paragraphs when natural.
+
+Allow sections to end abruptly if the point has been made.
+
+Do not force elegant conclusions everywhere.
+
+Human writers move on when a point is complete.
+
+FINAL EDITORIAL REVIEW
+
+Before producing the final article, silently rewrite any section that:
+
+• feels generic
+• sounds educational
+• repeats transitions
+• repeats examples
+• lacks operational detail
+• follows textbook structures
+• overuses keywords
+• explains obvious concepts
+• reads like AI output
+• ends too neatly
+• resolves every tradeoff
+• forces recommendations where none are needed
+
+The final article should:
+
+• vary sentence lengths naturally
+• include occasional short paragraphs
+• avoid predictable rhythms
+• leave some complexity unresolved
+• avoid wrapping every section with a lesson
+• maintain conversational professionalism
+• prioritize usefulness over completeness
+
+Readers should feel they are reading a thoughtful practitioner—not a system attempting to teach everything perfectly.
+
+====================
 OUTPUT
+====================
 
 Return ONLY valid JSON.
 
 {{
-"title":"",
-"meta_description":"",
-"category":"",
-"tags":[],
-"excerpt":"",
-"body":"clean HTML only"
+    "title": "",
+    "meta_description": "",
+    "category": "",
+    "tags": [],
+    "excerpt": "",
+    "body": "clean HTML only"
 }}
 """
 
+#     user_prompt = f"""
+# You are a senior content strategist, editor, and SEO writer.
+
+# Write an ORIGINAL blog post for {website.name}.
+
+# INPUT
+
+# Topic: {idea.title}
+# Context: {idea.context or "None provided"}
+# Target Keywords: {target_keywords}
+
+# Reference Samples:
+# {style_reference}
+
+# Verified Search Data:
+# {live_data}
+
+# GOAL
+
+# Create an editorial-quality blog that feels written by an experienced human writer.
+
+# Study the reference samples and learn:
+
+# * tone
+# * formatting
+# * pacing
+# * reading level
+# * CTA placement
+
+# Learn patterns only.
+# Do not imitate wording.
+
+# CONTENT
+
+# * Length: 900–1300 words
+# * Match search intent
+# * Use clear H2/H3 headings
+# * Keep paragraph lengths varied
+# * Each section must contribute new information
+# * Prefer practical insight over broad explanation
+# * Use operational examples where useful
+# * Explain ideas through situations, observations, and outcomes
+# * Do not force examples into every section
+
+# INTRODUCTION
+
+# Start close to the reader's real problem.
+
+# Choose one:
+
+# * business observation
+# * practical problem
+# * realistic situation
+
+# Do NOT begin with:
+
+# * broad industry statements
+# * definitions
+# * future predictions
+# * "In today's world"
+# * "Every day, businesses..."
+# * "AI is changing..."
+# * "Imagine a world..."
+
+# SECTION FLOW
+
+# Do not use one fixed structure across the entire article.
+
+# Different sections may use:
+
+# * observation → explanation
+# * problem → impact
+# * example → learning
+# * situation → outcome
+# * insight → recommendation
+
+# Some sections may:
+
+# * be short
+# * focus on one idea
+# * skip examples
+
+# Prioritize natural reading flow over perfect symmetry.
+
+# Do NOT expose internal writing labels.
+
+# Never output headings or phrases such as:
+
+# * Situation
+# * Explanation
+# * Outcome
+# * Insight
+# * Example
+# * Implementation Advice
+# * Call to Action
+
+# Use them internally only.
+
+# SPECIFICITY
+
+# Avoid generic actors:
+
+# * a company
+# * businesses
+# * organizations
+
+# Prefer:
+
+# * teams
+# * departments
+# * workflows
+# * operational situations
+
+# Describe:
+
+# * what changed
+# * why it mattered
+# * what happened next
+
+# LANGUAGE
+
+# Write in clear business English.
+
+# Target approximately Grade 7–9 reading level.
+
+# Prefer:
+
+# * common words
+# * shorter sentences
+# * direct explanations
+
+# If a simpler word works, use it.
+
+# Avoid:
+
+# * academic tone
+# * motivational tone
+# * corporate jargon
+# * abstract language
+# * dramatic technology framing
+
+# Avoid repeated words such as:
+# leverage
+# optimize
+# enhance
+# transform
+# facilitate
+# streamline
+# robust
+# innovation
+# impactful
+# cutting-edge
+# powerful
+# seamless
+# revolutionize
+# significant
+# groundbreaking
+
+# AUTHORITY
+
+# Use statistics only from Verified Search Data.
+
+# Never invent numbers.
+
+# If no verified data exists:
+# use examples instead.
+
+# SEO
+
+# * Use target keywords naturally
+# * Include related concepts naturally
+# * Avoid keyword stuffing
+# * Prioritize readability
+
+# BRAND
+
+# Mention {website.name} only if naturally relevant.
+# Maximum one mention.
+
+# CTA
+
+# End with practical next steps.
+
+# Do not sound promotional.
+
+# OUTPUT
+
+# Return ONLY valid JSON.
+
+# {{
+# "title":"",
+# "meta_description":"",
+# "category":"",
+# "tags":[],
+# "excerpt":"",
+# "body":"clean HTML only"
+# }}
+# """
 
     try:
         response = client.chat.completions.create(
             model=MODEL,
             messages=[
                 {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt},
+                {'role': 'user', 'content': user_prompt}
             ],
-            max_tokens=2000,
             temperature=0.7,
-            response_format={"type": "json_object"},
+            response_format={"type": "json_object"}
         )
-        
-        import json
-        content = json.loads(response.choices[0].message.content)
+        content = json.loads(response.choices[0].message.content.strip())
         content['generation_prompt'] = user_prompt
         content['ai_model'] = MODEL
         return content
     except Exception as e:
-        logger.warning(f"AI content generation failed: {e}. Falling back to rich local template.")
+        logger.error(f"Failed to generate blog post with single prompt: {e}")
         fallback_content = get_rich_fallback_blog(idea.title)
         fallback_content['generation_prompt'] = user_prompt
         fallback_content['ai_model'] = 'local-fallback'
         return fallback_content
-
 
 def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> dict:
     """Generates platform-specific social media content using user-provided samples."""
@@ -1169,7 +1811,8 @@ def build_svg_from_data(data: dict, website=None) -> str:
             if logo_url.startswith('/static/'):
                 rel_path = logo_url.replace('/static/', '')
                 logo_path = os.path.join(settings.BASE_DIR, 'frontend', rel_path)
-                if os.path.exists(logo_path):
+                print("DEBUG: logo_path 1 is", logo_path)
+                if logo_path is not None and os.path.exists(logo_path):
                     ext = logo_path.split('.')[-1].lower()
                     with open(logo_path, 'rb') as f:
                         encoded = base64.b64encode(f.read()).decode('utf-8')
@@ -1192,7 +1835,8 @@ def build_svg_from_data(data: dict, website=None) -> str:
         try:
             for ext in ['svg', 'png', 'jpg', 'jpeg']:
                 logo_path = os.path.join(media_dir, f'devexhub_logo.{ext}')
-                if os.path.exists(logo_path):
+                print("DEBUG: logo_path 2 is", logo_path)
+                if logo_path is not None and os.path.exists(logo_path):
                     with open(logo_path, 'rb') as f:
                         encoded = base64.b64encode(f.read()).decode('utf-8')
                     mime = f"image/{ext}" if ext != 'svg' else "image/svg+xml"
@@ -1609,7 +2253,7 @@ Output ONLY the final DALL-E 3 prompt. Do not add any extra explanation or markd
         return f"A premium, professional, modern corporate blog banner for '{title}' (Category: {category}). {excerpt}. Clean typography on the left with title, description, and button. Beautiful illustration representing the topic on the right. Top-left area is empty. Clean, eye-catching, modern design."
 
 
-def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", website=None) -> str:
+def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", website=None) -> tuple:
     """
     Generates a high-quality blog cover banner using the 'gpt-image-1' model for full visual generation
     (including custom background, typography, illustration, and button) and then composites the company logo
@@ -1665,7 +2309,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
     try:
         logger.info(f"Calling client.images.generate using gpt-image-1 for full banner...")
         response = client.images.generate(
-            model="gpt-image-1",
+            model="gpt-image-1-mini",
             prompt=image_prompt,
             n=1,
             size="1536x1024"
@@ -1747,7 +2391,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
         svg = f"""<svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
   <image href="data:image/png;base64,{b64_data}" x="0" y="0" width="1200" height="800"/>
 </svg>"""
-        return svg
+        return svg, final_filename
 
     # Fallback to normal layout planning if gpt-image-1 failed
     prompt = f"""You are an expert graphic designer. You are designing a blog cover layout for:
@@ -1807,7 +2451,7 @@ Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
         data = json.loads(response.choices[0].message.content.strip())
         svg_content = build_svg_from_data(data, website=website)
         if svg_content:
-            return svg_content
+            return svg_content, None
     except Exception as e:
         logger.warning(f"GPT SVG cover planning failed: {e}. Falling back to local heuristic.")
 
@@ -1858,10 +2502,10 @@ Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
                 {"label": "Growth", "color": "#8b5cf6"}
             ]
         }
-        return build_svg_from_data(fallback_data, website=website)
+        return build_svg_from_data(fallback_data, website=website), None
     except Exception as fallback_err:
         logger.error(f"Fallback SVG generation also failed: {fallback_err}")
-    return ""
+    return "", None
 
 
 def generate_for_idea(idea_id: int):
@@ -1877,37 +2521,41 @@ def generate_for_idea(idea_id: int):
         if idea.platform == 'blog':
             content_data = generate_blog_post(idea, website)
             category_name = content_data.get('category', 'General')
-            
-            # Generate cover image using GPT (SVG vector art)
-            try:
-                from django.conf import settings
-                import os
-                import uuid
-                
-                logger.info(f"Generating GPT SVG cover image for blog: {idea.title}")
-                svg_code = generate_svg_cover_via_gpt(
-                    idea.title, 
-                    category_name, 
-                    excerpt=content_data.get('excerpt', ''), 
-                    website=website
-                )
-                
-                if svg_code:
-                    media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
-                    os.makedirs(media_dir, exist_ok=True)
-                    
-                    filename = f"blog_cover_{uuid.uuid4().hex}.svg"
-                    filepath = os.path.join(media_dir, filename)
-                    
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write(svg_code)
-                        
-                    cover_image_url = f"/static/media/{filename}"
-                    logger.info(f"Successfully generated and saved GPT SVG cover image to: {cover_image_url}")
-            except Exception as img_err:
-                logger.warning(f"Failed to generate GPT SVG cover image: {img_err}")
         else:
             content_data = generate_social_post(idea, website, idea.platform)
+            category_name = website.industry or 'Social Media'
+            
+        # Generate cover image using GPT (SVG vector art)
+        try:
+            from django.conf import settings
+            import os
+            import uuid
+            
+            logger.info(f"Generating GPT SVG cover image for {idea.platform}: {idea.title}")
+            svg_code, png_filename = generate_svg_cover_via_gpt(
+                idea.title, 
+                category_name, 
+                excerpt=content_data.get('excerpt', ''), 
+                website=website
+            )
+            
+            if png_filename:
+                cover_image_url = f"/static/media/{png_filename}"
+                logger.info(f"Successfully generated and saved GPT PNG cover image to: {cover_image_url}")
+            elif svg_code:
+                media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+                os.makedirs(media_dir, exist_ok=True)
+                
+                filename = f"cover_{uuid.uuid4().hex}.svg"
+                filepath = os.path.join(media_dir, filename)
+                
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(svg_code)
+                    
+                cover_image_url = f"/static/media/{filename}"
+                logger.info(f"Successfully generated and saved GPT SVG cover image to: {cover_image_url}")
+        except Exception as img_err:
+            logger.warning(f"Failed to generate GPT SVG cover image: {img_err}")
         
         draft = ContentDraft.objects.create(
             idea=idea,

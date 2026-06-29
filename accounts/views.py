@@ -205,6 +205,13 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             'last_name': instance.last_name,
         }
         user = serializer.save()
+        
+        # Check if password is in request data to manually update it
+        password = self.request.data.get('password')
+        if password:
+            user.set_password(password)
+            user.save()
+            
         new_data = {
             'email': user.email,
             'role': user.role,

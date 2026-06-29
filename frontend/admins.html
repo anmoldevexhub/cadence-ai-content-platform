@@ -81,6 +81,14 @@
                     <tbody id="logBody"></tbody>
                   </table>
                 </div>
+                <!-- Pagination Controls -->
+                <div class="card__footer row-between" id="logPagination" style="padding:var(--s4) var(--s5);border-top:1px solid var(--border)">
+                  <div class="muted tsm" id="logPageIndicator">Page 1 of 1</div>
+                  <div class="row gap2">
+                    <button class="btn btn-secondary btn-sm" id="logPrevBtn"><i data-lucide="chevron-left"></i> Previous</button>
+                    <button class="btn btn-secondary btn-sm" id="logNextBtn">Next <i data-lucide="chevron-right"></i></button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -103,6 +111,27 @@
         </div>
       </div>
       <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="sendInvite"><i data-lucide="send"></i> Send invite</button></div>
+    </div>
+  </div>
+
+  <!-- Edit admin modal -->
+  <div class="modal-overlay" id="editAdminModal">
+    <div class="modal">
+      <div class="modal__head"><div class="mtxt"><h3>Edit admin</h3><div class="sub">Update user details and roles.</div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
+      <div class="modal__body">
+        <input type="hidden" id="editAdminId" />
+        <div class="field"><label class="label">Full name</label><input class="input" id="editAdminName" placeholder="Jordan Rivera"/></div>
+        <div class="field"><label class="label">Email</label><input class="input" id="editAdminEmail" type="email" placeholder="jordan@company.com"/></div>
+        <div class="field">
+          <label class="label">Role</label>
+          <select class="select" id="editAdminRole">
+            <option value="Admin">Admin</option>
+            <option value="Editor">Editor</option>
+            <option value="Super Admin">Super Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="saveAdminEdit"><i data-lucide="check"></i> Save changes</button></div>
     </div>
   </div>
 
@@ -198,25 +227,16 @@
               <button class="icon-btn btn-sm" data-menu="m${i}">${I("more-horizontal")}</button>
               <div class="menu" id="m${i}">
                 <button class="menu-item" onclick="Cadence.closeModal();document.getElementById('assignSub').textContent='${a.name}';openAssign()">${I("globe")} Assign websites</button>
-                <button class="menu-item" onclick="Cadence.toast({type:'info',title:'Edit ${a.name}'})">${I("pencil")} Edit</button>
-                <button class="menu-item" onclick="Cadence.toast({type:'info',title:'Reset password sent'})">${I("key-round")} Reset password</button>
+                <button class="menu-item" onclick="Cadence.closeModal();openEditAdmin('${a.id}', '${a.name.replace(/'/g, "\\'")}', '${a.email.replace(/'/g, "\\'")}', '${a.role}')">${I("pencil")} Edit</button>
+                <button class="menu-item" onclick="resetPassword('${a.id}', '${a.name}')">${I("key-round")} Reset password</button>
                 <div class="menu-sep"></div>
-                <button class="menu-item danger" onclick="Cadence.toast({type:'info',title:'${a.name} disabled'})">${I("ban")} ${a.status==="Disabled"?"Enable":"Disable"}</button>
+                <button class="menu-item danger" onclick="confirmDeleteAdmin('${a.id}', '${a.name}')">${I("trash-2")} Delete admin</button>
               </div></div>
           </td>
         </tr>`).join("");
       C.refreshIcons();
       C.mountShell && null;
-      rewireMenus();
       rewireStatusToggles();
-    }
-    function rewireMenus() {
-      document.querySelectorAll("#admBody [data-menu]").forEach(t => t.addEventListener("click", e => {
-        e.stopPropagation();
-        const m = document.getElementById(t.dataset.menu);
-        document.querySelectorAll(".menu.open").forEach(x => { if (x!==m) x.classList.remove("open"); });
-        m.classList.toggle("open");
-      }));
     }
     function rewireStatusToggles() {
       document.querySelectorAll("#admBody .status-toggle").forEach(t => t.addEventListener("change", async e => {
@@ -237,13 +257,109 @@
     renderAdmins();
     document.getElementById("admSearch").addEventListener("input", e => renderAdmins(e.target.value.toLowerCase()));
 
+    window.resetPassword = async function (id, name) {
+      const newPassword = prompt(`Enter new password for "${name}" (min 8 characters):`);
+      if (newPassword === null) return; // user cancelled
+      
+      const trimmed = newPassword.trim();
+      if (trimmed.length < 8) {
+        C.toast({ type: "error", title: "Invalid password", desc: "Password must be at least 8 characters long." });
+        return;
+      }
+      
+      try {
+        await CadenceAPI.updateAdmin(id, { password: trimmed });
+        C.toast({ type: "success", title: "Password updated", desc: `Successfully updated password for "${name}"` });
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Failed to reset password", desc: err.message });
+      }
+    };
+
+    window.confirmDeleteAdmin = async function (id, name) {
+      if (confirm(`Are you sure you want to delete admin "${name}"? This action cannot be undone.`)) {
+        try {
+          await CadenceAPI.deleteAdmin(id);
+          C.toast({ type: "success", title: "Admin deleted", desc: `Successfully deleted "${name}"` });
+          await M.syncMockData();
+          setTimeout(() => location.reload(), 900);
+        } catch (err) {
+          console.error(err);
+          C.toast({ type: "error", title: "Delete failed", desc: err.message });
+        }
+      }
+    };
+
     window.openAssign = function () {
       document.getElementById("assignList").innerHTML = M.websites.map((w,i) => `
-        <label class="chan-conn" style="cursor:pointer"><span class="favicon" style="width:32px;height:32px;border-radius:8px;font-size:13px;background:${w.color}">${w.short}</span>
-          <div style="flex:1"><div class="fw6">${w.name}</div><div class="muted tsm">${w.url}</div></div>
-          <span class="switch"><input type="checkbox" ${i<2?'checked':''}/><span class="track"></span></span></label>`).join("");
+        <label class="chan-conn" style="cursor:pointer">
+          <span class="favicon" style="background:${w.color}">${w.short}</span>
+          <div class="cc-meta">
+            <div class="cc-nm">${w.name}</div>
+            <div class="cc-st">${w.url}</div>
+          </div>
+          <span class="switch">
+            <input type="checkbox" ${i<2?'checked':''} />
+            <span class="track"></span>
+          </span>
+        </label>`).join("");
       C.openModal("assignModal");
     };
+
+
+    window.openEditAdmin = function (id, name, email, role) {
+      document.getElementById("editAdminId").value = id;
+      document.getElementById("editAdminName").value = name;
+      document.getElementById("editAdminEmail").value = email;
+      
+      const roleSel = document.getElementById("editAdminRole");
+      if (roleSel) {
+        roleSel.value = role;
+      }
+      
+      C.openModal("editAdminModal");
+    };
+
+    document.getElementById("saveAdminEdit")?.addEventListener("click", async () => {
+      const id = document.getElementById("editAdminId").value;
+      const name = document.getElementById("editAdminName").value.trim();
+      const email = document.getElementById("editAdminEmail").value.trim();
+      const roleSel = document.getElementById("editAdminRole").value;
+      
+      if (!name || !email) {
+        C.toast({ type: "error", title: "Enter a name and email" });
+        return;
+      }
+      
+      const roleVal = roleSel === "Super Admin" ? "super" : roleSel === "Editor" ? "editor" : "admin";
+      const nameParts = name.split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      
+      const btn = document.getElementById("saveAdminEdit");
+      btn.disabled = true;
+      btn.innerHTML = `<svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Saving…`;
+      
+      try {
+        await CadenceAPI.updateAdmin(id, {
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          role: roleVal
+        });
+        C.toast({ type: "success", title: "Admin updated", desc: "User details updated successfully." });
+        C.closeModal("editAdminModal");
+        await M.syncMockData();
+        setTimeout(() => location.reload(), 900);
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Failed to update admin", desc: err.message });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="check"></i> Save changes`;
+        C.refreshIcons();
+      }
+    });
 
 
     document.getElementById("sendInvite").addEventListener("click", async () => {
@@ -296,6 +412,9 @@
 
     // ---- activity logs ----
     let allLogs = [];
+    let logPage = 1;
+    const logLimit = 10;
+
     async function loadLogs() {
       try {
         allLogs = await window.CadenceAPI.getActivityLogs();
@@ -316,12 +435,27 @@
         return actor.includes(filter) || action.includes(filter) || target.includes(filter);
       });
 
+      const totalPages = Math.max(1, Math.ceil(filtered.length / logLimit));
+      if (logPage > totalPages) logPage = totalPages;
+
+      const pageIndicator = document.getElementById("logPageIndicator");
+      if (pageIndicator) pageIndicator.textContent = `Page ${logPage} of ${totalPages}`;
+
+      const prevBtn = document.getElementById("logPrevBtn");
+      const nextBtn = document.getElementById("logNextBtn");
+      if (prevBtn) prevBtn.disabled = (logPage === 1);
+      if (nextBtn) nextBtn.disabled = (logPage === totalPages);
+
       if (!filtered.length) {
         tbody.innerHTML = `<tr><td colspan="6" class="cell-muted" style="text-align:center;padding:var(--s6)">No activity logs found.</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = filtered.map(log => {
+      const startIndex = (logPage - 1) * logLimit;
+      const endIndex = startIndex + logLimit;
+      const pageItems = filtered.slice(startIndex, endIndex);
+
+      tbody.innerHTML = pageItems.map(log => {
         const actorInitials = log.actor_name ? log.actor_name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase() : 'AI';
         
         let changesHtml = '<span class="muted">—</span>';
@@ -358,9 +492,35 @@
           <td class="cell-muted tsm">${dateStr}</td>
         </tr>`;
       }).join("");
+      C.refreshIcons();
     }
 
-    document.getElementById("logSearch").addEventListener("input", e => renderLogs(e.target.value.toLowerCase()));
+    document.getElementById("logPrevBtn")?.addEventListener("click", () => {
+      if (logPage > 1) {
+        logPage--;
+        renderLogs(document.getElementById("logSearch").value.toLowerCase());
+      }
+    });
+
+    document.getElementById("logNextBtn")?.addEventListener("click", () => {
+      const filter = document.getElementById("logSearch").value.toLowerCase();
+      const filteredCount = allLogs.filter(log => {
+        const actor = (log.actor_name || "").toLowerCase();
+        const action = (log.action || "").toLowerCase();
+        const target = (log.target_description || "").toLowerCase();
+        return actor.includes(filter) || action.includes(filter) || target.includes(filter);
+      }).length;
+      const totalPages = Math.max(1, Math.ceil(filteredCount / logLimit));
+      if (logPage < totalPages) {
+        logPage++;
+        renderLogs(filter);
+      }
+    });
+
+    document.getElementById("logSearch").addEventListener("input", e => {
+      logPage = 1;
+      renderLogs(e.target.value.toLowerCase());
+    });
 
     const logsTabBtn = document.querySelector('button[data-tab="logs"]');
     if (logsTabBtn) {

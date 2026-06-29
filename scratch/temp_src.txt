@@ -1,0 +1,253 @@
+def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", website=None) -> str:
+    """
+    Generates a high-quality blog cover banner using the 'gpt-image-1' model for full visual generation
+    (including custom background, typography, illustration, and button) and then composites the company logo
+    onto the top-right corner using Pillow before wrapping it in a minimal SVG wrapper.
+    """
+    import os
+    import uuid
+    import base64
+    import requests
+    from django.conf import settings
+    from PIL import Image, ImageDraw
+
+    # 1. Generate dynamic, highly descriptive DALL-E prompt based on title/content using GPT-4o
+    image_prompt = generate_dalle_prompt_via_gpt(title, category, excerpt, website=website)
+    logger.info(f"Custom DALL-E prompt generated: {image_prompt[:200]}...")
+
+    # Extract corporate logo dynamically if website is provided
+    logo_file_path = None
+    try:
+        logo_url = website.logo_url if website else ""
+        if logo_url:
+            if logo_url.startswith('/static/'):
+                rel_path = logo_url.replace('/static/', '')
+                logo_path = os.path.join(settings.BASE_DIR, 'frontend', rel_path)
+                if os.path.exists(logo_path):
+                    logo_file_path = logo_path
+            elif logo_url.startswith('http://') or logo_url.startswith('https://'):
+                resp = requests.get(logo_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                if resp.status_code == 200:
+                    ext = logo_url.split('.')[-1].lower()
+                    if ext not in ['svg', 'png', 'jpg', 'jpeg', 'gif']:
+                        ext = 'png'
+                    media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+                    temp_logo_path = os.path.join(media_dir, f'temp_logo_{uuid.uuid4().hex}.{ext}')
+                    with open(temp_logo_path, 'wb') as f:
+                        f.write(resp.content)
+                    logo_file_path = temp_logo_path
+    except Exception as logo_err:
+        logger.warning(f"Failed to load logo_url in generate_svg_cover_via_gpt: {logo_err}")
+
+    if not logo_file_path:
+        media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+        try:
+            for ext in ['svg', 'png', 'jpg', 'jpeg']:
+                logo_path = os.path.join(media_dir, f'devexhub_logo.{ext}')
+                if os.path.exists(logo_path):
+                    logo_file_path = logo_path
+                    break
+        except Exception:
+            pass
+
+    b64_data = ""
+    try:
+        logger.info(f"Calling client.images.generate using gpt-image-1 for full banner...")
+        response = client.images.generate(
+            model="gpt-image-1-mini",
+            prompt=image_prompt,
+            n=1,
+            size="1536x1024"
+        )
+        generated_url = response.data[0].url
+        b64_data = getattr(response.data[0], 'b64_json', None)
+
+        raw_img_bytes = None
+        if b64_data:
+            logger.info("gpt-image-1 returned base64 data. Decoding...")
+            raw_img_bytes = base64.b64decode(b64_data)
+        elif generated_url:
+            logger.info("gpt-image-1 response received as URL. Downloading image...")
+            img_resp = requests.get(generated_url, timeout=15)
+            if img_resp.status_code == 200:
+                raw_img_bytes = img_resp.content
+
+        if raw_img_bytes:
+            media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+            os.makedirs(media_dir, exist_ok=True)
+            temp_filename = f"temp_cover_{uuid.uuid4().hex}.png"
+            temp_filepath = os.path.join(media_dir, temp_filename)
+            with open(temp_filepath, 'wb') as f:
+                f.write(raw_img_bytes)
+
+            # Composite the logo using Pillow
+            if logo_file_path and os.path.exists(logo_file_path):
+                try:
+                    bg = Image.open(temp_filepath).convert("RGBA")
+                    logo = Image.open(logo_file_path).convert("RGBA")
+                    bg_w, bg_h = bg.size
+                    
+                    # Resize logo: height is 11% of background height
+                    new_h = int(bg_h * 0.11)
+                    logo_w, logo_h = logo.size
+                    new_w = int(logo_w * (new_h / logo_h))
+                    logo_resized = logo.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                    
+                    # Coordinates in top-left with margins
+                    margin_x = int(bg_w * 0.05)
+                    margin_y = int(bg_h * 0.05)
+                    paste_x = margin_x
+                    paste_y = margin_y
+                    
+                    # Draw a white card behind the logo to ensure visibility
+                    draw = ImageDraw.Draw(bg)
+                    box_padding = 15
+                    box_x0 = paste_x - box_padding
+                    box_y0 = paste_y - box_padding
+                    box_x1 = paste_x + new_w + box_padding
+                    box_y1 = paste_y + new_h + box_padding
+                    draw.rounded_rectangle([box_x0, box_y0, box_x1, box_y1], radius=15, fill=(255, 255, 255, 255), outline=(203, 213, 225, 255), width=2)
+                    
+                    # Paste logo
+                    bg.alpha_composite(logo_resized, (paste_x, paste_y))
+                    
+                    # Save final composed image back
+                    bg.convert("RGB").save(temp_filepath, "PNG")
+                    logger.info("Successfully composited company logo onto PNG.")
+                except Exception as composite_err:
+                    logger.warning(f"Failed to composite logo using Pillow: {composite_err}")
+
+            # Read back composed image
+            with open(temp_filepath, 'rb') as f:
+                composed_bytes = f.read()
+            b64_data = base64.b64encode(composed_bytes).decode('utf-8')
+            
+            # Save final filename
+            final_filename = f"blog_cover_full_{uuid.uuid4().hex}.png"
+            final_filepath = os.path.join(media_dir, final_filename)
+            os.rename(temp_filepath, final_filepath)
+            logger.info(f"Successfully saved final composed PNG to: {final_filepath}")
+
+    except Exception as img_err:
+        logger.warning(f"gpt-image-1 generation failed: {img_err}. Falling back to standard SVG template planning.")
+
+    # 3. If generated successfully, wrap the final PNG base64 in a minimal SVG wrapper
+    if b64_data:
+        svg = f"""<svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+  <image href="data:image/png;base64,{b64_data}" x="0" y="0" width="1200" height="800"/>
+</svg>"""
+        return svg
+
+    # Fallback to normal layout planning if gpt-image-1 failed
+    prompt = f"""You are an expert graphic designer. You are designing a blog cover layout for:
+BLOG TITLE: {title}
+BLOG CATEGORY: {category}
+BLOG EXCERPT/SUMMARY: {excerpt}
+
+Based on this category, title, and excerpt summary, you must plan the cover illustration. We support three visual themes:
+- "theme1" (SEO / Digital Marketing / Business / Growth): Light right side, blue/indigo curved gradient sidebar on the left.
+- "theme2" (Artificial Intelligence / Technology / Machine Learning): Dark high-tech theme with a neon purple-to-pink glowing curved sidebar.
+- "theme3" (Web Development / Coding / Full Stack / PHP / software engineering): White background on the left, dark blue/indigo curved sidebar on the right.
+
+Your task is to analyze the title, category, and excerpt to select the best theme and provide structured details for rendering that are highly relevant to the actual blog content.
+
+Return a JSON object with the following keys:
+1. "theme": Select "theme1", "theme2", or "theme3".
+   - Select "theme2" for AI, machine learning, agents, or deep learning.
+   - Select "theme3" for coding, web development, PHP, full stack, database, or engineering.
+   - Select "theme1" for SEO, marketing, business, growth, or any general topics.
+2. "title_lines": Break the title into 2-4 short lines (each line under 28 characters) so it fits inside the left column beautifully.
+   Each line in "title_lines" is an object:
+   {{
+     "text": "The line text",
+     "type": "plain" | "boxed" | "accent"
+   }}
+   - "boxed": wraps the text in a styled rectangle border (use for key keywords, max 1 boxed line per title).
+   - "accent": uses the secondary highlight color (light blue or purple).
+   - "plain": uses the standard text color (white or dark blue depending on the theme).
+3. "subtext": A concise 1-2 sentence description summarizing the value of the post (max 120 characters total).
+4. "cta_text": The button text, e.g. "READ MORE", "LEARN MORE", "EXPLORE NOW".
+5. "laptop_screen": An object representing what is shown on the laptop:
+   - "title": A short bold title (1-2 words, e.g., "SEO", "AI", "CODE", "PHP", "ML") to display.
+   - "subtitle": A tiny subtitle (2-3 words, e.g. "Search Analytics", "Neural Network", "Full Stack").
+6. "badges": A list of exactly 4 floating badge cards. Each badge represents a relevant tool, technology, or concept:
+   - For example:
+     - For Web Dev: "HTML/CSS", "JavaScript", "PHP", "React", "NodeJS", "MySQL", "GitHub".
+     - For AI: "ChatGPT", "Gemini", "Perplexity", "Claude", "LLMs", "Agents", "NLP".
+     - For SEO: "Google", "Rankings", "Keywords", "Analytics", "Audits", "Content".
+   Each badge is an object:
+   {{
+     "label": "Badge label (max 12 chars)",
+     "color": "A hex color code for the badge icon (e.g. #3b82f6, #ec4899, #10b981)"
+   }}
+
+Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{'role': 'user', 'content': prompt}],
+            max_tokens=800,
+            temperature=0.4,
+            response_format={"type": "json_object"},
+        )
+
+        import json
+        data = json.loads(response.choices[0].message.content.strip())
+        svg_content = build_svg_from_data(data, website=website)
+        if svg_content:
+            return svg_content
+    except Exception as e:
+        logger.warning(f"GPT SVG cover planning failed: {e}. Falling back to local heuristic.")
+
+    # Heuristic Fallback
+    try:
+        import json
+        theme = "theme1"
+        cat_lower = category.lower() if category else ""
+        title_lower = title.lower() if title else ""
+        if any(k in cat_lower or k in title_lower for k in ["ai", "agent", "machine learning", "intelligence", "neural", "gpt"]):
+            theme = "theme2"
+        elif any(k in cat_lower or k in title_lower for k in ["web", "develop", "php", "code", "programming", "sql", "html", "css", "js", "javascript", "stack"]):
+            theme = "theme3"
+
+        words = title.split()
+        lines = []
+        curr = []
+        curr_len = 0
+        for w in words:
+            if curr_len + len(w) + 1 > 24:
+                lines.append(" ".join(curr))
+                curr = [w]
+                curr_len = len(w)
+            else:
+                curr.append(w)
+                curr_len += len(w) + 1
+        if curr:
+            lines.append(" ".join(curr))
+
+        title_lines = []
+        for i, line in enumerate(lines[:4]):
+            ltype = "boxed" if i == 1 else ("accent" if i == 3 else "plain")
+            title_lines.append({"text": line, "type": ltype})
+
+        fallback_data = {
+            "theme": theme,
+            "title_lines": title_lines,
+            "subtext": f"A detailed guide to {title}.",
+            "cta_text": "READ MORE",
+            "laptop_screen": {
+                "title": "DEVEX",
+                "subtitle": "Knowledge Base"
+            },
+            "badges": [
+                {"label": "Devex Hub", "color": "#0ea5e9"},
+                {"label": "Success", "color": "#10b981"},
+                {"label": "Learning", "color": "#f59e0b"},
+                {"label": "Growth", "color": "#8b5cf6"}
+            ]
+        }
+        return build_svg_from_data(fallback_data, website=website)
+    except Exception as fallback_err:
+        logger.error(f"Fallback SVG generation also failed: {fallback_err}")
+    return ""
