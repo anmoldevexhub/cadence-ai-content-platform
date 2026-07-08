@@ -42,22 +42,31 @@
               <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Website basics</h3>
               <div class="grid grid-2">
                 <div class="field" id="f-url">
-                  <label class="label" for="url">Website URL <span class="req">*</span></label>
+                  <label class="label" for="url">Website URL <span class="req">*</span> <i data-lucide="help-circle" class="field-info-btn" data-info="url" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
                   <div class="input-prefix">
                     <span class="pfx">https://</span>
-                    <input class="input" id="url" type="text" placeholder="acmecoffee.com" value="acmecoffee.com" />
+                    <input class="input" id="url" type="text" placeholder="acmecoffee.com" />
                   </div>
                   <div class="err-msg hide"><i data-lucide="alert-circle"></i> Enter a valid domain</div>
+                  <div class="info-help-text hide" id="info-url" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                    Enter your website's main domain name (e.g., mysite.com). Do not include 'https://' or sub-paths.
+                  </div>
                 </div>
                 <div class="field" id="f-name">
-                  <label class="label" for="name">Display name <span class="req">*</span></label>
-                  <input class="input" id="name" type="text" placeholder="Acme Coffee" value="Acme Coffee" />
+                  <label class="label" for="name">Display name <span class="req">*</span> <i data-lucide="help-circle" class="field-info-btn" data-info="name" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
+                  <input class="input" id="name" type="text" placeholder="Acme Coffee" />
                   <div class="err-msg hide"><i data-lucide="alert-circle"></i> Give the website a name</div>
+                  <div class="info-help-text hide" id="info-name" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                    A human-friendly name for this website workspace (e.g., Acme Coffee).
+                  </div>
                 </div>
               </div>
               <div class="field" style="margin-bottom:0">
-                <label class="label" for="desc">Description <span class="opt">(optional)</span></label>
+                <label class="label" for="desc">Description <span class="opt">(optional)</span> <i data-lucide="help-circle" class="field-info-btn" data-info="desc" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
                 <textarea class="textarea" id="desc" placeholder="A specialty coffee roaster focused on single-origin beans and at-home brewing education."></textarea>
+                <div class="info-help-text hide" id="info-desc" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                  Provide a brief overview of your business, products, or services. This helps the AI understand your company's context.
+                </div>
               </div>
             </div>
 
@@ -65,57 +74,185 @@
               <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Brand &amp; audience</h3>
               <div class="grid grid-2">
                 <div class="field">
-                  <label class="label" for="industry">Industry</label>
+                  <label class="label" for="industry">Industry <i data-lucide="help-circle" class="field-info-btn" data-info="industry" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
                   <select class="select" id="industry">
                     <option>Food &amp; Beverage</option><option>Health &amp; Fitness</option><option>Home &amp; Garden</option>
                     <option>Fintech / SaaS</option><option>Travel</option><option>Beauty</option><option>E-commerce</option><option>Other</option>
                   </select>
+                  <div class="info-help-text hide" id="info-industry" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                    Select the industry category that best represents your business to help tailor AI prompts.
+                  </div>
+                  <div class="field hide" id="customIndustryField" style="margin-top:12px">
+                    <label class="label" for="customIndustry">Specify Industry</label>
+                    <input class="input" id="customIndustry" type="text" placeholder="e.g. Real Estate, Education..." autocomplete="off" />
+                  </div>
                 </div>
                 <div class="field">
-                  <label class="label" for="tone">Brand tone / voice</label>
+                  <label class="label" for="tone">Brand tone / voice <i data-lucide="help-circle" class="field-info-btn" data-info="tone" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
                   <select class="select" id="tone">
                     <option>Warm &amp; artisanal</option><option>Energetic &amp; motivating</option><option>Calm &amp; informative</option>
                     <option>Authoritative &amp; clear</option><option>Playful &amp; bold</option><option>Friendly &amp; science-led</option>
                   </select>
+                  <div class="info-help-text hide" id="info-tone" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                    Choose the writing style and communication tone that represents your brand identity.
+                  </div>
                 </div>
               </div>
               <div class="field">
-                <label class="label" for="audience">Target audience</label>
-                <input class="input" id="audience" type="text" placeholder="Home brewing enthusiasts, 25–45, design-conscious" value="Home brewing enthusiasts, 25–45, design-conscious" />
+                <label class="label" for="audience">Target audience <i data-lucide="help-circle" class="field-info-btn" data-info="audience" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
+                <input class="input" id="audience" type="text" placeholder="Home brewing enthusiasts, 25–45, design-conscious" autocomplete="off" />
+                <div class="info-help-text hide" id="info-audience" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                  Describe your ideal customers (e.g., Home brewing enthusiasts, age 25–45). This guides the AI to write relevant copy.
+                </div>
               </div>
               <div class="field" style="margin-bottom:0">
-                <label class="label">Keywords <span class="opt">(press Enter to add)</span></label>
+                <label class="label">Keywords <span class="opt">(press Enter to add)</span> <i data-lucide="help-circle" class="field-info-btn" data-info="keywords" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
                 <div class="chip-input" id="kwInput">
-                  <span class="chip">pour-over <button type="button" aria-label="remove"><i data-lucide="x"></i></button></span>
-                  <span class="chip">single-origin <button type="button" aria-label="remove"><i data-lucide="x"></i></button></span>
-                  <span class="chip">sustainability <button type="button" aria-label="remove"><i data-lucide="x"></i></button></span>
-                  <input type="text" placeholder="Add keyword…" id="kwField" />
+                  <input type="text" placeholder="Add keyword…" id="kwField" autocomplete="off" />
+                </div>
+                <div class="info-help-text hide" id="info-keywords" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                  Add core terms and topics related to your brand. Press Enter after each keyword to add it.
                 </div>
               </div>
             </div>
 
             <div class="card card-pad mb6">
-              <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Social handles <span class="opt" style="font-size:var(--fs-sm)">(optional)</span></h3>
-              <p class="muted tsm mb4">Connect channels so Cadence can publish there directly.</p>
-              <div class="grid grid-3">
-                <div class="field" style="margin-bottom:0">
-                  <label class="label"><span class="row gap2"><span class="icon-tile tile-linkedin" style="width:24px;height:24px;border-radius:6px"></span> LinkedIn</span></label>
-                  <div class="input-prefix"><span class="pfx">in/</span><input class="input" type="text" placeholder="company" /></div>
+              <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Connected channels</h3>
+              <p class="muted tsm mb4">Connect publishing channels so Cadence can schedule and publish there directly.</p>
+              
+              <div class="col gap4" id="onboardingChannels" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- LinkedIn -->
+                <div class="chan-box" style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; background: var(--surface-2);">
+                  <div class="row-between" style="display:flex; align-items:center; justify-content:space-between;">
+                    <span class="row gap2 fw6" style="color:var(--text); display:flex; align-items:center; gap:8px;"><span class="icon-tile tile-linkedin" style="width:24px;height:24px;border-radius:6px;display:inline-block"></span> LinkedIn (via Make.com)</span>
+                    <label class="switch"><input type="checkbox" id="chk_linkedin" onchange="toggleChanPanel('linkedin')" /><span class="track"></span></label>
+                  </div>
+                  <div id="panel_linkedin" class="hide" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                    <div class="field" style="margin-bottom:8px">
+                      <label class="label">Make.com Webhook URL <i data-lucide="help-circle" class="field-info-btn" data-info="webhook-linkedin" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
+                      <input class="input" type="url" id="val_linkedin_url" placeholder="https://hook.us1.make.com/..." style="width:100%" />
+                      <div class="info-help-text hide" id="info-webhook-linkedin" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                        Enter the webhook URL from your Make.com LinkedIn integration scenario.
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="testOnboardingConn('linkedin')">Test Connection</button>
+                      <span class="test-status ml2" id="status_linkedin" style="font-size:12px"></span>
+                    </div>
+                  </div>
                 </div>
-                <div class="field" style="margin-bottom:0">
-                  <label class="label"><span class="row gap2"><span class="icon-tile tile-youtube" style="width:24px;height:24px;border-radius:6px"></span> YouTube</span></label>
-                  <div class="input-prefix"><span class="pfx">@</span><input class="input" type="text" placeholder="channel" /></div>
+
+                <!-- YouTube -->
+                <div class="chan-box" style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; background: var(--surface-2);">
+                  <div class="row-between" style="display:flex; align-items:center; justify-content:space-between;">
+                    <span class="row gap2 fw6" style="color:var(--text); display:flex; align-items:center; gap:8px;"><span class="icon-tile tile-youtube" style="width:24px;height:24px;border-radius:6px;display:inline-block"></span> YouTube (via Make.com)</span>
+                    <label class="switch"><input type="checkbox" id="chk_youtube" onchange="toggleChanPanel('youtube')" /><span class="track"></span></label>
+                  </div>
+                  <div id="panel_youtube" class="hide" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                    <div class="field" style="margin-bottom:8px">
+                      <label class="label">Make.com Webhook URL <i data-lucide="help-circle" class="field-info-btn" data-info="webhook-youtube" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
+                      <input class="input" type="url" id="val_youtube_url" placeholder="https://hook.us1.make.com/..." style="width:100%" />
+                      <div class="info-help-text hide" id="info-webhook-youtube" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                        Enter the webhook URL from your Make.com YouTube integration scenario.
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="testOnboardingConn('youtube')">Test Connection</button>
+                      <span class="test-status ml2" id="status_youtube" style="font-size:12px"></span>
+                    </div>
+                  </div>
                 </div>
-                <div class="field" style="margin-bottom:0">
-                  <label class="label"><span class="row gap2"><span class="icon-tile tile-instagram" style="width:24px;height:24px;border-radius:6px"></span> Instagram</span></label>
-                  <div class="input-prefix"><span class="pfx">@</span><input class="input" type="text" placeholder="handle" /></div>
+
+                <!-- Instagram -->
+                <div class="chan-box" style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; background: var(--surface-2);">
+                  <div class="row-between" style="display:flex; align-items:center; justify-content:space-between;">
+                    <span class="row gap2 fw6" style="color:var(--text); display:flex; align-items:center; gap:8px;"><span class="icon-tile tile-instagram" style="width:24px;height:24px;border-radius:6px;display:inline-block"></span> Instagram (via Make.com)</span>
+                    <label class="switch"><input type="checkbox" id="chk_instagram" onchange="toggleChanPanel('instagram')" /><span class="track"></span></label>
+                  </div>
+                  <div id="panel_instagram" class="hide" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                    <div class="field" style="margin-bottom:8px">
+                      <label class="label">Make.com Webhook URL <i data-lucide="help-circle" class="field-info-btn" data-info="webhook-instagram" style="width:14px;height:14px;cursor:pointer;color:var(--text-muted);vertical-align:middle;margin-left:4px"></i></label>
+                      <input class="input" type="url" id="val_instagram_url" placeholder="https://hook.us1.make.com/..." style="width:100%" />
+                      <div class="info-help-text hide" id="info-webhook-instagram" style="font-size:12px; color:var(--text-muted); margin-top:6px; background:var(--bg-subtle); padding:6px 10px; border-radius:4px; border-left:3px solid var(--primary)">
+                        Enter the webhook URL from your Make.com Instagram integration scenario.
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="testOnboardingConn('instagram')">Test Connection</button>
+                      <span class="test-status ml2" id="status_instagram" style="font-size:12px"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Blog -->
+                <div class="chan-box" style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; background: var(--surface-2);">
+                  <div class="row-between" style="display:flex; align-items:center; justify-content:space-between;">
+                    <span class="row gap2 fw6" style="color:var(--text); display:flex; align-items:center; gap:8px;"><span class="icon-tile tile-blog" style="width:24px;height:24px;border-radius:6px;display:inline-block"></span> Blog (Website Endpoint)</span>
+                    <label class="switch"><input type="checkbox" id="chk_blog" onchange="toggleChanPanel('blog')" /><span class="track"></span></label>
+                  </div>
+                  <div id="panel_blog" class="hide" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+                    <div class="field" style="margin-bottom:8px">
+                      <label class="label">Publishing Endpoint URL</label>
+                      <input class="input" type="url" id="val_blog_url" placeholder="e.g. https://yourdomain.com/wp-json/wp/v2/posts" style="width:100%" />
+                    </div>
+                    <div class="field" style="margin-bottom:8px">
+                      <label class="label">Security Authorization Type</label>
+                      <select class="select" id="val_blog_auth_type" onchange="showBlogAuthFields()" style="width:100%">
+                        <option value="none">None (No Auth)</option>
+                        <option value="api_key">API Key (Custom Header)</option>
+                        <option value="bearer_token">Bearer Token</option>
+                        <option value="basic_auth">Basic Auth (Username/Password)</option>
+                      </select>
+                    </div>
+
+                    <!-- Dynamic API Key fields -->
+                    <div id="blog_auth_fields_api_key" class="hide" style="margin-bottom:8px">
+                      <div class="grid grid-2">
+                        <div class="field">
+                          <label class="label">Header Name</label>
+                          <input class="input" type="text" id="val_blog_api_key_name" value="X-API-Key" style="width:100%" />
+                        </div>
+                        <div class="field">
+                          <label class="label">Header Value</label>
+                          <input class="input" type="password" id="val_blog_api_key_value" placeholder="Enter key..." style="width:100%" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Dynamic Bearer Token fields -->
+                    <div id="blog_auth_fields_bearer_token" class="hide" style="margin-bottom:8px">
+                      <div class="field">
+                        <label class="label">Token Value</label>
+                        <input class="input" type="password" id="val_blog_bearer_token_value" placeholder="Enter token..." style="width:100%" />
+                      </div>
+                    </div>
+
+                    <!-- Dynamic Basic Auth fields -->
+                    <div id="blog_auth_fields_basic_auth" class="hide" style="margin-bottom:8px">
+                      <div class="grid grid-2">
+                        <div class="field">
+                          <label class="label">Username</label>
+                          <input class="input" type="text" id="val_blog_username" placeholder="Username" style="width:100%" />
+                        </div>
+                        <div class="field">
+                          <label class="label">Password</label>
+                          <input class="input" type="password" id="val_blog_password" placeholder="Password" style="width:100%" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+                      <button type="button" class="btn btn-secondary btn-sm" onclick="testOnboardingConn('blog')">Test Connection</button>
+                      <span class="test-status ml2" id="status_blog" style="font-size:12px"></span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <!-- Sample Upload Sections -->
             <div class="card card-pad mb5">
-              <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Sample Content (Optional but Recommended)</h3>
+              <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Sample Content (Recommended)</h3>
               <p class="muted tsm mb4">Upload 5-7 examples of your best content for each platform. This helps AI match your brand voice perfectly.</p>
               
               <!-- Blog Samples -->
@@ -173,36 +310,6 @@
                   <div class="sample-item">
                     <input type="file" accept=".txt" class="sample-file-input" data-platform="youtube" />
                     <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="youtube" />
-                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Facebook Samples -->
-              <div class="sample-upload-section mb4" data-platform="facebook">
-                <div class="row-between mb3">
-                  <div><h4 style="font-size:var(--fs-md)">👥 Facebook Samples</h4><span class="muted tsm">Upload Facebook posts (TXT)</span></div>
-                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="facebook">+ Add Sample</button>
-                </div>
-                <div class="sample-list" id="facebook-samples">
-                  <div class="sample-item">
-                    <input type="file" accept=".txt" class="sample-file-input" data-platform="facebook" />
-                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="facebook" />
-                    <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Twitter Samples -->
-              <div class="sample-upload-section" data-platform="twitter">
-                <div class="row-between mb3">
-                  <div><h4 style="font-size:var(--fs-md)">🐦 Twitter/X Samples</h4><span class="muted tsm">Upload Twitter threads/posts (TXT)</span></div>
-                  <button type="button" class="btn btn-secondary btn-sm add-sample-btn" data-platform="twitter">+ Add Sample</button>
-                </div>
-                <div class="sample-list" id="twitter-samples">
-                  <div class="sample-item">
-                    <input type="file" accept=".txt" class="sample-file-input" data-platform="twitter" />
-                    <input type="text" placeholder="Title (optional)" class="sample-title-input" data-platform="twitter" />
                     <button type="button" class="icon-btn btn-sm remove-sample-btn">✕</button>
                   </div>
                 </div>
@@ -286,6 +393,104 @@
   (function () {
     const C = window.Cadence, M = window.MOCK;
     let domain = "acmecoffee.com", siteName = "Acme Coffee";
+
+    window.toggleChanPanel = function(plat) {
+      const chk = document.getElementById('chk_' + plat);
+      const panel = document.getElementById('panel_' + plat);
+      panel.classList.toggle('hide', !chk.checked);
+    };
+
+    window.showBlogAuthFields = function() {
+      const authType = document.getElementById('val_blog_auth_type').value;
+      document.getElementById('blog_auth_fields_api_key').classList.toggle('hide', authType !== 'api_key');
+      document.getElementById('blog_auth_fields_bearer_token').classList.toggle('hide', authType !== 'bearer_token');
+      document.getElementById('blog_auth_fields_basic_auth').classList.toggle('hide', authType !== 'basic_auth');
+    };
+
+    window.testOnboardingConn = async function(plat) {
+      const statusEl = document.getElementById('status_' + plat);
+      statusEl.className = 'test-status ml2 muted';
+      statusEl.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:12px;height:12px;display:inline-block"></i> Testing...`;
+      lucide.createIcons();
+
+      const url = document.getElementById('val_' + plat + '_url').value.trim();
+      if (!url) {
+        statusEl.className = 'test-status ml2 var-error';
+        statusEl.innerHTML = `<span style="color:var(--error);font-size:12px;font-weight:500;">URL is required</span>`;
+        return;
+      }
+
+      let authType = 'none';
+      let authPayload = {};
+
+      if (plat === 'blog') {
+        authType = document.getElementById('val_blog_auth_type').value;
+        if (authType === 'api_key') {
+          authPayload = {
+            api_key_name: document.getElementById('val_blog_api_key_name').value.trim(),
+            api_key_value: document.getElementById('val_blog_api_key_value').value.trim()
+          };
+        } else if (authType === 'bearer_token') {
+          authPayload = {
+            token_value: document.getElementById('val_blog_bearer_token_value').value.trim()
+          };
+        } else if (authType === 'basic_auth') {
+          authPayload = {
+            username: document.getElementById('val_blog_username').value.trim(),
+            password: document.getElementById('val_blog_password').value.trim()
+          };
+        }
+      }
+
+      try {
+        const res = await CadenceAPI.testConnection(0, plat, url, authType, authPayload);
+        if (res && res.connected) {
+          statusEl.innerHTML = `<span style="color:var(--success);font-size:12px;font-weight:500;"><i data-lucide="check-circle" style="width:14px;height:14px;color:var(--success);vertical-align:middle"></i> Connected</span>`;
+        } else {
+          statusEl.innerHTML = `<span style="color:var(--error);font-size:12px;font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle"></i> Failed</span>`;
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--error);font-size:12px;font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle"></i> Error</span>`;
+      }
+      lucide.createIcons();
+    };
+
+    async function saveConnectionsForSite(siteId) {
+      const platforms = ['linkedin', 'youtube', 'instagram', 'blog'];
+      for (const plat of platforms) {
+        const chk = document.getElementById('chk_' + plat);
+        if (chk && chk.checked) {
+          const urlVal = document.getElementById('val_' + plat + '_url').value.trim();
+          if (urlVal) {
+            let authType = 'none';
+            let authPayload = {};
+            if (plat === 'blog') {
+              authType = document.getElementById('val_blog_auth_type').value;
+              if (authType === 'api_key') {
+                authPayload = {
+                  api_key_name: document.getElementById('val_blog_api_key_name').value.trim(),
+                  api_key_value: document.getElementById('val_blog_api_key_value').value.trim()
+                };
+              } else if (authType === 'bearer_token') {
+                authPayload = {
+                  token_value: document.getElementById('val_blog_bearer_token_value').value.trim()
+                };
+              } else if (authType === 'basic_auth') {
+                authPayload = {
+                  username: document.getElementById('val_blog_username').value.trim(),
+                  password: document.getElementById('val_blog_password').value.trim()
+                };
+              }
+            }
+            try {
+              await CadenceAPI.connectSocial(siteId, plat, urlVal, authType, authPayload);
+            } catch(e) {
+              console.error(`Failed to connect plat ${plat}:`, e);
+            }
+          }
+        }
+      }
+    }
 
     // keyword chips
     const kwField = document.getElementById("kwField");
@@ -448,6 +653,15 @@
         const platform = btn.dataset.platform;
         const list = document.getElementById(`${platform}-samples`);
         if (list) {
+          const currentCount = list.querySelectorAll('.sample-item').length;
+          if (currentCount >= 7) {
+            C.toast({
+              type: "error",
+              title: "Limit Reached",
+              desc: "You can add a maximum of 7 style reference samples per platform."
+            });
+            return;
+          }
           list.appendChild(createSampleItem(platform));
         }
       });
@@ -458,6 +672,11 @@
         e.preventDefault();
         btn.closest(".sample-item").remove();
       });
+    });
+
+    document.getElementById("industry").addEventListener("change", (e) => {
+      const isOther = e.target.value === "Other";
+      document.getElementById("customIndustryField").classList.toggle("hide", !isOther);
     });
 
     async function handleSampleUpload(websiteId) {
@@ -526,9 +745,17 @@
         
         try {
           const urlStr = url.value.trim().startsWith('http') ? url.value.trim() : 'https://' + url.value.trim();
-          const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, "General", "Professional", [], true);
+          let indVal = document.getElementById("industry").value;
+          if (indVal === "Other") {
+            indVal = document.getElementById("customIndustry").value.trim() || "Other";
+          }
+          const toneVal = document.getElementById("tone").value;
+          const keywordChips = Array.from(document.querySelectorAll("#kwInput .chip")).map(c => c.childNodes[0].textContent.trim());
+          
+          const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, indVal, toneVal, keywordChips, true);
           createdSiteId = site.id;
           
+          await saveConnectionsForSite(site.id);
           await handleSampleUpload(site.id);
           
           // Set status to active directly
@@ -552,9 +779,17 @@
           log.innerHTML = "";
           addLogMessage("Creating website draft record...", "loader-circle", true);
           const urlStr = url.value.trim().startsWith('http') ? url.value.trim() : 'https://' + url.value.trim();
-          const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, "General", "Professional", [], false);
+          let indVal = document.getElementById("industry").value;
+          if (indVal === "Other") {
+            indVal = document.getElementById("customIndustry").value.trim() || "Other";
+          }
+          const toneVal = document.getElementById("tone").value;
+          const keywordChips = Array.from(document.querySelectorAll("#kwInput .chip")).map(c => c.childNodes[0].textContent.trim());
+          
+          const site = await CadenceAPI.addWebsite(siteName, domain, urlStr, indVal, toneVal, keywordChips, false);
           createdSiteId = site.id;
           
+          await saveConnectionsForSite(site.id);
           addLogMessage("Website record created. Initiating crawler...", "check-circle-2", false, "var(--success)");
           await CadenceAPI.triggerCrawl(site.id);
           addLogMessage("Crawl request dispatched. Running page crawler...", "loader-circle", true);
@@ -596,6 +831,20 @@
       } catch (err) {
         console.error(err);
         C.toast({ type: "error", title: "Failed to add website", desc: err.message });
+      }
+    });
+
+    // Toggle helper texts for fields (uses event delegation since Lucide replaces the elements in DOM)
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".field-info-btn");
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const infoId = "info-" + btn.dataset.info;
+        const infoEl = document.getElementById(infoId);
+        if (infoEl) {
+          infoEl.classList.toggle("hide");
+        }
       }
     });
 

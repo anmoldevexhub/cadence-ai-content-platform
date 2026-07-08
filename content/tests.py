@@ -213,7 +213,7 @@ class ContentDraftSoftDeleteAPITests(APITestCase):
         data = response.json()
         cover_image_url = data.get('cover_image')
         self.assertTrue(cover_image_url.startswith('/static/media/covers/cover_'))
-        self.assertTrue(cover_image_url.endswith('.png'))
+        self.assertTrue(cover_image_url.endswith('.jpg'))
         
         # Verify the file is actually written to disk
         filename = cover_image_url.split('/')[-1]
@@ -238,3 +238,168 @@ class ContentDraftSoftDeleteAPITests(APITestCase):
         self.assertEqual(self.draft.author_name, "Jane Doe")
         self.assertEqual(self.draft.custom_date, "July 4, 1776")
         self.assertEqual(self.draft.category, "History")
+
+
+from content.utils import inject_internal_links
+from content.models import ContentIdea, ContentDraft
+
+class InternalLinkingTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="testlinker@cadence.io",
+            username="testlinker",
+            password="testpassword",
+            role="admin"
+        )
+        self.website = Website.objects.create(
+            name="SEO Hub",
+            domain="seohub.com",
+            url="https://seohub.com",
+            owner=self.user,
+            status="active"
+        )
+        # Create an existing published blog post
+        self.idea1 = ContentIdea.objects.create(
+            website=self.website,
+            submitted_by=self.user,
+            title="SEO vs AEO",
+            platform="blog",
+            status="done"
+        )
+        self.published_post = ContentDraft.objects.create(
+            idea=self.idea1,
+            website=self.website,
+            platform="blog",
+            title="SEO vs AEO: Search in 2026",
+            body="<p>This is a complete guide to search engines.</p>",
+            tags=["SEO", "AEO", "Search"],
+            status="published"
+        )
+
+    def test_inject_internal_links_by_title_and_tag(self):
+        # Create a new draft containing keyword "SEO vs AEO"
+        idea2 = ContentIdea.objects.create(
+            website=self.website,
+            submitted_by=self.user,
+            title="Future trends",
+            platform="blog"
+        )
+        new_draft = ContentDraft.objects.create(
+            idea=idea2,
+            website=self.website,
+            platform="blog",
+            title="Our Digital Strategy",
+            body="<p>We are optimizing for SEO vs AEO. In addition, AEO is the next big shift.</p>",
+            status="draft"
+        )
+        
+        # Run link injector
+        inject_internal_links(new_draft)
+        
+        # Verify that "SEO vs AEO" is wrapped in <a>
+        expected_url = "https://seohub.com/blog/seo-vs-aeo-search-in-2026"
+        self.assertIn(f'<a href="{expected_url}" target="_blank">SEO vs AEO</a>', new_draft.body)
+        
+        # Since it only links the first occurrence of keywords for this target post,
+        # "AEO" (tag of published_post) should NOT be linked again because we already linked it via "SEO vs AEO"
+        self.assertNotIn(f'<a href="{expected_url}" target="_blank">AEO</a>', new_draft.body)
+
+    def test_inject_internal_links_manual_api_endpoint(self):
+        # Create a new draft
+        idea3 = ContentIdea.objects.create(
+            website=self.website,
+            submitted_by=self.user,
+            title="Digital Shift",
+            platform="blog"
+        )
+        new_draft = ContentDraft.objects.create(
+            idea=idea3,
+            website=self.website,
+            platform="blog",
+            title="Shifting search paradigms",
+            body="<p>Let us talk about SEO vs AEO.</p>",
+            status="draft"
+        )
+        
+        # Force login via SimpleJWT token
+        from rest_framework_simplejwt.tokens import RefreshToken
+        token = str(RefreshToken.for_user(self.user).access_token)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
+        
+        # Trigger POST to internal-links API endpoint
+        response = self.client.post(f'/api/content/drafts/{new_draft.id}/internal-links/')
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify response matches the expected linked body
+        data = response.json()
+        expected_url = "https://seohub.com/blog/seo-vs-aeo-search-in-2026"
+        self.assertIn(f'<a href="{expected_url}" target="_blank">SEO vs AEO</a>', data['body'])
+
+
+class DraftRegenerationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="testregen@cadence.io",
+            username="testregen",
+            password="testpassword",
+            role="admin"
+        )
+        self.website = Website.objects.create(
+            name="Regen Bakery",
+            domain="regenbakery.com",
+            url="https://regenbakery.com",
+            owner=self.user,
+            status="active"
+        )
+        from content.models import ContentIdea
+        self.idea = ContentIdea.objects.create(
+            website=self.website,
+            submitted_by=self.user,
+            title="Best Sourdough Bread Recipe",
+            platform="blog",
+            status="done"
+        )
+        self.draft = ContentDraft.objects.create(
+            idea=self.idea,
+            website=self.website,
+            platform="blog",
+            title="Best Sourdough Bread Recipe",
+            body="Existing body content",
+            cover_image="/static/media/old_cover.png",
+            cover_image_public_url="https://imgbb.com/old_cover.png",
+            status="draft"
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
+        token = str(RefreshToken.for_user(self.user).access_token)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
+
+    def test_regenerate_draft_content_only(self):
+        response = self.client.post(f'/api/content/drafts/{self.draft.id}/regenerate/', {"type": "content"}, format='json')
+        self.assertEqual(response.status_code, 200)
+        
+        # Check task was delayed and executed successfully (CELERY_TASK_ALWAYS_EAGER defaults to True in settings under test mode)
+        data = response.json()
+        new_draft_id = data.get('new_draft_id')
+        self.assertIsNotNone(new_draft_id)
+        
+        new_draft = ContentDraft.objects.get(pk=new_draft_id)
+        # Content should be new (not "Existing body content")
+        self.assertNotEqual(new_draft.body, "Existing body content")
+        # Cover image should be preserved
+        self.assertEqual(new_draft.cover_image, "/static/media/old_cover.png")
+        self.assertEqual(new_draft.cover_image_public_url, "https://imgbb.com/old_cover.png")
+
+    def test_regenerate_draft_image_only(self):
+        response = self.client.post(f'/api/content/drafts/{self.draft.id}/regenerate/', {"type": "image"}, format='json')
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertEqual(data.get('new_draft_id'), self.draft.id)
+        
+        self.draft.refresh_from_db()
+        # Content must be preserved
+        self.assertEqual(self.draft.body, "Existing body content")
+        # Cover image public URL must be cleared
+        self.assertEqual(self.draft.cover_image_public_url, "")
+        # Cover image must be regenerated (starts with static/media/)
+        self.assertTrue(self.draft.cover_image.startswith("/static/media/"))

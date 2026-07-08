@@ -1,0 +1,1025 @@
+﻿diff --git a/content/generator.py b/content/generator.py
+index 6120de5..ca53933 100644
+--- a/content/generator.py
++++ b/content/generator.py
+@@ -740,12 +740,16 @@ def generate_social_via_gemini(system_prompt: str, user_prompt: str) -> dict:
+ 
+ 
+ def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
+-    """Generates a full blog post using a single prompt approach."""
+-    # Get live search data
+-    logger.info(f"Performing live search for topic: {idea.title}")
++    """
++    Generates a high-quality blog post using a 2-Layer Architecture:
++    Layer 1: Generate a highly structured, strategic content outline based on live search and site context.
++    Layer 2: Expand the outline into a deep, human-sounding B2B/B2C blog post with clean HTML styling.
++    """
++    # 1. Perform live search for up-to-date facts, statistics, and industry context
++    logger.info(f"Layer 1: Performing live search for topic: {idea.title}")
+     live_data = search_live_data(idea.title)
+     
+-    # Get user-uploaded samples (NOT from crawler)
++    # 2. Load website writing style reference samples (if uploaded by user)
+     style_reference = get_style_reference_samples(website, 'blog')
+ 
+     target_keywords = (
+@@ -756,869 +760,151 @@ def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
+ 
+     system_prompt = build_system_prompt(website, 'blog')
+     import json
+-    
+-    user_prompt = f"""
+-You are a senior content strategist, editor, SEO specialist, and B2B technology writer.
+-
+-Write an ORIGINAL blog post for {website.name}.
+ 
+-====================
+-INPUT
+-====================
++    # ==========================================
++    # LAYER 1: STRATEGIC OUTLINE GENERATOR
++    # ==========================================
++    logger.info(f"Layer 1: Generating blog content outline for: {idea.title}")
++    layer1_user_prompt = f"""
++You are a senior content strategist and SEO architect.
++Create a highly structured blog post outline for {website.name} ({website.domain}).
+ 
+ Topic: {idea.title}
+ Context: {idea.context or "None provided"}
+ Target Keywords: {target_keywords}
+-
+-Reference Samples:
+-{style_reference}
+-
+-Verified Search Data:
++Verified Search Data (Use real facts/stats from here):
+ {live_data}
+ 
+-====================
+-PRIMARY OBJECTIVE
+-====================
+-
+-Create an editorial-quality article that feels genuinely written by an experienced practitioner.
+-
+-The writing must feel:
+-
+-ΓÇó practical
+-ΓÇó natural
+-ΓÇó observational
+-ΓÇó useful
+-ΓÇó grounded in execution
+-ΓÇó written from experience rather than explanation
+-
+-The reader should feel:
+-
+-"This person has worked through these problems before."
+-
+-Study the reference samples to understand:
+-
+-ΓÇó tone
+-ΓÇó formatting
+-ΓÇó pacing
+-ΓÇó reading level
+-ΓÇó CTA placement
+-
+-Learn patterns only.
+-
+-Never imitate:
+-
+-ΓÇó wording
+-ΓÇó sentence structures
+-ΓÇó examples
+-ΓÇó transitions
+-ΓÇó headings
+-ΓÇó metaphors
+-ΓÇó opening styles
+-
+-====================
+-CONTENT REQUIREMENTS
+-====================
+-
+-Length: 900ΓÇô1300 words.
+-
+-Requirements:
+-
+-ΓÇó Match search intent precisely.
+-ΓÇó Use H2 and H3 headings naturally.
+-ΓÇó Vary paragraph lengths.
+-ΓÇó Every section must introduce new information.
+-ΓÇó Prefer practical insight over broad explanation.
+-ΓÇó Focus on decisions, constraints, tradeoffs, and outcomes.
+-ΓÇó Use lists only when they genuinely improve clarity.
+-ΓÇó Avoid textbook writing.
+-ΓÇó Avoid encyclopedia-style explanations.
+-ΓÇó Avoid writing merely to fill sections.
+-
+-The article should prioritize usefulness over completeness.
+-
+-It is acceptable to leave obvious concepts unexplained if the audience would already understand them.
+-
+-====================
+-INTRODUCTION RULES
+-====================
+-
+-Start near a real problem.
+-
+-Choose naturally from:
+-
+-ΓÇó workflow friction
+-ΓÇó operational bottlenecks
+-ΓÇó implementation mistakes
+-ΓÇó difficult decisions
+-ΓÇó recurring team challenges
+-ΓÇó observations from execution
+-ΓÇó customer or internal process issues
+-
+-The opening must feel immediate and relevant.
+-
+-Never begin with:
+-
+-ΓÇó definitions
+-ΓÇó industry overviews
+-ΓÇó historical summaries
+-ΓÇó future predictions
+-ΓÇó motivational framing
+-ΓÇó broad statements
+-
+-Forbidden openings:
+-
+-ΓÇó "In today's digital world..."
+-ΓÇó "Technology is changing rapidly..."
+-ΓÇó "AI is transforming industries..."
+-ΓÇó "Every business today..."
+-ΓÇó "Organizations increasingly..."
+-ΓÇó "Imagine a world where..."
+-ΓÇó "As companies continue to grow..."
+-ΓÇó "The future of..."
+-
+-The first paragraph should feel like it starts in the middle of a real conversation.
+-
+-====================
+-HEADINGS
+-====================
+-
+-Avoid educational headings:
+-
+-ΓÇó What Is X
+-ΓÇó Benefits Of X
+-ΓÇó Challenges Of X
+-ΓÇó Future Of X
+-ΓÇó Applications Of X
+-ΓÇó Key Features
+-ΓÇó Final Thoughts
+-ΓÇó Conclusion
+-
+-Prefer headings that communicate:
+-
+-ΓÇó difficult choices
+-ΓÇó operational realities
+-ΓÇó implementation lessons
+-ΓÇó hidden constraints
+-ΓÇó tradeoffs
+-ΓÇó workflow consequences
+-ΓÇó mistakes teams repeatedly make
+-ΓÇó decisions that changed outcomes
+-
+-Headings should feel editorial, not instructional.
+-
+-====================
+-ARTICLE STRUCTURE
+-====================
+-
+-Never force this structure:
+-
+-Introduction
+-ΓåÆ Definition
+-ΓåÆ Features
+-ΓåÆ Benefits
+-ΓåÆ Challenges
+-ΓåÆ Conclusion
+-
+-Prefer natural structures:
+-
+-ΓÇó observation ΓåÆ implication
+-ΓÇó challenge ΓåÆ consequence
+-ΓÇó decision ΓåÆ outcome
+-ΓÇó workflow ΓåÆ bottleneck
+-ΓÇó mistake ΓåÆ lesson
+-ΓÇó tradeoff ΓåÆ recommendation
+-ΓÇó implementation ΓåÆ adjustment
+-
+-Different sections should use different structures.
+-
+-Some sections may contain no examples.
+-Some sections may contain no recommendations.
+-Some sections may focus on a single observation.
+-
+-Natural variation is more important than structural balance.
+-
+-Do not make every section symmetrical.
+-
+-Natural variation is preferred.
+-
+-Never expose internal labels.
+-
+-Forbidden headings:
+-
+-ΓÇó Example
+-ΓÇó Insight
+-ΓÇó Recommendation
+-ΓÇó Outcome
+-ΓÇó Situation
+-ΓÇó Lessons Learned
+-ΓÇó Implementation Advice
+-ΓÇó Call To Action
+-
+-Use these concepts internally only.
+-
+-NATURAL WRITING BEHAVIOR
+-
+-Do not force every section to contain:
+-
+-ΓÇó a problem
+-ΓÇó a tradeoff
+-ΓÇó a recommendation
+-ΓÇó an example
+-ΓÇó a lesson
+-
+-Some sections may simply:
+-
+-ΓÇó clarify a misconception
+-ΓÇó describe a constraint
+-ΓÇó compare approaches
+-ΓÇó explain a practical limitation
+-ΓÇó point out hidden costs
+-ΓÇó raise unanswered questions
+-
+-Human writers do not package every section into a complete teaching framework.
+-
+-Allow occasional ambiguity and unresolved tradeoffs when appropriate.
+-
+-
+-====================
+-HUMAN WRITING SIGNALS
+-====================
+-
+-The article should occasionally include:
+-
+-ΓÇó short paragraphs
+-ΓÇó incomplete explanatory symmetry
+-ΓÇó mild opinion grounded in experience
+-ΓÇó nuanced tradeoffs
+-ΓÇó practical observations
+-ΓÇó moments of uncertainty where appropriate
+-
+-Not every issue needs a perfect solution.
+-
+-Avoid presenting every topic as clean, obvious, or universally accepted.
+-
+-Allow room for:
+-
+-ΓÇó competing approaches
+-ΓÇó contextual decisions
+-ΓÇó operational compromises
+-
+-This creates authenticity.
+-
+-====================
+-EXPERIENCE SIGNALS
+-====================
+-
+-Write as though the author has seen these situations repeatedly.
+-
+-Avoid explaining concepts from first principles unless necessary.
+-
+-Focus on:
+-
+-ΓÇó execution realities
+-ΓÇó workflow constraints
+-ΓÇó organizational decisions
+-ΓÇó implementation friction
+-ΓÇó maintenance costs
+-ΓÇó unintended consequences
+-ΓÇó lessons from failures
+-ΓÇó adjustments made over time
+-
+-Readers should trust the writer because of practical understanding.
+-
+-Not because of authority claims.
+-
+-PERSONAL EXPERIENCE CLAIMS
+-
+-ABSOLUTE RULE:
+-
+-Never claim personal experience.
+-
+-Forbidden phrases:
+-
+-ΓÇó In my experience
+-ΓÇó I have seen
+-ΓÇó I worked with
+-ΓÇó One team I worked with
+-ΓÇó We discovered
+-ΓÇó We implemented
+-ΓÇó Over the years
+-ΓÇó I have found
+-
+-Do not invent:
+-
+-ΓÇó clients
+-ΓÇó projects
+-ΓÇó teams
+-ΓÇó deployments
+-ΓÇó case studies
+-ΓÇó firsthand observations
+-
+-If examples are necessary, describe common implementation patterns without implying direct involvement.
+-
+-The authority of the article must come from practical reasoning and operational understandingΓÇönot fabricated experience.
+-
+-====================
+-SPECIFICITY
+-====================
+-
+-Avoid generic actors:
+-
+-ΓÇó businesses
+-ΓÇó organizations
+-ΓÇó enterprises
+-ΓÇó companies
+-
+-Prefer:
+-
+-ΓÇó engineering teams
+-ΓÇó support teams
+-ΓÇó marketing operations
+-ΓÇó product managers
+-ΓÇó platform teams
+-ΓÇó development workflows
+-ΓÇó IT departments
+-ΓÇó customer success groups
+-ΓÇó revenue operations teams
+-
+-Whenever describing situations, explain:
+-
+-ΓÇó what changed
+-ΓÇó why it mattered
+-ΓÇó what constraints existed
+-ΓÇó what options were considered
+-ΓÇó what decisions followed
+-ΓÇó what happened afterward
+-
+-
+-SUBJECT VARIETY
+-
+-Do not make teams the subject of every paragraph.
+-
+-Vary subjects naturally across the article:
+-
+-ΓÇó workflows
+-ΓÇó approval processes
+-ΓÇó release cycles
+-ΓÇó infrastructure constraints
+-ΓÇó reporting structures
+-ΓÇó customer expectations
+-ΓÇó maintenance requirements
+-ΓÇó documentation gaps
+-ΓÇó data dependencies
+-ΓÇó operational realities
+-ΓÇó platform limitations
+-ΓÇó support processes
+-ΓÇó deployment patterns
+-
+-Avoid repetitive constructions such as:
+-
+-ΓÇó Teams struggle with...
+-ΓÇó Teams often discover...
+-ΓÇó Teams should...
+-ΓÇó Teams frequently...
+-ΓÇó Teams must...
+-
+-Use a wider range of observations and actors.
+-
+-====================
+-LANGUAGE
+-====================
+-
+-Write in clear professional English.
+-
+-Target readability:
+-
+-Grade 7ΓÇô9.
+-
+-Prefer:
+-
+-ΓÇó common vocabulary
+-ΓÇó shorter sentences
+-ΓÇó direct explanations
+-ΓÇó conversational clarity
+-
+-Use simple words whenever possible.
+-
+-Avoid:
+-
+-ΓÇó academic writing
+-ΓÇó motivational language
+-ΓÇó exaggerated marketing language
+-ΓÇó dramatic technology narratives
+-ΓÇó executive buzzwords
+-ΓÇó over-polished corporate copy
+-
+-Avoid repeated use of:
+-
+-leverage
+-optimize
+-enhance
+-transform
+-facilitate
+-streamline
+-robust
+-innovation
+-impactful
+-cutting-edge
+-powerful
+-seamless
+-revolutionize
+-significant
+-groundbreaking
+-synergy
+-enable
+-empower
+-accelerate
+-redefine
+-next-generation
+-
+-====================
+-TRANSITIONS
+-====================
+-
+-Avoid generic AI transitions:
+-
+-ΓÇó In practical terms
+-ΓÇó The fundamental difference
+-ΓÇó Looking ahead
+-ΓÇó In conclusion
+-ΓÇó As technology evolves
+-ΓÇó Despite these advantages
+-ΓÇó The future of
+-ΓÇó As organizations continue to grow
+-ΓÇó On the other hand
+-ΓÇó Furthermore
+-ΓÇó Moreover
+-ΓÇó Ultimately
+-
+-Transitions should emerge naturally.
+-Sometimes no transition is better.
+-
+-ADDITIONAL TRANSITION RULES
+-
+-Avoid repetitive connective phrases such as:
+-
+-ΓÇó On the other hand
+-ΓÇó For instance
+-ΓÇó Ultimately
+-ΓÇó In many cases
+-ΓÇó At the same time
+-ΓÇó In reality
+-ΓÇó Here are some steps
+-ΓÇó Here are some questions to consider
+-ΓÇó That said
+-ΓÇó Meanwhile
+-ΓÇó As a result
+-ΓÇó Therefore
+-ΓÇó In contrast
+-
+-Do not force transitions between every paragraph.
+-
+-Direct continuation is often more natural than explicit connectors.
+-
+-====================
+-EXAMPLES
+-====================
+-
+-Examples must include:
+-
+-ΓÇó constraints
+-ΓÇó tradeoffs
+-ΓÇó decisions
+-ΓÇó consequences
+-
+-Never create fictional case studies.
+-
+-Avoid:
+-
+-ΓÇó imaginary startups
+-ΓÇó invented companies
+-ΓÇó fabricated teams
+-ΓÇó fake statistics
+-
+-Avoid overused examples:
+-
+-ΓÇó chatbots
+-ΓÇó recommendation engines
+-ΓÇó personalized emails
+-ΓÇó social media campaigns
+-
+-Unless genuinely central to the topic.
+-
+-If no meaningful example exists:
+-
+-Use observations instead.
+-
+-====================
+-AUTHORITY
+-====================
+-
+-Use statistics ONLY from Verified Search Data.
+-
+-Never invent:
+-
+-ΓÇó numbers
+-ΓÇó percentages
+-ΓÇó surveys
+-ΓÇó studies
+-ΓÇó reports
+-
+-If no verified data exists:
+-
+-Focus on:
+-
+-ΓÇó operational realities
+-ΓÇó implementation experience
+-ΓÇó tradeoffs
+-ΓÇó practical reasoning
+-
+-====================
+-SEO
+-====================
+-
+-Requirements:
+-
+-ΓÇó Use target keywords naturally.
+-ΓÇó Include semantically related concepts.
+-ΓÇó Avoid keyword stuffing.
+-ΓÇó Prioritize readability.
+-ΓÇó Optimize for humans first.
+-ΓÇó Align headings with search intent.
+-ΓÇó Write compelling metadata.
+-ΓÇó Keep keyword density natural.
+-
+-Never sacrifice clarity for SEO.
+-
+-====================
+-BRAND MENTIONS
+-====================
+-
+-Mention {website.name} only if genuinely relevant.
+-
+-Maximum:
+-
+-ONE natural mention.
+-
+-No promotional language.
+-
+-No forced branding.
+-
+-====================
+-CTA RULES
+-====================
+-
+-The ending must feel useful.
+-
+-Prefer:
+-
+-ΓÇó practical next steps
+-ΓÇó operational recommendations
+-ΓÇó implementation checklists
+-ΓÇó questions readers should ask internally
+-
+-Avoid:
+-
+-ΓÇó Contact us today
+-ΓÇó Get started now
+-ΓÇó Transform your business
+-ΓÇó Reach out to our experts
+-ΓÇó Book a consultation
+-ΓÇó Unlock your potential
+-
+-The reader should leave with something actionable.
+-
+-====================
+-ANTI-AI DETECTION RULES
+-====================
+-
+-Avoid:
+-
+-ΓÇó repetitive sentence openings
+-ΓÇó identical paragraph structures
+-ΓÇó perfect symmetry
+-ΓÇó predictable rhythms
+-ΓÇó over-explaining obvious ideas
+-ΓÇó excessive transitions
+-ΓÇó keyword repetition
+-ΓÇó emotional exaggeration
+-
+-Mix:
+-
+-ΓÇó short sentences
+-ΓÇó medium sentences
+-ΓÇó longer explanatory sentences
+-
+-Occasionally use single-sentence paragraphs when natural.
+-
+-Allow sections to end abruptly if the point has been made.
+-
+-Do not force elegant conclusions everywhere.
+-
+-Human writers move on when a point is complete.
+-
+-FINAL EDITORIAL REVIEW
+-
+-Before producing the final article, silently rewrite any section that:
+-
+-ΓÇó feels generic
+-ΓÇó sounds educational
+-ΓÇó repeats transitions
+-ΓÇó repeats examples
+-ΓÇó lacks operational detail
+-ΓÇó follows textbook structures
+-ΓÇó overuses keywords
+-ΓÇó explains obvious concepts
+-ΓÇó reads like AI output
+-ΓÇó ends too neatly
+-ΓÇó resolves every tradeoff
+-ΓÇó forces recommendations where none are needed
+-
+-The final article should:
+-
+-ΓÇó vary sentence lengths naturally
+-ΓÇó include occasional short paragraphs
+-ΓÇó avoid predictable rhythms
+-ΓÇó leave some complexity unresolved
+-ΓÇó avoid wrapping every section with a lesson
+-ΓÇó maintain conversational professionalism
+-ΓÇó prioritize usefulness over completeness
+-
+-Readers should feel they are reading a thoughtful practitionerΓÇönot a system attempting to teach everything perfectly.
+-
+-====================
+-OUTPUT
+-====================
++Reference Samples (Match formatting structure):
++{style_reference}
+ 
+-Return ONLY valid JSON.
++Outline Guidelines (SEO + AEO + GEO Architecture):
++1. Editorial & Query-Based Headings: Do NOT use generic headings like "Introduction", "Conclusion", "What is X", or "Benefits of X". Plan 4-6 editorial, high-authority headings. Ensure some headings are phrased as natural-language user search queries (AEO/SEO optimized), e.g., "Why Standard Metrics Fail," "How to Implement X Without Performance Hits."
++2. Flow & Information Gain: Ensure each section introduces unique value and operational reality. Plan a conversational Q&A / FAQ section at the end of the post only when it naturally supports search intent and fills information gaps. Do not force-fit FAQs if the topic does not warrant it.
++3. Data & Citations: Identify specific spots in the outline to include data tables, bulleted lists, and verified search statistics (GEO optimization).
++4. Word Count: Plan the word count distribution targeting 900-1300 words overall.
+ 
++Return ONLY valid JSON in the following format:
+ {{
+-    "title": "",
+-    "meta_description": "",
+-    "category": "",
+-    "tags": [],
+-    "excerpt": "",
+-    "body": "clean HTML only"
++  "post_title": "Proposed practitioner-level post title",
++  "recommended_category": "Short category name",
++  "tags": ["tag1", "tag2"],
++  "sections": [
++    {{
++      "heading": "Section Heading",
++      "focus_points": ["bullet point 1", "bullet point 2"],
++      "estimated_words": 200
++    }}
++  ]
+ }}
+ """
++    try:
++        layer1_response = client.chat.completions.create(
++            model=MODEL,
++            messages=[
++                {{'role': 'system', 'content': "You are an expert B2B/B2C content strategist. You plan structured, SEO-optimized outlines."}},
++                {{'role': 'user', 'content': layer1_user_prompt}}
++            ],
++            temperature=0.4,
++            response_format={{"type": "json_object"}}
++        )
++        outline_data = json.loads(layer1_response.choices[0].message.content.strip())
++        logger.info(f"Layer 1: Outline successfully generated: {outline_data.get('post_title')}")
++    except Exception as layer1_err:
++        logger.error(f"Layer 1: Outline generation failed: {layer1_err}. Falling back to default layout.")
++        outline_data = {{
++            "post_title": idea.title,
++            "recommended_category": "Technology",
++            "tags": ["Technology", "Industry Insights"],
++            "sections": [
++                {{"heading": f"The State of {idea.title} Today", "focus_points": ["Current challenges", "Why this topic matters now"], "estimated_words": 250}},
++                {{"heading": "Key Tradeoffs and Implementation Hurdles", "focus_points": ["Decisions to make", "Common pitfalls to avoid"], "estimated_words": 300}},
++                {{"heading": "Practical Next Steps for Teams", "focus_points": ["Actionable workflows", "Success metrics"], "estimated_words": 250}}
++            ]
++        }}
+ 
+-#     user_prompt = f"""
+-# You are a senior content strategist, editor, and SEO writer.
+-
+-# Write an ORIGINAL blog post for {website.name}.
+-
+-# INPUT
+-
+-# Topic: {idea.title}
+-# Context: {idea.context or "None provided"}
+-# Target Keywords: {target_keywords}
+-
+-# Reference Samples:
+-# {style_reference}
+-
+-# Verified Search Data:
+-# {live_data}
+-
+-# GOAL
+-
+-# Create an editorial-quality blog that feels written by an experienced human writer.
+-
+-# Study the reference samples and learn:
+-
+-# * tone
+-# * formatting
+-# * pacing
+-# * reading level
+-# * CTA placement
+-
+-# Learn patterns only.
+-# Do not imitate wording.
+-
+-# CONTENT
+-
+-# * Length: 900ΓÇô1300 words
+-# * Match search intent
+-# * Use clear H2/H3 headings
+-# * Keep paragraph lengths varied
+-# * Each section must contribute new information
+-# * Prefer practical insight over broad explanation
+-# * Use operational examples where useful
+-# * Explain ideas through situations, observations, and outcomes
+-# * Do not force examples into every section
+-
+-# INTRODUCTION
+-
+-# Start close to the reader's real problem.
+-
+-# Choose one:
+-
+-# * business observation
+-# * practical problem
+-# * realistic situation
+-
+-# Do NOT begin with:
+-
+-# * broad industry statements
+-# * definitions
+-# * future predictions
+-# * "In today's world"
+-# * "Every day, businesses..."
+-# * "AI is changing..."
+-# * "Imagine a world..."
+-
+-# SECTION FLOW
+-
+-# Do not use one fixed structure across the entire article.
+-
+-# Different sections may use:
+-
+-# * observation ΓåÆ explanation
+-# * problem ΓåÆ impact
+-# * example ΓåÆ learning
+-# * situation ΓåÆ outcome
+-# * insight ΓåÆ recommendation
+-
+-# Some sections may:
+-
+-# * be short
+-# * focus on one idea
+-# * skip examples
+-
+-# Prioritize natural reading flow over perfect symmetry.
+-
+-# Do NOT expose internal writing labels.
+-
+-# Never output headings or phrases such as:
+-
+-# * Situation
+-# * Explanation
+-# * Outcome
+-# * Insight
+-# * Example
+-# * Implementation Advice
+-# * Call to Action
+-
+-# Use them internally only.
+-
+-# SPECIFICITY
+-
+-# Avoid generic actors:
+-
+-# * a company
+-# * businesses
+-# * organizations
+-
+-# Prefer:
+-
+-# * teams
+-# * departments
+-# * workflows
+-# * operational situations
+-
+-# Describe:
+-
+-# * what changed
+-# * why it mattered
+-# * what happened next
+-
+-# LANGUAGE
+-
+-# Write in clear business English.
+-
+-# Target approximately Grade 7ΓÇô9 reading level.
+-
+-# Prefer:
+-
+-# * common words
+-# * shorter sentences
+-# * direct explanations
+-
+-# If a simpler word works, use it.
+-
+-# Avoid:
+-
+-# * academic tone
+-# * motivational tone
+-# * corporate jargon
+-# * abstract language
+-# * dramatic technology framing
+-
+-# Avoid repeated words such as:
+-# leverage
+-# optimize
+-# enhance
+-# transform
+-# facilitate
+-# streamline
+-# robust
+-# innovation
+-# impactful
+-# cutting-edge
+-# powerful
+-# seamless
+-# revolutionize
+-# significant
+-# groundbreaking
+-
+-# AUTHORITY
+-
+-# Use statistics only from Verified Search Data.
+-
+-# Never invent numbers.
+-
+-# If no verified data exists:
+-# use examples instead.
+-
+-# SEO
+-
+-# * Use target keywords naturally
+-# * Include related concepts naturally
+-# * Avoid keyword stuffing
+-# * Prioritize readability
+-
+-# BRAND
+-
+-# Mention {website.name} only if naturally relevant.
+-# Maximum one mention.
+-
+-# CTA
+-
+-# End with practical next steps.
+-
+-# Do not sound promotional.
+-
+-# OUTPUT
+-
+-# Return ONLY valid JSON.
+-
+-# {{
+-# "title":"",
+-# "meta_description":"",
+-# "category":"",
+-# "tags":[],
+-# "excerpt":"",
+-# "body":"clean HTML only"
+-# }}
+-# """
++    # ==========================================
++    # LAYER 2: ARTICLE EXPANSION & COPYWRITER
++    # ==========================================
++    logger.info(f"Layer 2: Expanding outline into full blog draft for: {outline_data.get('post_title')}")
++    
++    sections_json_str = json.dumps(outline_data.get('sections', []), indent=2)
++    
++    layer2_user_prompt = f"""
++You are a senior editorial writer and B2B subject matter expert.
++Write a deep-dive, original blog post based on this planned outline.
++
++==================================
++PLANNING OUTLINE (Follow this structure)
++==================================
++Proposed Title: {outline_data.get('post_title')}
++Recommended Category: {outline_data.get('recommended_category')}
++Planned Sections:
++{sections_json_str}
++
++==================================
++CONTEXT & RESEARCH
++==================================
++Target Keywords: {target_keywords}
++Verified Search Data:
++{live_data}
+ 
++==================================
++WRITING DIRECTIVES (SEO + AEO + GEO FRAMEWORK)
++==================================
++1. Brand Voice & Pacing (Sound Human):
++   - Write from the collective perspective of the company/brand using collective first-person plural pronouns ("we", "our", "us") to build trust and sound human. Strictly avoid singular personal pronouns ("I", "my") that claim individual experience.
++   - Vary sentence and paragraph lengths. Mix short, punchy sentences with longer ones. Use occasional single-sentence paragraphs.
++   - Ground everything in operational reality, decisions, and workflows rather than broad theory.
++
++2. AEO (Answer Engine Optimization) Structure:
++   - Direct Answer Summaries: At the very beginning of key sections, provide a clear, direct, 1-to-2 sentence answer to the section's core query. This makes the content easily extractable for AI search summaries (Perplexity, SGE) and highly skimmable for humans.
++   - Structured Elements: Include at least one structured HTML data table (using standard table tags) or an ordered checklist mapping out steps or statistics.
++
++3. GEO (Generative Engine Optimization) Citations & Authority:
++   - Explicitly cite findings, surveys, or stats from the provided "Verified Search Data" (e.g., "According to [Source/Search Data]..."). Never fabricate statistics.
++   - High Information Gain: Provide sharp trade-offs, practical solutions, and brand-backed recommendations instead of generic encyclopedia definitions.
++
++4. Zero AI Clich├⌐s & Buzzwords:
++   - Strictly avoid: leverage, optimize, enhance, transform, facilitate, streamline, robust, innovation, impactful, cutting-edge, powerful, seamless, revolutionize, groundbreaking, synergy, enable, empower, accelerate, redefine, or next-generation.
++   - Do NOT use generic AI transition phrases (e.g. "Furthermore", "Moreover", "Ultimately", "In conclusion", "As a result", "Therefore").
++
++5. HTML Formatting:
++   - Use clean, standard HTML containing ONLY table, thead, tbody, tr, th, td, h2, h3, p, ul, ol, li, strong, a, and blockquote.
++   - Do NOT include markdown styling (like `**bold**` or `# heading`) inside the HTML body. Use HTML tags for all styling.
++
++==================================
++OUTPUT REQUIREMENT
++==================================
++Return ONLY valid JSON in the following format:
++{{
++  "title": "Final post title",
++  "meta_description": "Natural SEO meta description under 160 characters",
++  "category": "Single-word or short phrase category (e.g., Marketing, Engineering)",
++  "tags": ["tag1", "tag2"],
++  "excerpt": "A clean, plain-text summary (150-200 characters) for the preview card",
++  "body": "Your full, deep-dive article body in clean HTML format"
++}}
++"""
+     try:
+-        response = client.chat.completions.create(
++        layer2_response = client.chat.completions.create(
+             model=MODEL,
+             messages=[
+-                {'role': 'system', 'content': system_prompt},
+-                {'role': 'user', 'content': user_prompt}
++                {{'role': 'system', 'content': system_prompt}},
++                {{'role': 'user', 'content': layer2_user_prompt}}
+             ],
+             temperature=0.7,
+-            response_format={"type": "json_object"}
++            response_format={{"type": "json_object"}}
+         )
+-        content = json.loads(response.choices[0].message.content.strip())
+-        content['generation_prompt'] = user_prompt
++        content = json.loads(layer2_response.choices[0].message.content.strip())
++        content['generation_prompt'] = layer2_user_prompt
+         content['ai_model'] = MODEL
++        logger.info(f"Layer 2: Article expanded successfully: {content.get('title')} ({len(content.get('body', ''))} chars)")
+         return content
+     except Exception as e:
+-        logger.error(f"Failed to generate blog post with single prompt: {e}")
++        logger.error(f"Layer 2: Article expansion failed: {e}")
+         fallback_content = get_rich_fallback_blog(idea.title)
+-        fallback_content['generation_prompt'] = user_prompt
++        fallback_content['generation_prompt'] = layer2_user_prompt
+         fallback_content['ai_model'] = 'local-fallback'
+         return fallback_content
+ 
+@@ -2245,7 +1531,7 @@ Output ONLY the final DALL-E 3 prompt. Do not add any extra explanation or markd
+             model=MODEL,
+             messages=[{'role': 'user', 'content': prompt}],
+             max_tokens=600,
+-            temperature=0.7,
++            temperature=0.6,
+         )
+         return response.choices[0].message.content.strip()
+     except Exception as e:

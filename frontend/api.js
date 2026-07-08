@@ -8,6 +8,17 @@
   const ACCESS_KEY = 'cadence.access_token';
   const REFRESH_KEY = 'cadence.refresh_token';
   const USER_KEY = 'cadence.user';
+  const REMEMBER_KEY = 'cadence.remember_me';
+
+  // Get a token from either storage (localStorage takes priority)
+  function getStoredItem(key) {
+    return localStorage.getItem(key) || sessionStorage.getItem(key);
+  }
+
+  // Get the active storage based on remember-me setting
+  function getActiveStorage() {
+    return localStorage.getItem(REMEMBER_KEY) === 'true' ? localStorage : sessionStorage;
+  }
 
   // Helper to parse JWT payload to check expiration
   function isTokenExpired(token) {
@@ -28,13 +39,13 @@
 
   async function request(url, options = {}) {
     const headers = options.headers || {};
-    let accessToken = localStorage.getItem(ACCESS_KEY);
+    let accessToken = getStoredItem(ACCESS_KEY);
 
     // If token expired, try to refresh before sending the request
     if (accessToken && isTokenExpired(accessToken)) {
       const refreshed = await refreshAccessToken();
       if (refreshed) {
-        accessToken = localStorage.getItem(ACCESS_KEY);
+        accessToken = getStoredItem(ACCESS_KEY);
       } else {
         clearAuth();
         redirectToLogin();
@@ -103,7 +114,7 @@
   }
 
   async function refreshAccessToken() {
-    const refresh = localStorage.getItem(REFRESH_KEY);
+    const refresh = getStoredItem(REFRESH_KEY);
     if (!refresh) return false;
 
     try {
@@ -114,8 +125,8 @@
       });
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem(ACCESS_KEY, data.access);
-        if (data.refresh) localStorage.setItem(REFRESH_KEY, data.refresh);
+        getActiveStorage().setItem(ACCESS_KEY, data.access);
+        if (data.refresh) getActiveStorage().setItem(REFRESH_KEY, data.refresh);
         return true;
       }
     } catch (e) {
@@ -128,6 +139,10 @@
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+    sessionStorage.removeItem(ACCESS_KEY);
+    sessionStorage.removeItem(REFRESH_KEY);
+    sessionStorage.removeItem(USER_KEY);
   }
 
   function redirectToLogin() {
@@ -140,7 +155,7 @@
   // Check auth immediately on load
   const isAuthPage = ['login.html', 'signup.html', 'forgot-password.html', 'index.html'].some(p => window.location.pathname.includes(p)) || window.location.pathname === '/' || window.location.pathname === '/static/';
   if (!isAuthPage) {
-    const access = localStorage.getItem(ACCESS_KEY);
+    const access = getStoredItem(ACCESS_KEY);
     if (!access) {
       redirectToLogin();
     } else {
@@ -161,26 +176,39 @@
   const api = {
     request,
     clearAuth,
-    isLoggedIn: () => !!localStorage.getItem(ACCESS_KEY),
+    isLoggedIn: () => !!getStoredItem(ACCESS_KEY),
     getUser: () => {
       try {
-        return JSON.parse(localStorage.getItem(USER_KEY));
+        return JSON.parse(getStoredItem(USER_KEY));
       } catch (e) {
         return null;
       }
     },
     
     // Auth endpoints
-    async login(email, password) {
+    async login(email, password, rememberMe = true) {
       const data = await request('/auth/login/', {
         method: 'POST',
         body: JSON.stringify({ email, password })
       });
       if (data && data.access) {
-        localStorage.setItem(ACCESS_KEY, data.access);
-        localStorage.setItem(REFRESH_KEY, data.refresh);
-        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-        // Sync role to Cadence store
+        // Decide storage based on remember me
+        const storage = rememberMe ? localStorage : sessionStorage;
+        // Clear the other storage to avoid stale tokens
+        if (rememberMe) {
+          sessionStorage.removeItem(ACCESS_KEY);
+          sessionStorage.removeItem(REFRESH_KEY);
+          sessionStorage.removeItem(USER_KEY);
+        } else {
+          localStorage.removeItem(ACCESS_KEY);
+          localStorage.removeItem(REFRESH_KEY);
+          localStorage.removeItem(USER_KEY);
+        }
+        localStorage.setItem(REMEMBER_KEY, rememberMe ? 'true' : 'false');
+        storage.setItem(ACCESS_KEY, data.access);
+        storage.setItem(REFRESH_KEY, data.refresh);
+        storage.setItem(USER_KEY, JSON.stringify(data.user));
+        // Sync role to Cadence store (always in localStorage for UI state)
         localStorage.setItem("cadence.role", data.user.role === 'super_admin' ? 'super' : 'admin');
       }
       return data;
@@ -306,10 +334,32 @@
       return await request(`/websites/${id}/social/`);
     },
 
-    async connectSocial(id, platform, makeWebhookUrl) {
+    async connectSocial(id, platform, makeWebhookUrl, authType = 'none', authPayload = {}) {
       return await request(`/websites/${id}/social/`, {
         method: 'POST',
-        body: JSON.stringify({ platform, make_webhook_url: makeWebhookUrl || '' })
+        body: JSON.stringify({ 
+          platform, 
+          make_webhook_url: makeWebhookUrl || '',
+          auth_type: authType,
+          auth_payload_write: authPayload
+        })
+      });
+    },
+
+    async testConnection(id, platform, makeWebhookUrl, authType = 'none', authPayload = {}) {
+      return await request(`/websites/${id}/social/${platform}/test/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          make_webhook_url: makeWebhookUrl || '',
+          auth_type: authType,
+          auth_payload_write: authPayload
+        })
+      });
+    },
+
+    async disconnectSocial(websiteId, connId) {
+      return await request(`/websites/${websiteId}/social/${connId}/`, {
+        method: 'DELETE'
       });
     },
 
@@ -366,6 +416,10 @@
       });
     },
 
+    async getIdeaDetail(ideaId) {
+      return await request(`/content/ideas/${ideaId}/`);
+    },
+
     async approveDraft(id) {
       return await request(`/content/drafts/${id}/approve/`, {
         method: 'POST'
@@ -379,8 +433,15 @@
       });
     },
 
-    async regenerateDraft(id) {
+    async regenerateDraft(id, type = 'all') {
       return await request(`/content/drafts/${id}/regenerate/`, {
+        method: 'POST',
+        body: JSON.stringify({ type })
+      });
+    },
+
+    async injectInternalLinks(id) {
+      return await request(`/content/drafts/${id}/internal-links/`, {
         method: 'POST'
       });
     },
@@ -398,11 +459,26 @@
       });
     },
 
+    async createDraft(data) {
+      return await request('/content/drafts/', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
     async updateDraft(id, data) {
       return await request(`/content/drafts/${id}/`, {
         method: 'PATCH',
         body: JSON.stringify(data)
       });
+    },
+
+    async getDraftDetail(id) {
+      return await request(`/content/drafts/${id}/`);
+    },
+
+    async getTokenUsageStats(websiteId) {
+      return await request(`/content/usage/stats/${websiteId}/`);
     },
 
     // Logs & Analytics
@@ -498,20 +574,32 @@
           const dayName = days[dateObj.getDay()];
           const hours = String(dateObj.getHours()).padStart(2, '0');
           const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-          scheduledMap[sp.draft] = { day: dayName, time: `${hours}:${minutes}` };
+          scheduledMap[sp.draft] = { 
+            day: dayName, 
+            time: `${hours}:${minutes}`,
+            scheduled_for: sp.scheduled_for 
+          };
         });
 
         // Get drafts
         const drafts = await this.getDrafts({ website: websiteId });
         const mappedDrafts = drafts.map(d => {
-          // Find day of week from scheduled_post or mock
-          let day = 'Mon', time = '09:00';
+          let day = null, time = null, scheduled_for = null;
           if (scheduledMap[d.id]) {
             day = scheduledMap[d.id].day;
             time = scheduledMap[d.id].time;
-          } else {
-            const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-            day = days[d.id % 7];
+            scheduled_for = scheduledMap[d.id].scheduled_for;
+          } else if (d.status === 'published') {
+            const fallbackDate = d.custom_date || d.created_at;
+            if (fallbackDate) {
+              const dateObj = new Date(fallbackDate);
+              const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+              day = days[dateObj.getDay()];
+              const hours = String(dateObj.getHours()).padStart(2, '0');
+              const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+              time = `${hours}:${minutes}`;
+              scheduled_for = dateObj.toISOString();
+            }
           }
           
           return {
@@ -523,6 +611,7 @@
             status: d.status.charAt(0).toUpperCase() + d.status.slice(1),
             day: day,
             time: time,
+            scheduled_for: scheduled_for,
             words: d.word_count || 120,
             author: d.reviewed_by_name || 'AI · GPT-draft',
             excerpt: d.excerpt || (d.body ? d.body.substring(0, 100) + '...' : ''),
@@ -558,7 +647,7 @@
         };
 
         // Populate approvals
-        window.MOCK.approvals = mappedDrafts.filter(d => d.status === 'Draft').map(d => {
+        window.MOCK.approvals = mappedDrafts.filter(d => d.status === 'Draft' || d.status === 'Approved').map(d => {
           const w = mappedWebsites.find(s => s.id === d.site) || mappedWebsites[0];
           return { ...d, siteName: w.name, siteColor: w.color, siteShort: w.short };
         });

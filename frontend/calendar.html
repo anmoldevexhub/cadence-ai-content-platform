@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="workspace.css" />
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -79,6 +80,52 @@
             </div>
           </div>
         </div>
+
+        <!-- Large preview modal -->
+        <div class="modal-overlay" id="largePreviewModal">
+          <div class="modal lg" style="max-width: 960px; width: 95vw;">
+            <div class="modal__head">
+              <div class="mtxt">
+                <h3 id="largePreviewTitle">Preview Draft</h3>
+                <div class="sub" id="largePreviewSub">Full screen view</div>
+              </div>
+              <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal__body" style="padding:var(--s6); overflow-y:auto; max-height:75vh;">
+              <div id="largePreviewBody"></div>
+            </div>
+            <div class="modal__foot">
+              <button class="btn btn-primary" data-close-modal>Close preview</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Edit schedule modal -->
+        <div class="modal-overlay" id="editScheduleModal">
+          <div class="modal">
+            <div class="modal__head">
+              <div class="mtxt">
+                <h3>Schedule draft</h3>
+                <div class="sub">Set the publishing date and time for this draft.</div>
+              </div>
+              <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal__body">
+              <div class="field">
+                <label class="label">Date</label>
+                <input class="input" type="date" id="esDate" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label class="label">Time</label>
+                <input class="input" type="time" id="esTime" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+              </div>
+            </div>
+            <div class="modal__foot">
+              <button class="btn btn-ghost" data-close-modal>Cancel</button>
+              <button class="btn btn-primary" id="esSave"><i data-lucide="calendar"></i> Schedule</button>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
@@ -102,29 +149,68 @@
     const todayIndex = new Date().weekday();
     const today = daysOfWeek[todayIndex];
 
-    // Calculate dates of the current week dynamically
+    // Calculate dates of the current week dynamically based on offset
+    let currentWeekOffset = 0;
     const dates = {};
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    
-    const nowObj = new Date();
-    const mondayObj = new Date(nowObj.setDate(nowObj.getDate() - nowObj.weekday()));
-    
+    const weekDates = [];
     const formatMonthDay = (dateObj) => `${months[dateObj.getMonth()]} ${dateObj.getDate()}`;
     
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      const dObj = new Date(mondayObj);
-      dObj.setDate(mondayObj.getDate() + i);
-      const dayName = daysOfWeek[i];
-      dates[dayName] = dObj.getDate();
-      weekDates.push(dObj);
+    function updateWeek() {
+      const nowObj = new Date();
+      nowObj.setDate(nowObj.getDate() + (currentWeekOffset * 7));
+      const mondayObj = new Date(nowObj.setDate(nowObj.getDate() - nowObj.weekday()));
+      
+      weekDates.length = 0;
+      for (let i = 0; i < 7; i++) {
+        const dObj = new Date(mondayObj);
+        dObj.setDate(mondayObj.getDate() + i);
+        const dayName = daysOfWeek[i];
+        dates[dayName] = dObj.getDate();
+        weekDates.push(dObj);
+      }
+      
+      const startStr = formatMonthDay(weekDates[0]);
+      const endStr = formatMonthDay(weekDates[6]);
+      const yearStr = weekDates[6].getFullYear();
+      document.getElementById("weekLabel").textContent = `${startStr} – ${endStr}, ${yearStr}`;
     }
     
-    // Set week label dynamically
-    const startStr = formatMonthDay(weekDates[0]);
-    const endStr = formatMonthDay(weekDates[6]);
-    const yearStr = weekDates[6].getFullYear();
-    document.getElementById("weekLabel").textContent = `${startStr} – ${endStr}, ${yearStr}`;
+    updateWeek();
+
+    // Set min date for date inputs to prevent past scheduling
+    const todayObj = new Date();
+    const yyyy = todayObj.getFullYear();
+    const mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(todayObj.getDate()).padStart(2, '0');
+    const localTodayStr = `${yyyy}-${mm}-${dd}`;
+    const esDateInput = document.getElementById("esDate");
+    const esTimeInput = document.getElementById("esTime");
+    if (esDateInput) {
+      esDateInput.min = localTodayStr;
+    }
+
+    window.updateMinTime = function() {
+      if (esDateInput && esTimeInput) {
+        const tObj = new Date();
+        const y = tObj.getFullYear();
+        const m = String(tObj.getMonth() + 1).padStart(2, '0');
+        const d = String(tObj.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+        
+        if (esDateInput.value === todayStr) {
+          const hh = String(tObj.getHours()).padStart(2, '0');
+          const min = String(tObj.getMinutes()).padStart(2, '0');
+          esTimeInput.min = `${hh}:${min}`;
+        } else {
+          esTimeInput.removeAttribute("min");
+        }
+      }
+    };
+    if (esDateInput) {
+      esDateInput.addEventListener("change", window.updateMinTime);
+      esDateInput.addEventListener("input", window.updateMinTime);
+    }
 
     // Get user sites
     const user = role === "super" ? M.users.super : M.users.admin;
@@ -137,11 +223,144 @@
 
     // working set of cards
     let cards = [];
+
+    function previewHTML(siteId, plat, title, body, coverImage, tags, category, createdAt, authorName, customDate) {
+      const site = M.site(siteId) || M.websites[0];
+      const guide = site.style_guide || {};
+      const primaryFont = guide.primary_font ? guide.primary_font : 'inherit';
+      const headingFont = guide.heading_font ? guide.heading_font : primaryFont;
+      const headingColor = guide.heading_color ? guide.heading_color : 'inherit';
+      const textColor = guide.text_color ? guide.text_color : 'inherit';
+
+      const isColorLight = (c) => {
+        if (!c || c === 'inherit' || c === 'transparent') return false;
+        c = c.replace(/!important/gi, '').trim().toLowerCase();
+        return ['white', '#fff', '#ffffff'].includes(c);
+      };
+
+      const isColorDark = (c) => {
+        if (!c || c === 'inherit' || c === 'transparent') return false;
+        c = c.replace(/!important/gi, '').trim().toLowerCase();
+        return ['black', '#000', '#000000'].includes(c);
+      };
+
+      const styleId = `style-preview-${site.id}`;
+      let styleTag = document.getElementById(styleId);
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = styleId;
+        document.head.appendChild(styleTag);
+      }
+      styleTag.textContent = `
+        .preview-wrapper-${site.id} { font-family: ${primaryFont}, sans-serif !important; }
+        .preview-wrapper-${site.id} h2, .preview-wrapper-${site.id} h3 { font-family: ${headingFont}, sans-serif !important; }
+        html[data-theme="light"] .preview-wrapper-${site.id} { color: ${isColorLight(textColor) ? 'var(--text)' : textColor} !important; }
+        html[data-theme="light"] .preview-wrapper-${site.id} h2 { color: ${isColorLight(headingColor) ? 'var(--text)' : headingColor} !important; }
+        html[data-theme="dark"] .preview-wrapper-${site.id} { color: ${isColorDark(textColor) ? 'var(--text)' : textColor} !important; }
+        html[data-theme="dark"] .preview-wrapper-${site.id} h2 { color: ${isColorDark(headingColor) ? 'var(--text)' : headingColor} !important; }
+      `;
+
+      const SAMPLE = {
+        Blog: { body: ["Pour-over coffee rewards patience."] },
+        LinkedIn: "Motivation is a terrible training partner.",
+        Instagram: { cap: "Stale beans? Here's how to tell." },
+        YouTube: { desc: "Home roasting guide." }
+      };
+
+      if (plat === "Blog") {
+        let blogBody = typeof body === "string" ? body : (body && body.body ? body.body.map(p => `<p>${p}</p>`).join("") : `<p>${body || ""}</p>`);
+        let tagsHTML = "";
+        if (tags && tags.length > 0) {
+          tagsHTML = `<div class="editor-tags-list mt4" style="border-top:1px solid var(--border); padding-top:var(--s3); margin-top:var(--s4); display:flex; flex-wrap:wrap; gap:6px;">` +
+            tags.map(t => {
+              const parts = t.split(':');
+              const name = parts[0];
+              const style = parts[1] || 'neutral';
+              let styleClass = 'badge-neutral';
+              if (style === 'primary') styleClass = 'badge-primary';
+              else if (style === 'success') styleClass = 'badge-success';
+              else if (style === 'danger') styleClass = 'badge-error';
+              else if (style === 'warning') styleClass = 'badge-scheduled';
+              return `<span class="badge ${styleClass}" style="text-transform:uppercase;font-size:10px">${name}</span>`;
+            }).join(" ") + `</div>`;
+        }
+        const coverHTML = coverImage 
+          ? `<img class="bp-cover-img" src="${coverImage}" style="width:100%; height:auto; border-radius:var(--r-md); margin-bottom:var(--s4); display:block; border:none;" />` 
+          : `<div class="bp-cover">${I("image","style='width:28px;height:28px'")}</div>`;
+
+        const dateObj = createdAt ? new Date(createdAt) : new Date();
+        const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        
+        const displayAuthor = authorName !== undefined ? authorName : site.name;
+        const displayDate = customDate !== undefined ? customDate : formattedDate;
+        const displayCategory = category !== undefined ? category : (site.industry || "Marketing");
+
+        let bylineItems = [];
+        if (displayAuthor) bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("user", "style='width:14px;height:14px;color:var(--text-muted)'")} By: ${displayAuthor}</span>`);
+        if (displayDate) bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("calendar", "style='width:14px;height:14px;color:var(--text-muted)'")} ${displayDate}</span>`);
+        if (displayCategory) bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("folder", "style='width:14px;height:14px;color:var(--text-muted)'")} ${displayCategory}</span>`);
+        bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("message-square", "style='width:14px;height:14px;color:var(--text-muted)'")} 0 Comments</span>`);
+
+        const bylineHTML = `<div class="bp-byline" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin: var(--s2) 0 var(--s4) 0;">` +
+          bylineItems.join(`<span style="color: var(--border)">/</span>`) + `</div>`;
+
+        return `<div class="bp preview-wrapper-${site.id}"><div class="bp-kicker">Article</div><h2>${title}</h2>
+          ${bylineHTML}
+          ${coverHTML}
+          ${blogBody}
+          ${tagsHTML}</div>`;
+      }
+      if (plat === "LinkedIn") {
+        const txt = typeof body === "string" ? body : SAMPLE.LinkedIn;
+        const coverHTML = coverImage 
+          ? `<div class="li-cover" style="margin-top:var(--s3); border-radius:var(--r-sm); overflow:hidden; border:1px solid var(--border);"><img src="${coverImage}" style="width:100%; height:auto; display:block;" /></div>` 
+          : "";
+        return `<div class="li"><div class="li-top"><span class="avatar li-av" style="background:${site.color}">${site.short}</span>
+          <div style="flex:1"><div class="li-nm">${site.name}</div><div class="li-hl">${site.industry}</div><div class="li-time">Just now · ${I("globe","style='width:11px;height:11px'")}</div></div>${I("more-horizontal")}</div>
+          <div class="li-body" style="white-space: pre-wrap;">${txt}${coverHTML}</div>
+          <div class="li-bar"><button>${I("thumbs-up")} Like</button><button>${I("message-circle")} Comment</button><button>${I("repeat-2")} Repost</button><button>${I("send")} Send</button></div></div>`;
+      }
+      if (plat === "Instagram") {
+        const txt = typeof body === "string" ? body : SAMPLE.Instagram.cap;
+        const imgStyle = coverImage 
+          ? `style="background-image: url('${coverImage}'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: var(--bg-subtle);"`
+          : "";
+        const imgContent = coverImage ? "" : I("image", "style='width:32px;height:32px'");
+        return `<div class="ig"><div class="ig-top"><span class="ig-av"><span style="color:${site.color}">${site.short}</span></span><span class="ig-nm">${site.id}</span>${I("more-horizontal")}</div>
+          <div class="ig-img" ${imgStyle}>${imgContent}<span class="ig-tag">${title.slice(0,28)}</span></div>
+          <div class="ig-actions">${I("heart")}${I("message-circle")}${I("send")}<span class="sp">${I("bookmark")}</span></div>
+          <div class="ig-cap"><b>${site.id}</b> ${txt}</div></div>`;
+      }
+      if (plat === "YouTube") {
+        const txt = typeof body === "string" ? body : SAMPLE.YouTube.desc;
+        const thumbStyle = coverImage 
+          ? `style="background-image: url('${coverImage}'); background-size: cover; background-position: center;"`
+          : "";
+        return `<div class="yt"><div class="yt-thumb" ${thumbStyle}><span class="play">${I("play")}</span><span class="dur">8:42</span></div>
+          <div class="yt-info"><span class="avatar yt-av" style="background:${site.color}">${site.short}</span>
+          <div><div class="yt-t">${title}</div><div class="yt-ch">${site.name} · ${txt.substring(0, 80)}...</div></div></div></div>`;
+      }
+      return "";
+    }
+
+    function isCardInCurrentWeek(c) {
+      if (!c.scheduled_for) {
+        return false;
+      }
+      const cardDate = new Date(c.scheduled_for);
+      const monday = new Date(weekDates[0]);
+      monday.setHours(0, 0, 0, 0);
+      const sunday = new Date(weekDates[6]);
+      sunday.setHours(23, 59, 59, 999);
+      return cardDate >= monday && cardDate <= sunday;
+    }
+
     function loadCards() {
       cards = M.content.map(c => ({ ...c })).filter(c => c.status === "Scheduled" || c.status === "Published");
       if (role !== "super") {
         cards = cards.filter(c => userSiteIds.includes(String(c.site)));
       }
+      cards = cards.filter(isCardInCurrentWeek);
     }
     loadCards();
 
@@ -153,12 +372,14 @@
         && (filters.status === "all" || c.status === filters.status);
     }
 
-    function cardHTML(c) {
+    function cardHTML(c, isPastDate = false) {
       const p = M.platMeta(c.platform), w = M.site(c.site);
-      return `<div class="cal-card" draggable="true" data-id="${c.id}" style="border-left:3px solid ${p.color}; position: relative;">
-        <button class="icon-btn btn-sm cal-card-delete" data-del-id="${c.id}" title="Remove slot" style="position: absolute; top: var(--s2); right: var(--s2); padding: 4px; display: none; color: var(--text-muted); background: var(--surface-2); border-radius: var(--r-sm); z-index: 10;"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>
+      const isPublished = c.status === "Published";
+      const isFrozen = isPublished || isPastDate;
+      return `<div class="cal-card ${isPastDate ? 'frozen' : ''}" draggable="${!isFrozen}" data-id="${c.id}" style="border-left:3px solid ${p.color}; position: relative; ${isFrozen ? 'cursor: default; background: var(--surface-2); opacity: 0.85;' : 'cursor: grab;'}">
+        ${isFrozen ? '' : `<button class="icon-btn btn-sm cal-card-delete" data-del-id="${c.id}" title="Remove slot" style="position: absolute; top: var(--s2); right: var(--s2); padding: 4px; display: none; color: var(--text-muted); background: var(--surface-2); border-radius: var(--r-sm); z-index: 10;"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>`}
         <div class="cc-top"><span class="icon-tile tile-${p.tile}" style="width:22px;height:22px;border-radius:6px">${I(p.icon,"style='width:12px;height:12px'")}</span>
-          <span class="cc-time mono">${c.time}</span><span class="badge badge-${c.status.toLowerCase()}" style="margin-left:auto; margin-right: 20px;">${c.status}</span></div>
+          <span class="cc-time mono" style="${isFrozen ? 'text-decoration: none !important; cursor: default !important;' : ''}">${c.time}</span><span class="badge badge-${c.status.toLowerCase()}" style="margin-left:auto; margin-right: 20px;">${c.status}</span></div>
         <div class="cc-title" style="margin-right: 15px;">${c.title}</div>
         <div class="cc-foot"><span class="favicon" style="width:16px;height:16px;border-radius:4px;font-size:9px;background:${w.color}">${w.short}</span> ${w.name}</div>
       </div>`;
@@ -192,12 +413,19 @@
     function render() {
       const board = document.getElementById("board");
       board.innerHTML = M.schedule.days.map(d => {
+        const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+        const colDate = new Date(weekDates[dayOffsets[d]]);
+        colDate.setHours(0, 0, 0, 0);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const isPastDate = colDate < todayStart;
+
         const items = cards.filter(c => c.day === d && visible(c)).sort((a,b) => a.time.localeCompare(b.time));
-        return `<div class="cal-col" data-day="${d}">
+        return `<div class="cal-col ${isPastDate ? 'cal-col-frozen' : ''}" data-day="${d}">
           <div class="cal-head"><div><div class="cal-dow">${d}</div><div class="cal-date">${months[weekDates[daysOfWeek.indexOf(d)].getMonth()] || 'Jun'} ${dates[d]}</div></div>
             <span class="cal-count">${items.length}</span></div>
-          <div class="cal-slots" data-day="${d}">
-            ${items.map(cardHTML).join("") || `<div class="cal-empty" data-add-day="${d}">${I("plus")}<span>Drop or add</span></div>`}
+          <div class="cal-slots ${isPastDate ? 'cal-slots-frozen' : ''}" data-day="${d}" style="${isPastDate ? 'background: var(--bg-subtle); opacity: 0.85;' : ''}">
+            ${items.map(c => cardHTML(c, isPastDate)).join("") || (isPastDate ? `<div class="cal-empty frozen" style="cursor: not-allowed; opacity: 0.5;"><span>Passed</span></div>` : `<div class="cal-empty" data-add-day="${d}">${I("plus")}<span>Drop or add</span></div>`)}
           </div></div>`;
       }).join("");
 
@@ -227,6 +455,81 @@
         });
       });
 
+      // Wire card click for detailed preview
+      document.querySelectorAll(".cal-card").forEach(card => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest(".cal-card-delete") || e.target.closest(".cc-time")) {
+            return;
+          }
+          const cardId = card.dataset.id;
+          const d = cards.find(x => String(x.id) === String(cardId));
+          if (!d) return;
+          
+          document.getElementById("largePreviewTitle").textContent = d.title;
+          document.getElementById("largePreviewSub").textContent = `${d.platform} · ${d.status} details`;
+          const bodyContainer = document.getElementById("largePreviewBody");
+          if (bodyContainer) {
+            bodyContainer.innerHTML = previewHTML(
+              d.site,
+              d.platform,
+              d.title,
+              d.body || "No content available",
+              d.cover_image,
+              d.tags || [],
+              d.category,
+              d.created_at,
+              d.author_name,
+              d.custom_date
+            );
+          }
+          C.openModal("largePreviewModal");
+        });
+      });
+
+      // Wire time clicks for editing
+      document.querySelectorAll(".cc-time").forEach(timeBtn => {
+        const cardEl = timeBtn.closest(".cal-card");
+        if (!cardEl) return;
+        const cardId = cardEl.dataset.id;
+        const card = cards.find(c => String(c.id) === String(cardId));
+        if (card) {
+          const dayIndex = daysOfWeek.indexOf(card.day);
+          const currentDate = weekDates[dayIndex];
+          if (currentDate) {
+            const checkDate = new Date(currentDate);
+            checkDate.setHours(0,0,0,0);
+            const todayStart = new Date();
+            todayStart.setHours(0,0,0,0);
+            
+            if (card.status === "Published" || checkDate < todayStart) {
+              timeBtn.style.cursor = "default";
+              timeBtn.style.textDecoration = "none";
+              timeBtn.title = "";
+              return;
+            }
+          }
+        }
+        timeBtn.style.cursor = "pointer";
+        timeBtn.style.textDecoration = "underline";
+        timeBtn.title = "Click to edit time";
+        timeBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (!card) return;
+          
+          const dayIndex = daysOfWeek.indexOf(card.day);
+          const currentDate = weekDates[dayIndex];
+          const yyyy = currentDate.getFullYear();
+          const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
+          const dd = String(currentDate.getDate()).padStart(2, '0');
+          document.getElementById("esDate").value = `${yyyy}-${mm}-${dd}`;
+          document.getElementById("esTime").value = card.time;
+          
+          if (window.updateMinTime) window.updateMinTime();
+          window.activeEditCard = card;
+          C.openModal("editScheduleModal");
+        });
+      });
+
       C.refreshIcons();
       wireDnD();
     }
@@ -234,28 +537,66 @@
     function wireDnD() {
       let dragId = null;
       document.querySelectorAll(".cal-card").forEach(card => {
+        const cardId = card.dataset.id;
+        const c = cards.find(x => String(x.id) === String(cardId));
+        const isPublished = c && c.status === "Published";
+        let isPastDate = false;
+        if (c && c.day) {
+          const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+          const colDate = new Date(weekDates[dayOffsets[c.day]]);
+          colDate.setHours(0, 0, 0, 0);
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          isPastDate = colDate < todayStart;
+        }
+
+        if (isPublished || isPastDate) {
+          card.setAttribute("draggable", "false");
+          card.style.cursor = "default";
+          return;
+        }
+
         card.addEventListener("dragstart", e => { dragId = card.dataset.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
         card.addEventListener("dragend", () => { dragId = null; document.querySelectorAll(".cal-card").forEach(c=>c.classList.remove("dragging")); document.querySelectorAll(".cal-slots").forEach(s=>s.classList.remove("drop-on")); });
       });
+
       document.querySelectorAll(".cal-slots").forEach(slot => {
-        slot.addEventListener("dragover", e => { e.preventDefault(); slot.classList.add("drop-on"); });
+        const day = slot.dataset.day;
+        const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+        const colDate = new Date(weekDates[dayOffsets[day]]);
+        colDate.setHours(0, 0, 0, 0);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const isPastDate = colDate < todayStart;
+
+        slot.addEventListener("dragover", e => {
+          if (isPastDate) return;
+          e.preventDefault();
+          slot.classList.add("drop-on");
+        });
         slot.addEventListener("dragleave", () => slot.classList.remove("drop-on"));
         slot.addEventListener("drop", async e => {
-          e.preventDefault(); slot.classList.remove("drop-on");
+          e.preventDefault();
+          slot.classList.remove("drop-on");
+          if (isPastDate) {
+            C.toast({ type: "warning", title: "Rescheduling blocked", desc: "Cannot schedule or move posts to past dates." });
+            return;
+          }
           const card = cards.find(c => c.id === dragId);
           if (card && card.day !== slot.dataset.day) {
-            // Calculate date for the new day
-            const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
-            const todayDate = new Date();
-            const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday())); // Monday
-            const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[slot.dataset.day]));
+            const targetDate = new Date(weekDates[dayOffsets[slot.dataset.day]]);
             const timeParts = card.time.split(':');
             targetDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1] || 0), 0, 0);
+
+            const now = new Date();
+            if (targetDate < now) {
+              C.toast({ type: "warning", title: "Rescheduling blocked", desc: `Cannot schedule posts in the past. Today at ${card.time} has already passed.` });
+              return;
+            }
 
             try {
               await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
               card.day = slot.dataset.day; 
-              // Refresh mock data from backend and re-render
               await M.syncMockData();
               loadCards();
               render();
@@ -287,11 +628,15 @@
       }
       
       const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
-      const todayDate = new Date();
-      const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday()));
-      const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[selectedDayForAdd]));
+      const targetDate = new Date(weekDates[dayOffsets[selectedDayForAdd]]);
       const timeParts = timeVal.split(':');
       targetDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1] || 0), 0, 0);
+
+      const now = new Date();
+      if (targetDate < now) {
+        C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule posts in the past." });
+        return;
+      }
 
       try {
         await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
@@ -306,21 +651,76 @@
       }
     });
 
-    // auto-schedule: take approved drafts and distribute
+    // esSave modal save action
+    document.getElementById("esSave").addEventListener("click", async () => {
+      const card = window.activeEditCard;
+      if (!card) return;
+      
+      const dateVal = document.getElementById("esDate").value;
+      const timeVal = document.getElementById("esTime").value;
+      
+      if (!dateVal || !timeVal) {
+        C.toast({ type: "warning", title: "Date and Time are required" });
+        return;
+      }
+      
+      const targetDate = new Date(`${dateVal}T${timeVal}:00`);
+      
+      const now = new Date();
+      if (targetDate < now) {
+        C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule posts in the past." });
+        return;
+      }
+
+      const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const newDay = daysShort[targetDate.getDay()];
+      
+      try {
+        await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+        C.closeModal("editScheduleModal");
+        await M.syncMockData();
+        loadCards();
+        render();
+        C.toast({ type: "success", title: "Schedule updated", desc: `Set to ${newDay} at ${timeVal}` });
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Failed to update schedule", desc: err.message });
+      }
+    });
+
+    // auto-schedule: take approved drafts and distribute only on future/today dates of this week
     document.getElementById("autoBtn").addEventListener("click", async function () {
       this.disabled = true; this.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Scheduling…'; lucide.createIcons();
       const approved = M.content.filter(c => c.status === "Approved" && userSiteIds.includes(String(c.site)));
-      const days = M.schedule.days;
       
+      if (!approved.length) {
+        C.toast({ type: "info", title: "Nothing to schedule", desc: "No approved drafts are available for auto-scheduling." });
+        this.disabled = false; this.innerHTML = '<i data-lucide="wand-sparkles"></i> Auto-schedule week'; lucide.createIcons();
+        return;
+      }
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const availableDates = weekDates.filter(d => {
+        const checkDate = new Date(d);
+        checkDate.setHours(0, 0, 0, 0);
+        return checkDate >= todayStart;
+      });
+
+      if (!availableDates.length) {
+        C.toast({ type: "warning", title: "Auto-schedule blocked", desc: "All days in this week have already passed." });
+        this.disabled = false; this.innerHTML = '<i data-lucide="wand-sparkles"></i> Auto-schedule week'; lucide.createIcons();
+        return;
+      }
+
       try {
         for (let i = 0; i < approved.length; i++) {
           const card = approved[i];
-          const targetDay = days[(i * 2 + 1) % 7];
-          const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
-          const todayDate = new Date();
-          const startOfWeek = new Date(todayDate.setDate(todayDate.getDate() - todayDate.weekday()));
-          const targetDate = new Date(startOfWeek.setDate(startOfWeek.getDate() + dayOffsets[targetDay]));
-          targetDate.setHours(9 + (i % 3) * 2, 0, 0, 0); // e.g., 09:00, 11:00, 13:00
+          const targetDate = new Date(availableDates[i % availableDates.length]);
+          const round = Math.floor(i / availableDates.length);
+          const hour = 9 + (round * 4); // 9, 13, 17, 21...
+          targetDate.setHours(hour, 0, 0, 0);
 
           await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
         }
@@ -328,7 +728,7 @@
         await M.syncMockData();
         loadCards();
         render();
-        C.toast({ type: "success", title: "Week auto-scheduled", desc: `${approved.length} approved drafts distributed Mon–Sun` });
+        C.toast({ type: "success", title: "Week auto-scheduled", desc: `${approved.length} approved drafts distributed on remaining days` });
       } catch (err) {
         console.error(err);
         C.toast({ type: "error", title: "Auto-scheduling failed", desc: err.message });
@@ -337,8 +737,18 @@
       }
     });
 
-    document.getElementById("prevWeek").addEventListener("click", () => C.toast({type:"info",title:"Previous week"}));
-    document.getElementById("nextWeek").addEventListener("click", () => C.toast({type:"info",title:"Next week"}));
+    document.getElementById("prevWeek").addEventListener("click", () => {
+      currentWeekOffset--;
+      updateWeek();
+      loadCards();
+      render();
+    });
+    document.getElementById("nextWeek").addEventListener("click", () => {
+      currentWeekOffset++;
+      updateWeek();
+      loadCards();
+      render();
+    });
 
     render();
     C.refreshIcons();
@@ -356,6 +766,11 @@
     .cal-board { display:grid; grid-template-columns:repeat(7,1fr); gap:var(--s3); align-items:start; }
     @media (max-width:1200px){ .cal-board { grid-template-columns:repeat(7,minmax(150px,1fr)); overflow-x:auto; padding-bottom:var(--s3); } }
     .cal-col { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-lg); height:520px; display:flex; flex-direction:column; }
+    .cal-col-frozen { background: var(--bg-subtle) !important; opacity: 0.9; border-color: var(--border-subtle); }
+    .cal-slots-frozen { background: var(--bg-subtle) !important; }
+    .cal-card.frozen { background: var(--bg-subtle) !important; opacity: 0.85; border-color: var(--border-subtle) !important; cursor: default !important; }
+    .cal-card.frozen:hover { box-shadow: none !important; border-color: var(--border-subtle) !important; }
+    .cal-empty.frozen { background: var(--bg-subtle) !important; border-color: var(--border-subtle) !important; color: var(--text-faint) !important; cursor: not-allowed !important; }
     .cal-head { display:flex; align-items:center; gap:8px; padding:var(--s3) var(--s3); border-bottom:1px solid var(--border); flex-shrink:0; }
     .cal-dow { font-weight:700; font-size:var(--fs-md); }
     .cal-date { font-size:var(--fs-xs); color:var(--text-muted); }
@@ -366,8 +781,8 @@
     .cal-slots::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:99px; }
     .cal-slots::-webkit-scrollbar-thumb:hover { background:var(--text-faint); }
     .cal-slots.drop-on { background:var(--primary-soft); outline:2px dashed var(--primary); outline-offset:-4px; }
-    .cal-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:10px; cursor:grab; box-shadow:var(--sh-xs); transition:box-shadow .12s, transform .08s; flex-shrink:0; }
-    .cal-card:hover { box-shadow:var(--sh-md); }
+    .cal-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:10px; cursor:pointer; box-shadow:var(--sh-xs); transition:box-shadow .12s, transform .08s, border-color .15s; flex-shrink:0; }
+    .cal-card:hover { box-shadow:var(--sh-md); border-color: var(--border-strong); }
     .cal-card.dragging { opacity:.4; }
     .cal-card:active { cursor:grabbing; }
     .cc-top { display:flex; align-items:center; gap:7px; margin-bottom:7px; }

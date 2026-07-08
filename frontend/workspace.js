@@ -6,6 +6,18 @@
   const params = new URLSearchParams(location.search);
   let site = M.site(params.get("site")) || M.websites[0];
 
+  // Intercept relative domain links in content previews/editor to prevent local 404 redirects (e.g. www.devexhub.com -> https://www.devexhub.com)
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a");
+    if (a && a.closest(".bp, .li, .ig, .yt, .rich-editor, #largePreviewBody, #draftPreviewContent")) {
+      const href = a.getAttribute("href");
+      if (href && href.trim() && !/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(href.trim())) {
+        e.preventDefault();
+        window.open("https://" + href.trim(), "_blank");
+      }
+    }
+  });
+
   /* ---------- hero ---------- */
   document.getElementById("bcName").textContent = site.name;
   document.getElementById("wsName").textContent = site.name;
@@ -23,33 +35,72 @@
   document.getElementById("visitBtn").addEventListener("click", () => window.open("https://" + site.url, "_blank"));
 
   /* ---------- overview ---------- */
+  const siteContent = M.content.filter(c => c.site === site.id);
+
+  // Calculate live stats from actual content
+  const publishedCount = siteContent.filter(c => c.status === "Published" || c.status === "published").length;
+  const scheduledCount = siteContent.filter(c => c.status === "Scheduled" || c.status === "scheduled").length;
+  const pendingCount = siteContent.filter(c => c.status === "Draft" || c.status === "draft").length;
+  const totalCount = siteContent.length;
+
   const ovStats = [
-    { l: "Posts published", v: site.published, d: site.engagement, icon: "send", tile: "blog" },
-    { l: "Scheduled", v: site.scheduled, d: "this week", icon: "calendar-clock", tile: "linkedin" },
-    { l: "Pending approval", v: site.pending, d: "needs review", icon: "clock", tile: "youtube" },
-    { l: "Total posts", v: site.posts, d: "all time", icon: "layers", tile: "instagram" },
+    { l: "Posts published", v: publishedCount, d: site.engagement, icon: "send", tile: "blog" },
+    { l: "Scheduled", v: scheduledCount, d: "this week", icon: "calendar-clock", tile: "linkedin" },
+    { l: "Pending approval", v: pendingCount, d: "needs review", icon: "clock", tile: "youtube" },
+    { l: "Total posts", v: totalCount, d: "all time", icon: "layers", tile: "instagram" },
   ];
   document.getElementById("ovStats").innerHTML = ovStats.map(s => `
     <div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div>
       <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up muted" style="font-weight:500">${s.d}</div></div>`).join("");
+  // Sort by created_at descending
+  const sortedContent = [...siteContent].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  const recentContent = sortedContent.slice(0, 5);
 
-  const siteContent = M.content.filter(c => c.site === site.id);
-  document.getElementById("ovPipeline").innerHTML = siteContent.length ? siteContent.map(c => {
+  let pipelineHTML = recentContent.map(c => {
     const p = M.platMeta(c.platform);
-    return `<div class="pipe-row"><span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
-      <span class="pr-t">${c.title}</span><span class="badge badge-${c.status.toLowerCase()}">${c.status}</span></div>`;
-  }).join("") : `<div class="empty"><div class="empty-art">${I("file-plus")}</div><h3>No content yet</h3><p>Generate your first drafts to get started.</p></div>`;
+    return `<div class="pipe-row" style="cursor: pointer; padding: 11px var(--s2); border-radius: var(--r-sm); transition: background 0.15s ease;" onclick="window.previewDraftFromWeekChip('${c.id}')" title="Click to view details">
+      <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+      <span class="pr-t" style="margin-left: 4px;">${c.title}</span>
+      <span class="badge badge-${c.status.toLowerCase()}">${c.status}</span>
+    </div>`;
+  }).join("");
 
-  const chanData = [["Blog","blog",96,"var(--blog)"],["LinkedIn","linkedin",142,"var(--linkedin)"],["YouTube","youtube",58,"var(--youtube)"],["Instagram","instagram",188,"var(--instagram)"]];
-  const chanMax = 188;
+  if (siteContent.length > 5) {
+    pipelineHTML += `
+      <div style="padding: var(--s3) 0 var(--s1); text-align: center; border-top: 1px solid var(--border); margin-top: var(--s2);">
+        <button class="btn btn-soft btn-sm" data-tab="generate" style="font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);">
+          View all ${siteContent.length} drafts
+        </button>
+      </div>`;
+  }
+
+  document.getElementById("ovPipeline").innerHTML = pipelineHTML || `<div class="empty"><div class="empty-art">${I("file-plus")}</div><h3>No content yet</h3><p>Generate your first drafts to get started.</p></div>`;
+
+  const counts = { Blog: 0, LinkedIn: 0, YouTube: 0, Instagram: 0 };
+  siteContent.forEach(c => {
+    const platform = c.chan || c.platform;
+    if (counts[platform] !== undefined) {
+      counts[platform]++;
+    }
+  });
+
+  const chanData = [
+    ["Blog", "blog", counts.Blog, "var(--blog)"],
+    ["LinkedIn", "linkedin", counts.LinkedIn, "var(--linkedin)"],
+    ["YouTube", "youtube", counts.YouTube, "var(--youtube)"],
+    ["Instagram", "instagram", counts.Instagram, "var(--instagram)"]
+  ];
+  const chanMax = Math.max(...Object.values(counts), 1);
   document.getElementById("ovChannels").innerHTML = chanData.map(([n,t,v,col]) => `
     <div><div class="row-between mb2"><span class="row gap2"><span class="icon-tile tile-${t}" style="width:24px;height:24px;border-radius:6px">${I(M.platMeta(n).icon,"style='width:13px;height:13px'")}</span> ${n}</span><span class="fw6 mono">${v}</span></div>
       <div class="chan-bar"><i style="width:${Math.round(v/chanMax*100)}%;background:${col}"></i></div></div>`).join("");
 
-  /* ---------- calendar week ---------- */
+  /* ---------- calendar week (full cal-board, mirrors global calendar) ---------- */
   const todayIndex = new Date().getDay();
   const days = M.schedule.days;
   const today = days[todayIndex === 0 ? 6 : todayIndex - 1];
+
+  let wsWeekOffset = 0;
 
   window.previewDraftFromWeekChip = function(draftId) {
     const d = siteContent.find(x => String(x.id) === String(draftId));
@@ -63,33 +114,392 @@
     C.openModal("largePreviewModal");
   };
 
-  document.getElementById("wsWeek").innerHTML = days.map(d => {
-    const items = siteContent.filter(c => c.day === d && c.status !== "Draft");
-    return `<div class="week-col ${d===today?'is-today':''}"><div class="week-day"><span>${d}</span>${d===today?'<span class="badge badge-primary txs">Today</span>':''}</div>
-      <div class="week-items">${items.length ? items.map(c => { const p = M.platMeta(c.platform);
-        return `<div class="week-chip" title="${c.title}" style="border-left: 3px solid ${p.color}; cursor: pointer;" onclick="window.previewDraftFromWeekChip('${c.id}')"><span class="icon-tile tile-${p.tile}" style="width:20px;height:20px;border-radius:4px">${I(p.icon,"style='width:11px;height:11px'")}</span>
-          <span class="wc-txt"><span class="wc-time">${c.time}</span><span class="wc-site">${c.platform}</span></span></div>`; }).join("") : '<div class="week-empty">—</div>'}</div></div>`;
-  }).join("");
+  function renderWorkspaceCalendar() {
+    const todayDate = new Date();
+    todayDate.setDate(todayDate.getDate() + (wsWeekOffset * 7));
+    const currentDayOfWeek = todayDate.getDay() === 0 ? 6 : todayDate.getDay() - 1;
+    const startOfWeek = new Date(todayDate);
+    startOfWeek.setDate(todayDate.getDate() - currentDayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    // Week dates array for each day
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      weekDates.push(d);
+    }
+
+    // Format week label
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const startStr = `${months[startOfWeek.getMonth()]} ${startOfWeek.getDate()}`;
+    const endStr   = `${months[endOfWeek.getMonth()]} ${endOfWeek.getDate()}`;
+    const yearStr  = endOfWeek.getFullYear();
+
+    const weekLabelEl = document.getElementById("wsWeekLabel");
+    if (weekLabelEl) {
+      weekLabelEl.textContent = wsWeekOffset === 0
+        ? `This week  ·  ${startStr} – ${endStr}, ${yearStr}`
+        : `${startStr} – ${endStr}, ${yearStr}`;
+    }
+
+    // Active platform filter
+    const wsCalPlatFilter = document.getElementById("wsCalPlatFilter");
+    const activePlatBtn = wsCalPlatFilter ? wsCalPlatFilter.querySelector("button.active") : null;
+    const activePlat = activePlatBtn ? activePlatBtn.dataset.p : "all";
+
+    // Cards for this week from this site
+    let wsCards = siteContent.filter(c => {
+      if (c.status !== "Scheduled" && c.status !== "Published") return false;
+      if (!c.scheduled_for) return false;
+      const cardDate = new Date(c.scheduled_for);
+      return cardDate >= startOfWeek && cardDate <= endOfWeek;
+    });
+
+    function visibleCard(c) {
+      return activePlat === "all" || c.platform === activePlat;
+    }
+
+    const board = document.getElementById("wsCalBoard");
+    if (!board) return;
+
+    const actualToday = new Date();
+    actualToday.setHours(0, 0, 0, 0);
+
+    board.innerHTML = days.map((dayName, idx) => {
+      const colDate = new Date(weekDates[idx]);
+      colDate.setHours(0, 0, 0, 0);
+      const isPastDate = colDate < actualToday;
+      const isToday = colDate.getTime() === actualToday.getTime();
+
+      const items = wsCards.filter(c => {
+        if (!visibleCard(c)) return false;
+        const cd = new Date(c.scheduled_for);
+        const cdIdx = cd.getDay() === 0 ? 6 : cd.getDay() - 1;
+        return days[cdIdx] === dayName;
+      }).sort((a, b) => a.time.localeCompare(b.time));
+
+      function cardHTML(c) {
+        const p = M.platMeta(c.platform);
+        const w = M.site(c.site);
+        const isFrozen = c.status === "Published" || isPastDate;
+        return `<div class="cal-card ${isFrozen ? 'frozen' : ''}" draggable="${!isFrozen}" data-id="${c.id}" style="border-left:3px solid ${p.color}; ${isFrozen ? 'cursor:default;' : 'cursor:grab;'}">
+          ${!isFrozen ? `<button class="icon-btn btn-sm cal-card-delete" data-del-id="${c.id}" title="Remove slot"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>` : ''}
+          <div class="cc-top">
+            <span class="icon-tile tile-${p.tile}" style="width:22px;height:22px;border-radius:6px">${I(p.icon, "style='width:12px;height:12px'")}</span>
+            <span class="cc-time mono" ${!isFrozen ? 'style="cursor:pointer;text-decoration:underline;" title="Click to edit time"' : ''}>${c.time}</span>
+            <span class="badge badge-${c.status.toLowerCase()}" style="margin-left:auto;margin-right:${!isFrozen ? '20px' : '4px'};">${c.status}</span>
+          </div>
+          <div class="cc-title">${c.title}</div>
+          <div class="cc-foot"><span class="favicon" style="width:16px;height:16px;border-radius:4px;font-size:9px;background:${w ? w.color : 'var(--primary)'}">${w ? w.short : '?'}</span> ${w ? w.name : 'Site'}</div>
+        </div>`;
+      }
+
+      const itemsHTML = items.length
+        ? items.map(c => cardHTML(c)).join("")
+        : (isPastDate
+            ? `<div class="cal-empty frozen"><span>Passed</span></div>`
+            : `<div class="cal-empty" data-add-day="${dayName}">${I("plus")}<span>Drop or add</span></div>`);
+
+      const todayBadge = isToday ? `<span class="badge badge-primary txs">Today</span>` : '';
+      const calDate = `${months[weekDates[idx].getMonth()]} ${weekDates[idx].getDate()}`;
+
+      return `<div class="cal-col ${isPastDate ? 'cal-col-frozen' : ''}" data-day="${dayName}">
+        <div class="cal-head">
+          <div>
+            <div class="cal-dow">${dayName} ${todayBadge}</div>
+            <div class="cal-date">${calDate}</div>
+          </div>
+          <span class="cal-count">${items.length}</span>
+        </div>
+        <div class="cal-slots" data-day="${dayName}" style="${isPastDate ? 'background:var(--bg-subtle);opacity:0.85;' : ''}">
+          ${itemsHTML}
+        </div>
+      </div>`;
+    }).join("");
+
+    C.refreshIcons();
+
+    // Delete buttons
+    board.querySelectorAll(".cal-card-delete").forEach(btn => {
+      btn.addEventListener("click", async e => {
+        e.stopPropagation();
+        const id = btn.dataset.delId;
+        try {
+          await CadenceAPI.unscheduleDraft(id);
+          C.toast({ type: "success", title: "Removed from calendar" });
+          await M.syncMockData();
+          renderWorkspaceCalendar();
+        } catch (err) {
+          C.toast({ type: "error", title: "Removal failed", desc: err.message });
+        }
+      });
+    });
+
+    // Card click → preview
+    board.querySelectorAll(".cal-card").forEach(card => {
+      card.addEventListener("click", e => {
+        if (e.target.closest(".cal-card-delete") || e.target.closest(".cc-time")) return;
+        const id = card.dataset.id;
+        const d = wsCards.find(x => String(x.id) === String(id));
+        if (!d) return;
+        document.getElementById("largePreviewTitle").textContent = d.title;
+        document.getElementById("largePreviewSub").textContent = `${d.platform} · ${d.status}`;
+        const bodyContainer = document.getElementById("largePreviewBody");
+        if (bodyContainer) {
+          bodyContainer.innerHTML = previewHTML(d.platform, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+        }
+        C.openModal("largePreviewModal");
+      });
+    });
+
+    // Time click → edit schedule
+    board.querySelectorAll(".cc-time").forEach(timeBtn => {
+      const cardEl = timeBtn.closest(".cal-card");
+      if (!cardEl || cardEl.classList.contains("frozen")) return;
+      timeBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        const id = cardEl.dataset.id;
+        const c = wsCards.find(x => String(x.id) === String(id));
+        if (!c) return;
+        const sf = new Date(c.scheduled_for);
+        const yyyy = sf.getFullYear();
+        const mm = String(sf.getMonth()+1).padStart(2,'0');
+        const dd2 = String(sf.getDate()).padStart(2,'0');
+        const esDate = document.getElementById("esDate");
+        const esTimeEl = document.getElementById("esTime");
+        if (esDate) esDate.value = `${yyyy}-${mm}-${dd2}`;
+        if (esTimeEl) esTimeEl.value = c.time;
+        if (window.updateMinTime) window.updateMinTime();
+        window.activeEditCard = c;
+        C.openModal("editScheduleModal");
+      });
+    });
+
+    // Drag and Drop
+    let dragId = null;
+    board.querySelectorAll(".cal-card").forEach(card => {
+      if (card.classList.contains("frozen")) return;
+      card.addEventListener("dragstart", e => {
+        dragId = card.dataset.id;
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+      card.addEventListener("dragend", () => {
+        dragId = null;
+        board.querySelectorAll(".cal-card").forEach(c => c.classList.remove("dragging"));
+        board.querySelectorAll(".cal-slots").forEach(s => s.classList.remove("drop-on"));
+      });
+    });
+
+    board.querySelectorAll(".cal-slots").forEach(slot => {
+      const slotDayIdx = days.indexOf(slot.dataset.day);
+      const colDate2 = new Date(weekDates[slotDayIdx]);
+      colDate2.setHours(0, 0, 0, 0);
+      const isPast2 = colDate2 < actualToday;
+
+      slot.addEventListener("dragover", e => {
+        if (isPast2) return;
+        e.preventDefault();
+        slot.classList.add("drop-on");
+      });
+      slot.addEventListener("dragleave", () => slot.classList.remove("drop-on"));
+      slot.addEventListener("drop", async e => {
+        e.preventDefault();
+        slot.classList.remove("drop-on");
+        if (isPast2) {
+          C.toast({ type: "warning", title: "Rescheduling blocked", desc: "Cannot schedule to past dates." });
+          return;
+        }
+        const dragged = wsCards.find(c => c.id === dragId);
+        if (!dragged) return;
+        const targetDate = new Date(weekDates[slotDayIdx]);
+        const tp = dragged.time.split(':');
+        targetDate.setHours(parseInt(tp[0]), parseInt(tp[1] || 0), 0, 0);
+        if (targetDate < new Date()) {
+          C.toast({ type: "warning", title: "Rescheduling blocked", desc: `Today at ${dragged.time} has already passed.` });
+          return;
+        }
+        try {
+          await CadenceAPI.scheduleDraft(dragged.id, targetDate.toISOString());
+          await M.syncMockData();
+          renderWorkspaceCalendar();
+          C.toast({ type: "success", title: "Rescheduled", desc: `Moved to ${slot.dataset.day}` });
+        } catch (err) {
+          C.toast({ type: "error", title: "Rescheduling failed", desc: err.message });
+        }
+      });
+    });
+  }
+
+  // Initial render
+  renderWorkspaceCalendar();
+
+  // Week navigation
+  const prevBtn = document.getElementById("wsPrevWeek");
+  const nextBtn = document.getElementById("wsNextWeek");
+  if (prevBtn) prevBtn.onclick = () => { wsWeekOffset--; renderWorkspaceCalendar(); };
+  if (nextBtn) nextBtn.onclick = () => { wsWeekOffset++; renderWorkspaceCalendar(); };
+
+  // Platform filter pills
+  const wsCalPlatFilter2 = document.getElementById("wsCalPlatFilter");
+  if (wsCalPlatFilter2) {
+    wsCalPlatFilter2.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        wsCalPlatFilter2.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderWorkspaceCalendar();
+      });
+    });
+  }
+
+  // Auto-schedule button
+  const wsAutoBtn = document.getElementById("wsAutoScheduleBtn");
+  if (wsAutoBtn) {
+    wsAutoBtn.addEventListener("click", async function() {
+      this.disabled = true;
+      this.innerHTML = `${I("loader-circle", "class='spin'")} Scheduling…`;
+      C.refreshIcons();
+      const approved = siteContent.filter(c => c.status === "Approved");
+      if (!approved.length) {
+        C.toast({ type: "info", title: "Nothing to schedule", desc: "No approved drafts available." });
+        this.disabled = false; this.innerHTML = `${I("wand-sparkles")} Auto-schedule`; C.refreshIcons();
+        return;
+      }
+      const now = new Date();
+      let scheduled = 0;
+      for (const draft of approved) {
+        const target = new Date();
+        target.setDate(target.getDate() + (scheduled % 5));
+        target.setHours(9 + scheduled, 0, 0, 0);
+        if (target <= now) { target.setDate(target.getDate() + 1); target.setHours(9, 0, 0, 0); }
+        try { await CadenceAPI.scheduleDraft(draft.id, target.toISOString()); scheduled++; } catch(e) { /* skip */ }
+      }
+      await M.syncMockData();
+      renderWorkspaceCalendar();
+      this.disabled = false; this.innerHTML = `${I("wand-sparkles")} Auto-schedule`; C.refreshIcons();
+      C.toast({ type: "success", title: `${scheduled} draft${scheduled !== 1 ? 's' : ''} scheduled` });
+    });
+  }
+
+  // Edit-schedule modal save
+  const wsEsSave = document.getElementById("esSave");
+  if (wsEsSave && !wsEsSave._wsWired) {
+    wsEsSave._wsWired = true;
+    wsEsSave.addEventListener("click", async () => {
+      const card = window.activeEditCard;
+      if (!card) return;
+      const dateVal = (document.getElementById("esDate") || {}).value || "";
+      const timeVal = (document.getElementById("esTime") || {}).value || "";
+      if (!dateVal || !timeVal) { C.toast({ type: "warning", title: "Date and Time are required" }); return; }
+      const targetDate = new Date(`${dateVal}T${timeVal}:00`);
+      if (targetDate < new Date()) { C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule in the past." }); return; }
+      try {
+        await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+        C.closeModal("editScheduleModal");
+        await M.syncMockData();
+        renderWorkspaceCalendar();
+        C.toast({ type: "success", title: "Schedule updated" });
+      } catch(err) {
+        C.toast({ type: "error", title: "Failed to update schedule", desc: err.message });
+      }
+    });
+  }
+
 
   /* ---------- published grid ---------- */
   const published = siteContent.filter(c => c.status === "Published").concat(
     siteContent.filter(c => c.status === "Approved" || c.status === "Scheduled")
   );
   function coverGrad(plat) { return ({Blog:"linear-gradient(135deg,#095075,#053046)",LinkedIn:"linear-gradient(135deg,#0a66c2,#063b73)",YouTube:"linear-gradient(135deg,#dc2626,#7f1d1d)",Instagram:"linear-gradient(135deg,#f09433,#bc1888)"})[plat]; }
+  let pubCurrentPage = 1;
+  const pubPageSize = 6;
+  let pubActiveFilter = "all";
+
   function renderPub(filter) {
-    const list = published.filter(c => filter === "all" || c.platform === filter);
+    if (filter !== undefined) {
+      pubActiveFilter = filter;
+      pubCurrentPage = 1;
+    }
+    const list = published.filter(c => pubActiveFilter === "all" || c.platform === pubActiveFilter);
     const grid = document.getElementById("pubGrid");
-    if (!list.length) { grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-art">${I("inbox")}</div><h3>Nothing here yet</h3><p>Published content for this channel will appear here.</p></div>`; C.refreshIcons(); return; }
-    grid.innerHTML = list.map(c => { const p = M.platMeta(c.platform);
+    const pagWrap = document.getElementById("pubPagination");
+    
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-art">${I("inbox")}</div><h3>Nothing here yet</h3><p>Published content for this channel will appear here.</p></div>`;
+      if (pagWrap) pagWrap.innerHTML = "";
+      document.getElementById("pubCount").textContent = "0 items";
+      C.refreshIcons();
+      return;
+    }
+    
+    const totalItems = list.length;
+    const totalPages = Math.ceil(totalItems / pubPageSize);
+    
+    if (pubCurrentPage > totalPages) pubCurrentPage = totalPages;
+    if (pubCurrentPage < 1) pubCurrentPage = 1;
+    
+    const startIdx = (pubCurrentPage - 1) * pubPageSize;
+    const paginatedList = list.slice(startIdx, startIdx + pubPageSize);
+    
+    grid.innerHTML = paginatedList.map(c => {
+      const p = M.platMeta(c.platform);
       const coverStyle = c.cover_image ? `background-image: url('${c.cover_image}'); background-size: cover; background-position: center;` : `background:${coverGrad(c.platform)}`;
       const coverContent = c.cover_image ? '' : I(p.icon,"style='width:30px;height:30px'");
-      return `<div class="pub-card"><div class="pub-cover" style="${coverStyle}">${coverContent}</div>
+      return `<div class="pub-card" onclick="window.previewPublishedCard('${c.id}')"><div class="pub-cover" style="${coverStyle}">${coverContent}</div>
         <div class="pub-body"><div class="row gap2 mb3"><span class="badge badge-${c.status.toLowerCase()}">${c.status}</span><span class="muted txs">${c.platform}</span></div>
-          <div class="pub-title">${c.title}</div><div class="pub-foot"><span>${c.day} · ${c.time}</span><span class="row gap2">${I("eye","style='width:14px;height:14px'")} ${(Math.random()*4+1).toFixed(1)}k</span></div></div></div>`;
+          <div class="pub-title">${c.title}</div><div class="pub-foot"><span>${c.day} · ${c.time}</span></div></div></div>`;
     }).join("");
-    document.getElementById("pubCount").textContent = `${list.length} item${list.length>1?'s':''}`;
+    
+    document.getElementById("pubCount").textContent = `${totalItems} item${totalItems>1?'s':''}`;
+    
+    if (pagWrap) {
+      if (totalPages <= 1) {
+        pagWrap.innerHTML = "";
+      } else {
+        let pagHtml = "";
+        pagHtml += `<button class="btn btn-secondary btn-sm" ${pubCurrentPage === 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} onclick="window.changePubPage(${pubCurrentPage - 1})">${I("arrow-left")} Prev</button>`;
+        for (let i = 1; i <= totalPages; i++) {
+          pagHtml += `<button class="btn ${i === pubCurrentPage ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="window.changePubPage(${i})">${i}</button>`;
+        }
+        pagHtml += `<button class="btn btn-secondary btn-sm" ${pubCurrentPage === totalPages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''} onclick="window.changePubPage(${pubCurrentPage + 1})">Next ${I("arrow-right")}</button>`;
+        pagWrap.innerHTML = pagHtml;
+      }
+    }
     C.refreshIcons();
   }
+
+  window.changePubPage = function(page) {
+    pubCurrentPage = page;
+    renderPub();
+  };
+
+  window.previewPublishedCard = function(itemId) {
+    const item = M.content.find(x => String(x.id) === String(itemId));
+    if (!item) return;
+    document.getElementById("largePreviewTitle").textContent = item.title;
+    document.getElementById("largePreviewSub").textContent = `${item.platform} · ${item.status} details`;
+    const bodyContainer = document.getElementById("largePreviewBody");
+    if (bodyContainer) {
+      bodyContainer.innerHTML = previewHTML(
+        item.platform,
+        item.title,
+        item.body || "No content available",
+        item.cover_image,
+        item.tags || [],
+        item.category,
+        item.created_at,
+        item.author_name,
+        item.custom_date
+      );
+    }
+    C.openModal("largePreviewModal");
+  };
+
   renderPub("all");
   document.querySelectorAll("#pubFilter button").forEach(b => b.addEventListener("click", () => {
     document.querySelectorAll("#pubFilter button").forEach(x => x.classList.remove("active")); b.classList.add("active"); renderPub(b.dataset.p);
@@ -117,6 +527,16 @@
       }
     }
   }
+
+  // Wire the "Start crawl" button inside the style guide empty state
+  const crawlBtnFromGuide = document.getElementById("crawlBtnFromGuide");
+  if (crawlBtnFromGuide) {
+    crawlBtnFromGuide.addEventListener("click", () => {
+      const mainCrawlBtn = document.getElementById("crawlBtn");
+      if (mainCrawlBtn) mainCrawlBtn.click();
+    });
+  }
+
 
   function updateLogoPreview(url) {
     const preview = document.getElementById("logoPreview");
@@ -447,12 +867,16 @@
   }
 
   if (crawlBtn) {
-    // If the site is already crawling when page loads, resume visual state
     if (site.scrape_status === "crawling") {
       crawlBtn.disabled = true;
       crawlBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Crawling...`;
       C.refreshIcons();
-      crawlInterval = setInterval(checkCrawlStatus, 2000);
+      crawlInterval = setInterval(async () => {
+        await checkCrawlStatus();
+        if (site.scrape_status === "done") {
+          loadCrawledPages();
+        }
+      }, 2000);
     }
 
     crawlBtn.addEventListener("click", async () => {
@@ -462,7 +886,12 @@
       try {
         await CadenceAPI.triggerCrawl(site.id);
         C.toast({ type: "info", title: "Crawl started", desc: "Analyzing website style and page structure..." });
-        crawlInterval = setInterval(checkCrawlStatus, 2000);
+        crawlInterval = setInterval(async () => {
+          await checkCrawlStatus();
+          if (site.scrape_status === "done") {
+            loadCrawledPages();
+          }
+        }, 2000);
       } catch (err) {
         crawlBtn.disabled = false;
         crawlBtn.innerHTML = `${I("refresh-cw")} Crawl website`;
@@ -472,19 +901,810 @@
     });
   }
 
-  const conns = [["LinkedIn","linkedin",true,"company/"+site.id],["YouTube","youtube",true,"@"+site.id],["Instagram","instagram",false,""],["Blog (RSS)","blog",true,site.url+"/feed"]];
-  document.getElementById("setChannels").innerHTML = conns.map(([n,t,on,h]) => `
-    <div class="chan-conn"><span class="icon-tile tile-${t}">${I(M.platMeta(n==="Blog (RSS)"?"Blog":n).icon)}</span>
-      <div class="cc-meta"><div class="cc-nm">${n}</div><div class="cc-st">${on?h:"Not connected"}</div></div>
-      ${on?`<span class="badge badge-success">${I("check")} Connected</span>`:`<button class="btn btn-secondary btn-sm" onclick="Cadence.toast({type:'success',title:'${n} connected'})">Connect</button>`}</div>`).join("");
+  /* ---------- Crawled Data & Style Guide Editor Logic ---------- */
+  let crawledPagesList = [];
+  
+  // Helper: extract a clean hex color from a raw CSS color string
+  function cleanHex(raw) {
+    if (!raw) return null;
+    // Strip !important, whitespace, quotes
+    const str = raw.replace(/!important/gi, "").replace(/['"]/g, "").trim();
+    // Match 3 or 6 digit hex
+    const m = str.match(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/);
+    if (!m) return null;
+    let hex = m[0];
+    // Expand 3-digit to 6-digit
+    if (hex.length === 4) {
+      hex = "#" + hex[1]+hex[1]+hex[2]+hex[2]+hex[3]+hex[3];
+    }
+    return hex;
+  }
+
+  function populateStyleGuideFields() {
+    const guide = site.style_guide || {};
+    const brandColors = Array.isArray(site.brand_colors) ? site.brand_colors : [];
+    const hasData = !!(guide.heading_color || guide.text_color || guide.primary_tone || guide.heading_pattern || site.tone || brandColors.length);
+
+    const noCrawlMsg = document.getElementById("noCrawlDataMsg");
+    const crawlFields = document.getElementById("crawlDataFields");
+    const statusBadge = document.getElementById("crawlStatusBadge");
+
+    if (noCrawlMsg && crawlFields) {
+      noCrawlMsg.style.display = hasData ? "none" : "block";
+      crawlFields.style.display = hasData ? "block" : "none";
+    }
+
+    if (statusBadge) {
+      if (site.scrape_status === "done") {
+        statusBadge.className = "badge badge-published";
+        statusBadge.style.cssText = "font-size:11px;background:#dcfce7;color:#166534";
+        statusBadge.textContent = "Crawled";
+      } else if (site.scrape_status === "crawling") {
+        statusBadge.className = "badge badge-scheduled";
+        statusBadge.style.cssText = "font-size:11px";
+        statusBadge.textContent = "Crawling...";
+      } else if (hasData) {
+        statusBadge.className = "badge badge-neutral";
+        statusBadge.style.cssText = "font-size:11px";
+        statusBadge.textContent = "From crawl";
+      } else {
+        statusBadge.className = "";
+        statusBadge.textContent = "";
+      }
+    }
+
+    if (!hasData) return;
+
+    // --- Brand Color Swatches ---
+    const swatchContainer = document.getElementById("brandColorSwatches");
+    const noBrandColorsMsg = document.getElementById("noBrandColors");
+
+    // Collect all color sources: brand_colors array + heading_color + text_color from style_guide
+    const rawColors = [...brandColors];
+    if (guide.heading_color) rawColors.push(guide.heading_color);
+    if (guide.text_color) rawColors.push(guide.text_color);
+
+    // Clean and deduplicate
+    const cleanColors = [...new Set(
+      rawColors.map(c => cleanHex(c)).filter(Boolean)
+    )];
+
+    if (swatchContainer) {
+      if (cleanColors.length === 0) {
+        swatchContainer.innerHTML = "";
+        if (noBrandColorsMsg) noBrandColorsMsg.style.display = "block";
+      } else {
+        if (noBrandColorsMsg) noBrandColorsMsg.style.display = "none";
+        swatchContainer.innerHTML = cleanColors.map((hex, i) => {
+          const label = i === 0 ? "Primary" : i === 1 ? "Secondary" : i === 2 ? "Accent" : `Color ${i+1}`;
+          // Determine if color is light or dark for label contrast
+          const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+          const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+          const textCol = luminance > 0.55 ? "#374151" : "#ffffff";
+          return `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:default" title="${hex}">
+              <div style="width:44px;height:44px;border-radius:8px;background:${hex};border:1px solid rgba(0,0,0,0.08);display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+                <span style="font-size:8px;font-weight:700;color:${textCol};letter-spacing:-0.3px;font-family:monospace">${hex.toUpperCase()}</span>
+              </div>
+              <span style="font-size:10px;color:var(--text-muted);font-weight:500">${label}</span>
+            </div>
+          `;
+        }).join("") + `
+          <button id="editColorsBtn" style="width:44px;height:44px;border-radius:8px;border:1px dashed var(--border);background:var(--bg-subtle);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);transition:all 0.15s" title="Edit colors">
+            <i data-lucide="pencil" style="width:14px;height:14px"></i>
+          </button>
+        `;
+        C.refreshIcons();
+
+        // Wire edit button to open inline color editor
+        const editBtn = document.getElementById("editColorsBtn");
+        if (editBtn) {
+          editBtn.addEventListener("click", () => {
+            const currentVal = cleanColors.join(", ");
+            const inp = document.createElement("input");
+            inp.className = "input";
+            inp.value = currentVal;
+            inp.style.marginTop = "8px";
+            inp.placeholder = "#hex1, #hex2, ...";
+            swatchContainer.after(inp);
+            inp.focus();
+            editBtn.style.display = "none";
+            inp.addEventListener("blur", () => {
+              // Parse and refresh swatches
+              site.brand_colors = inp.value.split(",").map(s => s.trim()).filter(Boolean);
+              inp.remove();
+              populateStyleGuideFields();
+            });
+          });
+        }
+      }
+    }
+
+    // --- Text fields ---
+    const toneEl = document.getElementById("setGuideTone");
+    if (toneEl) toneEl.value = guide.primary_tone || site.tone || "";
+
+    const vocabEl = document.getElementById("setGuideVocabulary");
+    if (vocabEl) {
+      const vocab = guide.recurring_vocabulary || [];
+      // Filter out any hex-like junk words (< 2 real letters)
+      const cleanVocab = Array.isArray(vocab) ? vocab.filter(v => /[a-zA-Z]{2,}/.test(v) && !/^[0-9a-fA-F]{3,8}$/.test(v)) : [];
+      vocabEl.value = cleanVocab.length ? cleanVocab.join(", ") : (Array.isArray(vocab) ? vocab.join(", ") : vocab);
+    }
+
+    const patternEl = document.getElementById("setGuideHeadingPattern");
+    if (patternEl) patternEl.value = guide.heading_pattern || "";
+
+    // --- New Crawl Style fields ---
+    const headingFontEl = document.getElementById("styleHeadingFont");
+    if (headingFontEl) headingFontEl.value = guide.heading_font || "";
+
+    const styleToneEl = document.getElementById("styleTone");
+    if (styleToneEl) styleToneEl.value = guide.primary_tone || site.tone || "";
+
+    const styleVocabEl = document.getElementById("styleVocabulary");
+    if (styleVocabEl) {
+      const vocab = guide.recurring_vocabulary || [];
+      const cleanVocab = Array.isArray(vocab) ? vocab.filter(v => /[a-zA-Z]{2,}/.test(v) && !/^[0-9a-fA-F]{3,8}$/.test(v)) : [];
+      styleVocabEl.value = cleanVocab.length ? cleanVocab.join(", ") : (Array.isArray(vocab) ? vocab.join(", ") : vocab);
+    }
+  }
+
+  // Populate immediately on page load
+  populateStyleGuideFields();
+
+  // Edit Style Guide Button Action
+  const editStyleGuideBtn = document.getElementById("editStyleGuideBtn");
+  if (editStyleGuideBtn) {
+    editStyleGuideBtn.addEventListener("click", () => {
+      // Make fields editable
+      const fields = ["styleHeadingFont", "styleTone", "styleVocabulary"];
+      fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.removeAttribute("readonly");
+          el.style.background = "var(--surface)";
+          el.style.border = "1px solid var(--border)";
+        }
+      });
+      
+      // Change button to Save
+      editStyleGuideBtn.innerHTML = `<i data-lucide="check"></i> Save Changes`;
+      editStyleGuideBtn.classList.remove("btn-secondary");
+      editStyleGuideBtn.classList.add("btn-primary");
+      C.refreshIcons();
+      
+      // Change button action to save
+      editStyleGuideBtn.onclick = async () => {
+        editStyleGuideBtn.disabled = true;
+        const originalText = editStyleGuideBtn.innerHTML;
+        editStyleGuideBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Saving...`;
+        C.refreshIcons();
+
+        const guide = site.style_guide || {};
+        const updatedGuide = {
+          ...guide,
+          heading_font: document.getElementById("styleHeadingFont").value.trim(),
+          primary_tone: document.getElementById("styleTone").value.trim(),
+          recurring_vocabulary: document.getElementById("styleVocabulary").value.split(",").map(v => v.trim()).filter(v => v.length > 0)
+        };
+
+        try {
+          await CadenceAPI.updateWebsite(site.id, {
+            style_guide: updatedGuide,
+            tone: updatedGuide.primary_tone
+          });
+          
+          await window.MOCK.syncMockData(site.id);
+          site = window.MOCK.site(site.id);
+          populateStyleGuideFields();
+          
+          // Make fields readonly again
+          fields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+              el.setAttribute("readonly", true);
+              el.style.background = "var(--bg-subtle)";
+              el.style.border = "";
+            }
+          });
+          
+          // Reset button
+          editStyleGuideBtn.innerHTML = `<i data-lucide="edit-3"></i> Edit Style Guide`;
+          editStyleGuideBtn.classList.remove("btn-primary");
+          editStyleGuideBtn.classList.add("btn-secondary");
+          editStyleGuideBtn.disabled = false;
+          C.refreshIcons();
+          
+          C.toast({ type: "success", title: "Style Guide saved", desc: "Successfully updated!" });
+        } catch (err) {
+          editStyleGuideBtn.disabled = false;
+          editStyleGuideBtn.innerHTML = originalText;
+          C.refreshIcons();
+          C.toast({ type: "error", title: "Save failed", desc: err.message });
+        }
+      };
+    });
+  }
+
+  // Save Style Guide Button Action
+  const saveStyleGuideBtn = document.getElementById("saveStyleGuideBtn");
+  if (saveStyleGuideBtn) {
+    saveStyleGuideBtn.addEventListener("click", async () => {
+      saveStyleGuideBtn.disabled = true;
+      const originalText = saveStyleGuideBtn.innerHTML;
+      saveStyleGuideBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Saving...`;
+      C.refreshIcons();
+
+      const tone = document.getElementById("setGuideTone").value.trim();
+      const vocabRaw = document.getElementById("setGuideVocabulary").value.trim();
+      const vocab = vocabRaw ? vocabRaw.split(",").map(v => v.trim()).filter(v => v.length > 0) : [];
+      const headingPattern = document.getElementById("setGuideHeadingPattern").value.trim();
+
+      const guide = site.style_guide || {};
+      const updatedGuide = {
+        ...guide,
+        primary_tone: tone,
+        recurring_vocabulary: vocab,
+        heading_pattern: headingPattern
+      };
+
+      try {
+        await CadenceAPI.updateWebsite(site.id, {
+          style_guide: updatedGuide,
+          brand_colors: site.brand_colors || [],
+          tone: tone
+        });
+        
+        await window.MOCK.syncMockData(site.id);
+        site = window.MOCK.site(site.id);
+        populateStyleGuideFields();
+        
+        C.toast({ type: "success", title: "Style Guide saved", desc: "Successfully updated!" });
+      } catch (err) {
+        C.toast({ type: "error", title: "Save failed", desc: err.message });
+      } finally {
+        saveStyleGuideBtn.disabled = false;
+        saveStyleGuideBtn.innerHTML = originalText;
+        C.refreshIcons();
+      }
+    });
+  }
+
+  // Load crawled pages
+  async function loadCrawledPages() {
+    const tableBody = document.getElementById("crawledPagesTableBody");
+    if (!tableBody) return;
+
+    try {
+      crawledPagesList = await CadenceAPI.getWebsitePages(site.id) || [];
+      renderCrawledPages();
+    } catch (err) {
+      console.error("Failed to load crawled pages:", err);
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align:center; padding:var(--s5); color:var(--error)">
+            Failed to load crawled pages.
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  function renderCrawledPages() {
+    const tableBody = document.getElementById("crawledPagesTableBody");
+    if (!tableBody) return;
+
+    const searchQuery = document.getElementById("crawlPageSearch").value.toLowerCase().trim();
+    
+    const filtered = crawledPagesList.filter(p => {
+      const title = (p.page_title || "").toLowerCase();
+      const url = (p.page_url || "").toLowerCase();
+      return title.includes(searchQuery) || url.includes(searchQuery);
+    });
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align:center; padding:var(--s5); color:var(--text-muted)">
+            No crawled pages found.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = filtered.map(p => {
+      const wordCount = p.raw_text ? p.raw_text.split(/\s+/).length : 0;
+      let type = p.page_type || "Page";
+      if (type === "other") type = "Page";
+      type = type.charAt(0).toUpperCase() + type.slice(1);
+
+      const titleOrUrl = p.page_title || p.page_url;
+      const displayTitle = titleOrUrl.length > 50 ? titleOrUrl.substring(0, 47) + "..." : titleOrUrl;
+
+      return `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:10px var(--s3); font-weight:550; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${p.page_url}">
+            <div style="font-weight:600; color:var(--text)">${displayTitle}</div>
+            <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis">${p.page_url}</div>
+          </td>
+          <td style="padding:10px var(--s3)"><span class="badge badge-neutral">${type}</span></td>
+          <td style="padding:10px var(--s3); text-align:right" class="mono">${wordCount}</td>
+          <td style="padding:10px var(--s3); text-align:center">
+            <button class="btn btn-secondary btn-sm btn-view-page-details" data-page-id="${p.id}" style="padding:4px 8px; font-size:12px;">
+              View Details
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    // Wire up details button
+    tableBody.querySelectorAll(".btn-view-page-details").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const pageId = btn.dataset.pageId;
+        const pageObj = crawledPagesList.find(p => String(p.id) === String(pageId));
+        if (pageObj) {
+          openPageDetailsModal(pageObj);
+        }
+      });
+    });
+  }
+
+  // Open Scraped Page Details Modal
+  function openPageDetailsModal(page) {
+    document.getElementById("pageDetailsTitle").textContent = page.page_title || "Page details";
+    document.getElementById("pageDetailsUrl").textContent = page.page_url;
+    document.getElementById("pageMetaTitle").textContent = page.meta_title || page.page_title || "—";
+    document.getElementById("pageMetaDesc").textContent = page.meta_description || "—";
+    document.getElementById("pageAuthor").textContent = page.author || "—";
+    
+    const typeBadge = document.getElementById("pageTypeBadge");
+    if (typeBadge) {
+      let type = page.page_type || "Page";
+      if (type === "other") type = "Page";
+      typeBadge.textContent = type.toUpperCase();
+    }
+
+    const dateObj = new Date(page.crawled_at);
+    document.getElementById("pageCrawledDate").textContent = dateObj.toLocaleString();
+
+    // CTAs
+    const ctasListEl = document.getElementById("pageCTAList");
+    if (ctasListEl) {
+      const ctas = page.ctas || [];
+      if (ctas.length > 0) {
+        ctasListEl.innerHTML = ctas.map(c => {
+          let text = c;
+          if (typeof c === 'object') {
+            text = c.text || c.label || JSON.stringify(c);
+          }
+          return `<div style="padding:4px 8px; background:var(--surface); border-radius:4px; border:1px solid var(--border)">${text}</div>`;
+        }).join("");
+      } else {
+        ctasListEl.innerHTML = `<span class="muted" style="font-size:12px">No CTAs detected on this page.</span>`;
+      }
+    }
+
+    // Heading structure
+    const headingsEl = document.getElementById("pageHeadingStructure");
+    if (headingsEl) {
+      const headings = page.heading_structure || [];
+      if (headings.length > 0) {
+        headingsEl.innerHTML = headings.map(h => {
+          let lvl = "H";
+          let txt = "";
+          if (typeof h === 'object') {
+            lvl = (h.level || "H").toUpperCase();
+            txt = h.text || "";
+          } else {
+            txt = h;
+          }
+          const indent = lvl === 'H1' ? '0px' : lvl === 'H2' ? '12px' : lvl === 'H3' ? '24px' : '36px';
+          return `<div style="margin-left:${indent}; padding:2px 0;"><span class="badge badge-neutral" style="font-size:9px; padding:1px 3px; margin-right:6px">${lvl}</span>${txt}</div>`;
+        }).join("");
+      } else {
+        headingsEl.innerHTML = `<span class="muted" style="font-size:12px">No headings detected.</span>`;
+      }
+    }
+
+    // Main Content text
+    const textEl = document.getElementById("pageMainContentText");
+    if (textEl) {
+      textEl.textContent = page.main_content || page.raw_text || "No text content available.";
+    }
+
+    C.openModal("pageDetailsModal");
+  }
+
+  // Bind Search & Refresh button listeners
+  const crawlPageSearch = document.getElementById("crawlPageSearch");
+  if (crawlPageSearch) {
+    crawlPageSearch.addEventListener("input", renderCrawledPages);
+  }
+
+  const btnRefreshCrawlPagesList = document.getElementById("btnRefreshCrawlPagesList");
+  if (btnRefreshCrawlPagesList) {
+    btnRefreshCrawlPagesList.addEventListener("click", () => {
+      btnRefreshCrawlPagesList.disabled = true;
+      loadCrawledPages().finally(() => {
+        btnRefreshCrawlPagesList.disabled = false;
+      });
+    });
+  }
+
+  // Load Style Guide and Crawled Pages initially
+  populateStyleGuideFields();
+  loadCrawledPages();
+  /* ------------------------------------------------------------- */
+
+  let activeConns = [];
+
+  async function loadConnections() {
+    try {
+      activeConns = await CadenceAPI.getSocialConnections(site.id) || [];
+    } catch(e) {
+      console.error("Failed to load connections:", e);
+      activeConns = [];
+    }
+    renderConnections();
+  }
+
+  window.showWorkspaceBlogAuthFields = function() {
+    const authType = document.getElementById('connectAuthType').value;
+    document.getElementById('connect_auth_fields_api_key').classList.toggle('hide', authType !== 'api_key');
+    document.getElementById('connect_auth_fields_bearer_token').classList.toggle('hide', authType !== 'bearer_token');
+    document.getElementById('connect_auth_fields_basic_auth').classList.toggle('hide', authType !== 'basic_auth');
+  };
+
+  const authSelect = document.getElementById('connectAuthType');
+  if (authSelect) {
+    authSelect.addEventListener('change', window.showWorkspaceBlogAuthFields);
+  }
+
+  function truncateUrl(url) {
+    if (!url) return '';
+    try {
+      const urlObj = new URL(url);
+      const host = urlObj.hostname;
+      const path = urlObj.pathname;
+      if (path.length > 15) {
+        return urlObj.protocol + "//" + host + path.substring(0, 8) + "..." + path.substring(path.length - 6);
+      }
+      return url;
+    } catch(e) {
+      if (url.length > 30) {
+        return url.substring(0, 15) + "..." + url.substring(url.length - 8);
+      }
+      return url;
+    }
+  }
+
+  function renderConnections() {
+    const list = document.getElementById("setChannels");
+    if (!list) return;
+
+    const platforms = [
+      { name: "LinkedIn", key: "linkedin", defaultHandle: "company/" + site.id },
+      { name: "YouTube", key: "youtube", defaultHandle: "@" + site.id },
+      { name: "Instagram", key: "instagram", defaultHandle: "Not connected" },
+      { name: "Blog (RSS)", key: "blog", defaultHandle: site.url + "/feed" }
+    ];
+
+    list.innerHTML = platforms.map(p => {
+      const conn = activeConns.find(c => c.platform === p.key && c.is_active);
+      const pm = M.platMeta(p.name === "Blog (RSS)" ? "Blog" : p.name);
+      
+      let badgeHTML = "";
+      let detailsHTML = "";
+      let disconnectHTML = "";
+
+      badgeHTML = conn 
+        ? `<span class="badge badge-success" style="display:inline-flex; align-items:center; gap:4px; margin-right:8px;">${I("check")} Connected</span>
+           <button class="btn btn-secondary btn-sm btn-connect-platform" data-plat="${p.key}" data-name="${p.name}" title="Edit connection details" style="padding:4px 8px;">${I("settings")}</button>`
+        : `<button class="btn btn-secondary btn-sm btn-connect-platform" data-plat="${p.key}" data-name="${p.name}">Connect</button>`;
+
+      detailsHTML = conn 
+        ? `<div class="cc-st" style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); word-break:break-all; margin-top:2px;">
+             ${conn.platform === 'blog' ? 'Endpoint' : 'Webhook'}: ${truncateUrl(conn.make_webhook_url) || 'No URL'}
+             ${conn.platform === 'blog' ? `(${conn.auth_type === 'none' ? 'No Auth' : conn.auth_type.replace('_', ' ')})` : ''}
+           </div>`
+        : `<div class="cc-st">${p.defaultHandle}</div>`;
+
+      disconnectHTML = conn 
+        ? `<button class="icon-btn btn-sm btn-disconnect-platform" data-conn-id="${conn.id}" title="Disconnect" style="margin-left:8px; color:var(--text-muted);"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>`
+        : '';
+
+      return `
+        <div class="chan-conn" style="display:flex; align-items:center; padding:12px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); margin-bottom:8px;">
+          <span class="icon-tile tile-${p.key}" style="width:32px; height:32px; border-radius:8px; display:grid; place-items:center; flex-shrink:0; background:${pm.color}15; color:${pm.color};">${I(pm.icon)}</span>
+          <div class="cc-meta" style="flex:1; min-width:0; margin-left:12px;">
+            <div class="cc-nm" style="font-weight:600; color:var(--text);">${p.name}</div>
+            ${detailsHTML}
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${badgeHTML}
+            ${disconnectHTML}
+          </div>
+        </div>`;
+    }).join("");
+
+    C.refreshIcons();
+
+    // Wire up Connect / Edit buttons
+    document.querySelectorAll(".btn-connect-platform").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const plat = btn.dataset.plat;
+        const name = btn.dataset.name;
+        
+        // Reset modal fields
+        document.getElementById("connectModalPlatName").textContent = name;
+        document.getElementById("connectWebhookUrl").value = "";
+        document.getElementById("connectAuthType").value = "none";
+        document.getElementById("connectBlogFormat").value = "json";
+        document.getElementById("connect_api_key_name").value = "X-API-Key";
+        document.getElementById("connect_api_key_value").value = "";
+        document.getElementById("connect_bearer_token_value").value = "";
+        document.getElementById("connect_username").value = "";
+        document.getElementById("connect_password").value = "";
+        document.getElementById("connectModalTestStatus").innerHTML = "";
+
+        // Toggle labels and custom blog fields
+        const isBlog = plat === 'blog';
+        document.getElementById("connectUrlLabel").textContent = isBlog ? "Publishing Endpoint URL" : "Webhook URL (Make.com, Zapier, or API Endpoint)";
+        document.getElementById("blogSettingsFields").classList.toggle("hide", !isBlog);
+
+        // Find existing connection to pre-populate
+        const existing = activeConns.find(c => c.platform === plat);
+        if (existing) {
+          document.getElementById("connectWebhookUrl").value = existing.make_webhook_url || "";
+          if (isBlog) {
+            document.getElementById("connectAuthType").value = existing.auth_type || "none";
+            const payload = existing.auth_payload || {};
+            document.getElementById("connectBlogFormat").value = payload.payload_format || "json";
+            if (existing.auth_type === 'api_key') {
+              document.getElementById("connect_api_key_name").value = payload.api_key_name || "X-API-Key";
+              document.getElementById("connect_api_key_value").value = payload.api_key_value || "";
+            } else if (existing.auth_type === 'bearer_token') {
+              document.getElementById("connect_bearer_token_value").value = payload.token_value || "";
+            } else if (existing.auth_type === 'basic_auth') {
+              document.getElementById("connect_username").value = payload.username || "";
+              document.getElementById("connect_password").value = payload.password || "";
+            }
+          }
+        }
+
+        if (isBlog) {
+          window.showWorkspaceBlogAuthFields();
+        }
+
+        const saveBtn = document.getElementById("btnSaveSocialConn");
+        if (saveBtn) saveBtn.dataset.plat = plat;
+
+        const testBtn = document.getElementById("btnTestSocialConn");
+        if (testBtn) testBtn.dataset.plat = plat;
+
+        C.openModal("connectSocialModal");
+      });
+    });
+
+    // Wire up Disconnect buttons
+    document.querySelectorAll(".btn-disconnect-platform").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const connId = btn.dataset.connId;
+        if (confirm("Are you sure you want to disconnect this platform?")) {
+          try {
+            await CadenceAPI.disconnectSocial(site.id, connId);
+            C.toast({ type: "info", title: "Channel disconnected", desc: "Configuration removed successfully" });
+            await loadConnections();
+          } catch(err) {
+            C.toast({ type: "error", title: "Disconnection failed", desc: err.message });
+          }
+        }
+      });
+    });
+  }
+
+  // Bind Connect Social Modal Save Action
+  const btnSaveSocialConn = document.getElementById("btnSaveSocialConn");
+  if (btnSaveSocialConn) {
+    btnSaveSocialConn.addEventListener("click", async () => {
+      const plat = btnSaveSocialConn.dataset.plat;
+      const url = document.getElementById("connectWebhookUrl").value.trim();
+      if (!url) {
+        C.toast({ type: "error", title: "URL required", desc: "Please enter a valid URL" });
+        return;
+      }
+
+      let authType = 'none';
+      let authPayload = {};
+
+      if (plat === 'blog') {
+        authType = document.getElementById('connectAuthType').value;
+        const payload_format = document.getElementById('connectBlogFormat').value;
+        if (authType === 'api_key') {
+          const api_key_name = document.getElementById('connect_api_key_name').value.trim();
+          const api_key_value = document.getElementById('connect_api_key_value').value.trim();
+          if (!api_key_name || !api_key_value) {
+            C.toast({ type: "error", title: "API Key required", desc: "Please fill in both key name and key value" });
+            return;
+          }
+          authPayload = { api_key_name, api_key_value, payload_format };
+        } else if (authType === 'bearer_token') {
+          const token_value = document.getElementById('connect_bearer_token_value').value.trim();
+          if (!token_value) {
+            C.toast({ type: "error", title: "Token required", desc: "Please enter the bearer token" });
+            return;
+          }
+          authPayload = { token_value, payload_format };
+        } else if (authType === 'basic_auth') {
+          const username = document.getElementById('connect_username').value.trim();
+          const password = document.getElementById('connect_password').value.trim();
+          if (!username || !password) {
+            C.toast({ type: "error", title: "Credentials required", desc: "Please enter both username and password" });
+            return;
+          }
+          authPayload = { username, password, payload_format };
+        } else {
+          authPayload = { payload_format };
+        }
+      }
+
+      btnSaveSocialConn.disabled = true;
+      btnSaveSocialConn.textContent = "Connecting...";
+      try {
+        await CadenceAPI.connectSocial(site.id, plat, url, authType, authPayload);
+        C.closeModal("connectSocialModal");
+        C.toast({ type: "success", title: "Platform connected", desc: "Webhook configured successfully!" });
+        await loadConnections();
+      } catch (err) {
+        C.toast({ type: "error", title: "Connection failed", desc: err.message });
+      } finally {
+        btnSaveSocialConn.disabled = false;
+        btnSaveSocialConn.textContent = "Connect Channel";
+      }
+    });
+  }
+
+  // Bind Connect Social Modal Test Action
+  const btnTestSocialConn = document.getElementById("btnTestSocialConn");
+  if (btnTestSocialConn) {
+    btnTestSocialConn.addEventListener("click", async () => {
+      const plat = btnTestSocialConn.dataset.plat;
+      const url = document.getElementById("connectWebhookUrl").value.trim();
+      const statusEl = document.getElementById("connectModalTestStatus");
+      
+      if (!url) {
+        C.toast({ type: "error", title: "URL required", desc: "Please enter a valid URL to test" });
+        return;
+      }
+
+      statusEl.className = "";
+      statusEl.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:12px;height:12px;color:var(--text-muted)"></i> <span class="muted">Testing...</span>`;
+      C.refreshIcons();
+
+      let authType = 'none';
+      let authPayload = {};
+
+      if (plat === 'blog') {
+        authType = document.getElementById('connectAuthType').value;
+        if (authType === 'api_key') {
+          const api_key_name = document.getElementById('connect_api_key_name').value.trim();
+          const api_key_value = document.getElementById('connect_api_key_value').value.trim();
+          if (!api_key_name || !api_key_value) {
+            C.toast({ type: "error", title: "API Key required", desc: "Please fill in both key name and key value" });
+            statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Missing credentials</span>`;
+            C.refreshIcons();
+            return;
+          }
+          authPayload = { api_key_name, api_key_value };
+        } else if (authType === 'bearer_token') {
+          const token_value = document.getElementById('connect_bearer_token_value').value.trim();
+          if (!token_value) {
+            C.toast({ type: "error", title: "Token required", desc: "Please enter the bearer token" });
+            statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Missing credentials</span>`;
+            C.refreshIcons();
+            return;
+          }
+          authPayload = { token_value };
+        } else if (authType === 'basic_auth') {
+          const username = document.getElementById('connect_username').value.trim();
+          const password = document.getElementById('connect_password').value.trim();
+          if (!username || !password) {
+            C.toast({ type: "error", title: "Credentials required", desc: "Please enter both username and password" });
+            statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Missing credentials</span>`;
+            C.refreshIcons();
+            return;
+          }
+          authPayload = { username, password };
+        }
+      }
+
+      try {
+        const res = await CadenceAPI.testConnection(site.id, plat, url, authType, authPayload);
+        if (res && res.connected) {
+          statusEl.innerHTML = `<span style="color:var(--success); font-weight:500;"><i data-lucide="check-circle" style="width:14px;height:14px;color:var(--success);vertical-align:middle;"></i> Connected</span>`;
+        } else {
+          statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Failed</span>`;
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Error</span>`;
+      }
+      C.refreshIcons();
+    });
+  }
+
+  loadConnections();
 
   /* ==========================================================================
      GENERATE — composer, drafts, previews
      ========================================================================== */
   let curChan = "Blog";
+  let sessionGeneratedDrafts = [];
   document.querySelectorAll(".chan").forEach(b => b.addEventListener("click", () => {
     document.querySelectorAll(".chan").forEach(x => x.classList.remove("active")); b.classList.add("active"); curChan = b.dataset.chan;
+    
+    // Toggle composer inputs based on channel
+    const stdFields = document.getElementById("standardIdeaFields");
+    const ytFields = document.getElementById("youtubeUploadFields");
+    const titleHeader = document.getElementById("composerHeaderTitle");
+    const subHeader = document.getElementById("composerHeaderSub");
+    const iconHeader = document.getElementById("composerHeaderIcon");
+    const genBtn = document.getElementById("genBtn");
+    
+    if (curChan === "YouTube") {
+      if (stdFields) stdFields.style.display = "none";
+      if (ytFields) ytFields.style.display = "block";
+      if (titleHeader) titleHeader.textContent = "Upload new video";
+      if (subHeader) subHeader.textContent = "Upload your video file and caption directly to draft queue.";
+      if (iconHeader) {
+        iconHeader.className = "icon-tile tile-youtube";
+        iconHeader.innerHTML = `<i data-lucide="video"></i>`;
+      }
+      if (genBtn) {
+        genBtn.innerHTML = `<i data-lucide="plus-circle"></i> Create Video Draft`;
+      }
+    } else {
+      if (stdFields) stdFields.style.display = "block";
+      if (ytFields) ytFields.style.display = "none";
+      if (titleHeader) titleHeader.textContent = "New content idea";
+      if (subHeader) subHeader.textContent = "Pick a channel, give a topic — Cadence drafts it.";
+      if (iconHeader) {
+        const pm = M.platMeta(curChan);
+        iconHeader.className = `icon-tile tile-${pm.tile}`;
+        iconHeader.innerHTML = `<i data-lucide="${pm.icon}"></i>`;
+      }
+      if (genBtn) {
+        genBtn.innerHTML = `<i data-lucide="sparkles"></i> Generate with AI`;
+      }
+    }
+    renderQueue();
+    if (window.lucide) window.lucide.createIcons();
   }));
+
+  // Composer YouTube video upload wiring
+  const composerYtBtn = document.getElementById("ytVideoUploadBtn");
+  const composerYtFileInput = document.getElementById("ytVideoFile");
+  if (composerYtBtn && composerYtFileInput) {
+    composerYtBtn.addEventListener("click", () => composerYtFileInput.click());
+    composerYtFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      const fileNameSpan = document.getElementById("ytVideoFileName");
+      const base64Input = document.getElementById("ytVideoBase64");
+      if (file) {
+        if (fileNameSpan) fileNameSpan.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (base64Input) base64Input.value = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        if (fileNameSpan) fileNameSpan.textContent = "No video file selected";
+        if (base64Input) base64Input.value = "";
+      }
+    });
+  }
 
   let ideaQueue = [];
   let ideaQueueLoading = false;
@@ -503,7 +1723,7 @@
     if (showLoader) {
       document.getElementById("ideaQueue").innerHTML = `
         <div style="display:flex;flex-direction:column;gap:var(--s2)">
-          ${[1,2,3,4].map(() => `<div style="height:38px;border-radius:var(--radius-sm);background:var(--surface2);animation:pulse 1.5s ease-in-out infinite;opacity:0.6"></div>`).join("")}
+          ${[1,2,3,4].map(() => `<div style="height:76px;border-radius:var(--r-md);background:var(--surface-2);animation:pulse 1.5s ease-in-out infinite;opacity:0.6"></div>`).join("")}
         </div>`;
       document.getElementById("queueCount").textContent = "…";
     }
@@ -532,26 +1752,54 @@
   }
 
   function renderQueue() {
-    document.getElementById("queueCount").textContent = ideaQueue.length;
-    document.getElementById("ideaQueue").innerHTML = ideaQueue.length ? ideaQueue.map((q, i) => { const p = M.platMeta(q.chan);
-      return `<div class="idea-q" title="${q.reason ? q.reason.replace(/"/g, '&quot;') : ''}" style="position:relative"><span class="icon-tile tile-${p.tile} iq-ic">${I(p.icon,"style='width:14px;height:14px'")}</span>
-        <span class="iq-t">${q.title}</span><button class="icon-btn btn-sm" data-q="${i}" title="Use this suggestion">${I("sparkles","style='width:15px;height:15px'")}</button></div>`;
-    }).join("") : `<div class="muted tsm" style="text-align:center;padding:var(--s4)">Click Refresh to generate AI suggestions for your brand.</div>`;
+    const filteredQueue = ideaQueue.filter(q => q.chan.toLowerCase() === curChan.toLowerCase());
+    document.getElementById("queueCount").textContent = filteredQueue.length;
+    document.getElementById("ideaQueue").innerHTML = filteredQueue.length ? filteredQueue.map((q) => { 
+      const originalIdx = ideaQueue.indexOf(q);
+      const p = M.platMeta(q.chan);
+      const reasonHTML = q.reason ? `<div class="iq-reason" style="font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.4;">${q.reason}</div>` : '';
+      return `<div class="idea-q" style="display:flex; gap:12px; padding:12px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); transition:all 0.2s ease; position:relative;" data-index="${originalIdx}">
+        <span class="icon-tile tile-${p.tile} iq-ic" style="width:32px; height:32px; border-radius:8px; display:grid; place-items:center; flex-shrink:0; background:${p.color}15; color:${p.color};">${I(p.icon,"style='width:16px;height:16px'")}</span>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="badge badge-neutral" style="font-size:9px; padding:1px 5px; text-transform:uppercase; font-weight:700;">${q.chan}</span>
+          </div>
+          <div class="iq-t" style="font-weight:600; font-size:14px; color:var(--text); margin-top:4px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; white-space:normal;">${q.title}</div>
+          ${reasonHTML}
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px; justify-content:center; align-items:flex-end; flex-shrink:0;">
+          <button class="btn btn-primary btn-sm btn-use-idea" data-q="${originalIdx}" title="Use this suggestion" style="padding:6px 10px; border-radius:var(--r-sm); display:flex; align-items:center; gap:4px; font-size:12px;">
+            ${I("sparkles","style='width:12px;height:12px'")}
+            <span>Draft</span>
+          </button>
+          <button class="icon-btn btn-sm btn-dismiss-idea" data-dismiss="${originalIdx}" title="Dismiss suggestion" style="color:var(--text-muted); opacity:0.6; padding:4px; border-radius:4px; transition:all 0.15s ease;">
+            ${I("x", "style='width:14px;height:14px'")}
+          </button>
+        </div>
+      </div>`;
+    }).join("") : `<div class="muted tsm" style="text-align:center;padding:var(--s4)">No suggestions available for ${curChan}. Click Refresh to generate new suggestions.</div>`;
+    
     C.refreshIcons();
-    document.querySelectorAll("[data-q]").forEach(b => b.addEventListener("click", () => {
+    
+    document.querySelectorAll(".btn-use-idea").forEach(b => b.addEventListener("click", () => {
       const q = ideaQueue[+b.dataset.q];
       const titleInput = document.getElementById("ideaTitle");
       if (titleInput) {
-        const currentVal = titleInput.value.trim();
-        if (currentVal) {
-          titleInput.value = currentVal + "\n" + q.title;
-        } else {
-          titleInput.value = q.title;
-        }
+        titleInput.value = q.title;
         titleInput.focus();
       }
       curChan = q.chan;
       document.querySelectorAll(".chan").forEach(x => x.classList.toggle("active", x.dataset.chan === q.chan));
+      renderQueue();
+      C.toast({ type: "success", title: "Idea applied", desc: `Loaded suggestion into the ${q.chan} composer!` });
+    }));
+
+    document.querySelectorAll(".btn-dismiss-idea").forEach(b => b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = +b.dataset.dismiss;
+      ideaQueue.splice(idx, 1);
+      renderQueue();
+      C.toast({ type: "info", title: "Idea dismissed", desc: "Suggestion removed from queue" });
     }));
   }
 
@@ -576,8 +1824,11 @@
     const guide = site.style_guide || {};
     const primaryFont = guide.primary_font ? guide.primary_font : 'inherit';
     const headingFont = guide.heading_font ? guide.heading_font : primaryFont;
-    const headingColor = guide.heading_color ? guide.heading_color : 'inherit';
-    const textColor = guide.text_color ? guide.text_color : 'inherit';
+    let headingColor = guide.heading_color ? guide.heading_color : 'inherit';
+    let textColor = guide.text_color ? guide.text_color : 'inherit';
+
+    if (headingColor.toLowerCase() === 'transparent') headingColor = 'inherit';
+    if (textColor.toLowerCase() === 'transparent') textColor = 'inherit';
 
     const isColorLight = (colorStr) => {
       if (!colorStr || colorStr === 'inherit' || colorStr === 'transparent') return false;
@@ -765,7 +2016,6 @@
       return `<div class="li"><div class="li-top"><span class="avatar li-av" style="background:${site.color}">${site.short}</span>
         <div style="flex:1"><div class="li-nm">${site.name}</div><div class="li-hl">${site.industry}</div><div class="li-time">Just now · ${I("globe","style='width:11px;height:11px'")}</div></div>${I("more-horizontal")}</div>
         <div class="li-body" style="white-space: pre-wrap;">${txt}${coverHTML}</div>
-        <div class="li-react"><span class="row" style="gap:2px"><span style="background:var(--linkedin);color:#fff;width:16px;height:16px;border-radius:99px;display:grid;place-items:center;font-size:9px">👍</span></span> 248 · 32 comments</div>
         <div class="li-bar"><button>${I("thumbs-up")} Like</button><button>${I("message-circle")} Comment</button><button>${I("repeat-2")} Repost</button><button>${I("send")} Send</button></div></div>`;
     }
     if (plat === "Instagram") {
@@ -779,14 +2029,22 @@
       return `<div class="ig"><div class="ig-top"><span class="ig-av"><span style="color:${site.color}">${site.short}</span></span><span class="ig-nm">${site.id}</span>${I("more-horizontal")}</div>
         <div class="ig-img" ${imgStyle}>${imgContent}<span class="ig-tag">${title.slice(0,28)}</span></div>
         <div class="ig-actions">${I("heart")}${I("message-circle")}${I("send")}<span class="sp">${I("bookmark")}</span></div>
-        <div class="ig-likes">1,204 likes</div><div class="ig-cap"><b>${site.id}</b> ${txt}</div></div>`;
+        <div class="ig-cap"><b>${site.id}</b> ${txt}</div></div>`;
     }
     if (plat === "YouTube") {
       const txt = (typeof body === "string" ? body : SAMPLE.YouTube.desc);
-      const thumbStyle = coverImage 
-        ? `style="background-image: url('${coverImage}'); background-size: cover; background-position: center;"`
-        : "";
-      return `<div class="yt"><div class="yt-thumb" ${thumbStyle}><span class="play">${I("play")}</span><span class="dur">8:42</span></div>
+      const isVid = coverImage && (coverImage.toLowerCase().endsWith(".mp4") || coverImage.toLowerCase().endsWith(".webm") || coverImage.startsWith("data:video/"));
+      
+      let mediaHTML = "";
+      if (isVid) {
+        mediaHTML = `<video src="${coverImage}" controls style="width:100%; border-radius:8px; display:block; margin-bottom:var(--s2); max-height:200px; object-fit:cover;"></video>`;
+      } else {
+        const thumbStyle = coverImage 
+          ? `style="background-image: url('${coverImage}'); background-size: cover; background-position: center;"`
+          : "";
+        mediaHTML = `<div class="yt-thumb" ${thumbStyle}><span class="play">${I("play")}</span><span class="dur">Video</span></div>`;
+      }
+      return `<div class="yt">${mediaHTML}
         <div class="yt-info"><span class="avatar yt-av" style="background:${site.color}">${site.short}</span>
         <div><div class="yt-t">${title}</div><div class="yt-ch">${site.name} · ${txt.substring(0, 80)}...</div></div></div></div>`;
     }
@@ -795,7 +2053,11 @@
   /* ----- draft model ----- */
   let drafts = M.content.filter(c => c.site === site.id);
   let filter = "all";
+  let channelFilter = "all";
   let selectedDraftId = null;
+  let activeWsDraftId = null;
+  let draftsPage = 1;
+  const DRAFTS_PER_PAGE = 5;
 
   function statusPill(s) { return `<span class="badge badge-${s.toLowerCase()}">${s}</span>`; }
 
@@ -821,14 +2083,19 @@
     const p = M.platMeta(d.chan);
     const actions = d.status === "Draft"
       ? `<button class="btn btn-ghost btn-sm" data-act="reject" data-id="${d.id}">${I("x")} Reject</button>
-         <button class="btn btn-ghost btn-sm" data-act="regen" data-id="${d.id}">${I("rotate-cw")} Regenerate</button>
+         <button class="btn btn-ghost btn-sm" data-act="regen-content" data-id="${d.id}">${I("file-text")} Regen Content</button>
+         ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("image")} Regen Image</button>` : ''}
+         ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>` : ''}
          <span class="spacer"></span>
          <button class="btn btn-secondary btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button>
          <button class="btn btn-success btn-sm" data-act="approve" data-id="${d.id}">${I("check")} Approve</button>`
       : d.status === "Approved"
       ? `<button class="btn btn-ghost btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button><span class="spacer"></span>
          <button class="btn btn-primary btn-sm" data-act="schedule" data-id="${d.id}">${I("calendar-plus")} Schedule</button>`
-      : `<span class="muted tsm row gap2">${I("check-check","style='width:15px;height:15px;color:var(--success)'")} ${d.status==='Scheduled'?'Scheduled':'Live'}</span><span class="spacer"></span>
+      : d.status === "Scheduled"
+      ? `<button class="btn btn-ghost btn-sm" data-act="unschedule" data-id="${d.id}">${I("calendar-x")} Unschedule</button><span class="spacer"></span>
+         <button class="btn btn-ghost btn-sm" data-act="view" data-id="${d.id}">${I("eye")} View</button>`
+      : `<span class="muted tsm row gap2">${I("check-check","style='width:15px;height:15px;color:var(--success)'")} Published</span><span class="spacer"></span>
          <button class="btn btn-ghost btn-sm" data-act="view" data-id="${d.id}">${I("eye")} View</button>`;
          
     return `<div class="draft-preview-card" data-card="${d.id}">
@@ -850,38 +2117,209 @@
     </div>`;
   }
 
-  function renderDrafts() {
-    const list = drafts.filter(d => filter === "all" || d.status === filter);
-    const wrap = document.getElementById("draftList");
-    const previewContainer = document.getElementById("draftPreviewContent");
+  function openBigPreview(d) {
+    document.getElementById("largePreviewTitle").textContent = d.title;
+    document.getElementById("largePreviewSub").textContent = `${d.chan} · AI draft preview`;
     
-    if (!list.length) {
-      wrap.innerHTML = `<div class="empty card" style="padding:var(--s9)"><div class="empty-art">${I("sparkles")}</div><h3>No ${filter==='all'?'':filter.toLowerCase()+' '}drafts</h3><p>Use the composer to generate AI content for this website.</p></div>`;
-      if (previewContainer) {
-        previewContainer.innerHTML = `<div class="empty card" style="padding:var(--s9); border-style:dashed;"><div class="empty-art">${I("sparkles")}</div><h3>No draft selected</h3><p>Create a draft first or change filter to see preview.</p></div>`;
-      }
-      C.refreshIcons();
+    const bodyContainer = document.getElementById("largePreviewBody");
+    if (bodyContainer) {
+      bodyContainer.innerHTML = previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+    }
+    
+    const footContainer = document.getElementById("largePreviewFoot");
+    if (footContainer) {
+      const isYouTube = d.chan === "YouTube";
+      const actions = d.status === "Draft"
+        ? `<button class="btn btn-ghost btn-sm" data-act="reject" data-id="${d.id}">${I("x")} Reject</button>
+           <button class="btn btn-ghost btn-sm" data-act="regen-content" data-id="${d.id}">${I("file-text")} Regen Content</button>
+           ${isYouTube 
+             ? `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("video")} Regen Video</button>`
+             : `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("image")} Regen Image</button>`
+           }
+           ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>` : ''}
+           <span class="spacer"></span>
+           <button class="btn btn-secondary btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button>
+           <button class="btn btn-success btn-sm" data-act="approve" data-id="${d.id}">${I("check")} Approve</button>`
+        : d.status === "Approved"
+        ? `<button class="btn btn-ghost btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button><span class="spacer"></span>
+           <button class="btn btn-primary btn-sm" data-act="schedule" data-id="${d.id}">${I("calendar-plus")} Schedule</button>`
+        : d.status === "Scheduled"
+        ? `<button class="btn btn-ghost btn-sm" data-act="unschedule" data-id="${d.id}">${I("calendar-x")} Unschedule</button><span class="spacer"></span>
+           <button class="btn btn-ghost btn-sm" data-act="view" data-id="${d.id}">${I("eye")} View</button>`
+        : `<span class="muted tsm row gap2">${I("check-check","style='width:15px;height:15px;color:var(--success)'")} Published</span><span class="spacer"></span>
+           <button class="btn btn-ghost btn-sm" data-act="view" data-id="${d.id}">${I("eye")} View</button>`;
+      footContainer.innerHTML = actions;
+    }
+    C.openModal("largePreviewModal");
+    C.refreshIcons();
+    wireDraftActions();
+  }
+
+  function renderWsDraftPreview(d) {
+    const el = document.getElementById("wsDraftPreview");
+    if (!el) return;
+    if (!d) {
+      el.innerHTML = `<div class="empty card" style="padding:var(--s9); border:none; display:grid; place-content:center; text-align:center;"><div class="empty-art">${I("sparkles")}</div><h3>No draft selected</h3><p>Select a draft from the list to preview details.</p></div>`;
       return;
     }
+    
+    const p = M.platMeta(d.chan);
+    const isApproved = d.status === "Approved";
+    const isDraft = d.status === "Draft";
+    const isScheduled = d.status === "Scheduled";
 
-    // Determine active draft selection
-    let activeDraft = list.find(d => d.id === selectedDraftId);
-    if (!activeDraft) {
-      // Default to first item of list
-      activeDraft = list[0];
-      selectedDraftId = activeDraft ? activeDraft.id : null;
+    const isYouTube = d.chan === "YouTube";
+    const actionsLeft = isDraft
+      ? `<button class="btn btn-ghost btn-sm" data-act="reject" data-id="${d.id}">${I("x")} Reject</button>
+         <button class="btn btn-ghost btn-sm" data-act="regen-content" data-id="${d.id}">${I("file-text")} Regen Content</button>
+         ${isYouTube 
+           ? `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("video")} Regen Video</button>`
+           : `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("image")} Regen Image</button>`
+         }
+         ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>` : ''}`
+      : isScheduled
+      ? `<button class="btn btn-ghost btn-sm" data-act="unschedule" data-id="${d.id}">${I("calendar-x")} Unschedule</button>`
+      : '';
+
+    const actionsRight = isDraft
+      ? `<button class="btn btn-secondary btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button>
+         <button class="btn btn-success btn-sm" data-act="approve" data-id="${d.id}">${I("check")} Approve</button>`
+      : isApproved
+      ? `<button class="btn btn-secondary btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button>
+         <button class="btn btn-primary btn-sm" data-act="schedule" data-id="${d.id}">${I("calendar-plus")} Schedule</button>`
+      : `<button class="btn btn-ghost btn-sm" data-act="view" data-id="${d.id}">${I("eye")} View</button>`;
+
+    el.innerHTML = `
+      <div class="card__header" style="display:flex; align-items:center; justify-content:space-between; padding: 12px var(--s5);">
+        <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+        <div style="flex:1;min-width:0;margin-left:10px;">
+          <h3 style="font-size:var(--fs-md);margin-bottom:2px;">${d.chan} draft</h3>
+          <div class="sub">${site.name} · status: <b>${d.status}</b></div>
+        </div>
+        <button class="icon-btn btn-sm" id="maximizeWsDraft" title="Full screen view" style="margin-right:4px;">${I("maximize-2")}</button>
+      </div>
+      <div class="card__body" id="wsPrevBody" style="max-height:480px;overflow-y:auto;padding:var(--s5);">${previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date)}</div>
+      <div class="card__footer" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding: 12px var(--s5);">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          ${actionsLeft}
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          ${actionsRight}
+        </div>
+      </div>`;
+
+    const maxBtn = document.getElementById("maximizeWsDraft");
+    if (maxBtn) {
+      maxBtn.addEventListener("click", () => openBigPreview(d));
     }
 
-    wrap.innerHTML = list.map(d => draftListItem(d, d.id === selectedDraftId)).join("");
+    C.refreshIcons();
+    wireDraftActions();
+  }
+
+  function renderDrafts() {
+    // 1. Render main Drafts Tab Panel list
+    const wsWrap = document.getElementById("wsDraftList");
+    const wsPagWrap = document.getElementById("wsDraftListPagination");
     
-    if (previewContainer) {
-      if (activeDraft) {
-        previewContainer.innerHTML = draftPreviewContent(activeDraft);
+    if (wsWrap) {
+      const list = drafts.filter(d => {
+        const matchesStatus = filter === "all" || d.status === filter;
+        const matchesChannel = channelFilter === "all" || d.chan.toLowerCase() === channelFilter.toLowerCase();
+        return matchesStatus && matchesChannel;
+      });
+      list.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+      
+      const totalPages = Math.ceil(list.length / DRAFTS_PER_PAGE);
+      if (draftsPage > totalPages) draftsPage = Math.max(1, totalPages);
+      
+      let activeWsDraft = null;
+      if (list.length > 0) {
+        activeWsDraft = list.find(d => d.id === activeWsDraftId);
+        if (!activeWsDraft) {
+          activeWsDraft = list[0];
+          activeWsDraftId = activeWsDraft.id;
+        }
       } else {
-        previewContainer.innerHTML = `<div class="empty card" style="padding:var(--s9); border-style:dashed;"><div class="empty-art">${I("sparkles")}</div><h3>No draft selected</h3><p>Select a draft from the list to preview its details.</p></div>`;
+        activeWsDraftId = null;
+      }
+      
+      renderWsDraftPreview(activeWsDraft);
+      
+      if (!list.length) {
+        wsWrap.innerHTML = `<div class="empty card" style="padding:var(--s9)"><div class="empty-art">${I("sparkles")}</div><h3>No ${filter==='all'?'':filter.toLowerCase()+' '}drafts</h3><p>Use the composer to generate AI content for this website.</p></div>`;
+        if (wsPagWrap) wsPagWrap.innerHTML = "";
+      } else {
+        const pageItems = list.slice((draftsPage - 1) * DRAFTS_PER_PAGE, draftsPage * DRAFTS_PER_PAGE);
+        wsWrap.innerHTML = pageItems.map(d => draftListItem(d, d.id === activeWsDraftId)).join("");
+        
+        if (wsPagWrap) {
+          if (totalPages > 1) {
+            wsPagWrap.innerHTML = `
+              <button class="btn btn-secondary btn-sm" id="prevDraftPage" ${draftsPage === 1 ? 'disabled' : ''} style="padding: 4px 8px; font-size: 11px;">
+                ${I("chevron-left", "style='width:12px;height:12px'")} Prev
+              </button>
+              <span class="tsm muted" style="font-size: 12px; font-weight: 550; min-width: 60px; text-align: center;">
+                ${draftsPage} / ${totalPages}
+              </span>
+              <button class="btn btn-secondary btn-sm" id="nextDraftPage" ${draftsPage === totalPages ? 'disabled' : ''} style="padding: 4px 8px; font-size: 11px;">
+                Next ${I("chevron-right", "style='width:12px;height:12px'")}
+              </button>
+            `;
+            
+            document.getElementById("prevDraftPage").addEventListener("click", () => {
+              if (draftsPage > 1) {
+                draftsPage--;
+                renderDrafts();
+              }
+            });
+            document.getElementById("nextDraftPage").addEventListener("click", () => {
+              if (draftsPage < totalPages) {
+                draftsPage++;
+                renderDrafts();
+              }
+            });
+          } else {
+            wsPagWrap.innerHTML = "";
+          }
+        }
+      }
+    }
+
+    // 2. Render Session Generated Drafts in Generate Panel
+    const sessionSection = document.getElementById("sessionDraftsSection");
+    const sessionWrap = document.getElementById("sessionDraftList");
+    
+    if (sessionSection && sessionWrap) {
+      const sessionList = drafts.filter(d => sessionGeneratedDrafts.includes(String(d.id)));
+      sessionList.sort((a, b) => parseInt(b.id) - parseInt(a.id));
+      
+      if (sessionList.length > 0) {
+        sessionSection.style.display = "block";
+        sessionWrap.innerHTML = sessionList.map(d => draftListItem(d, false)).join("");
+      } else {
+        sessionSection.style.display = "none";
+        sessionWrap.innerHTML = "";
       }
     }
     
+    // Wire draft list click listeners
+    document.querySelectorAll(".draft-list-item").forEach(item => {
+      // Don't flag as wired here, wire fresh list clicks each render
+      item.addEventListener("click", () => {
+        const id = item.dataset.listId;
+        // If clicking in the main drafts tab, update split screen view
+        if (wsWrap && wsWrap.contains(item)) {
+          activeWsDraftId = id;
+          renderDrafts();
+        } else {
+          // If clicking in the session drafts list, open full modal
+          const d = drafts.find(x => x.id === id);
+          if (d) openBigPreview(d);
+        }
+      });
+    });
+
     C.refreshIcons();
     wireDraftActions();
   }
@@ -893,6 +2331,11 @@
         e.stopPropagation();
         const id = b.dataset.id, act = b.dataset.act, d = drafts.find(x => x.id === id);
         if (!d) return;
+        
+        if (["approve", "reject", "schedule", "unschedule", "edit", "view", "more", "regen-content", "regen-image"].includes(act)) {
+          C.closeModal("largePreviewModal");
+        }
+        
         if (act === "approve") {
           try {
             await CadenceAPI.approveDraft(d.id);
@@ -934,10 +2377,48 @@
           document.getElementById("schedDate").value = `${yyyy}-${mm}-${dd}`;
           document.getElementById("schedTime").value = `${hh}:${min}`;
           
+          if (window.updateWorkspaceMinTime) window.updateWorkspaceMinTime();
           C.openModal("scheduleModal");
         }
-        else if (act === "regen") {
-          await regenerate(d);
+        else if (act === "regen-content") {
+          await regenerate(d, "content");
+        }
+        else if (act === "regen-image") {
+          await regenerate(d, "image");
+        }
+        else if (act === "unschedule") {
+          try {
+            await CadenceAPI.updateDraft(d.id, { status: "draft" });
+            d.status = "Draft";
+            C.toast({ type: "success", title: "Unscheduled", desc: "Draft moved back to Draft status" });
+            await M.syncMockData(site.id);
+            if (C.mountShell) C.mountShell();
+            renderDrafts();
+          } catch (err) {
+            C.toast({ type: "error", title: "Unschedule failed", desc: err.message });
+          }
+        }
+        else if (act === "internal-links") {
+          try {
+            b.disabled = true;
+            b.innerHTML = `${I("loader-circle", "class='spin' style='width:12px;height:12px'")} Linking...`;
+            C.refreshIcons();
+            const updated = await CadenceAPI.injectInternalLinks(d.id);
+            d.body = updated.body;
+            C.toast({ type: "success", title: "Links added", desc: "Successfully linked keywords to old posts!" });
+            
+            // Update preview body directly
+            const bodyContainer = document.querySelector(".draft-preview-body");
+            if (bodyContainer) {
+              bodyContainer.innerHTML = previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+            }
+          } catch (err) {
+            C.toast({ type: "error", title: "Linking failed", desc: err.message });
+          } finally {
+            b.disabled = false;
+            b.innerHTML = `${I("link")} Link References`;
+            C.refreshIcons();
+          }
         }
         else if (act === "edit" || act === "view") {
           openEdit(d);
@@ -970,27 +2451,227 @@
       });
     });
 
-    document.querySelectorAll(".draft-list-item").forEach(item => {
-      if (item._wired) return;
-      item._wired = true;
-      item.addEventListener("click", () => {
-        selectedDraftId = item.dataset.listId;
-        renderDrafts();
-      });
-    });
   }
 
-  async function regenerate(d) {
+  /* ----- Global Task Polling & UI Indicators ----- */
+  function getActiveTasks() {
+    let ideas = [];
+    let draftsList = [];
+    try {
+      ideas = JSON.parse(localStorage.getItem("cadence.active_ideas")) || [];
+    } catch(e){}
+    try {
+      draftsList = JSON.parse(localStorage.getItem("cadence.active_drafts")) || [];
+    } catch(e){}
+    return { ideas, drafts: draftsList };
+  }
+
+  function saveActiveTasks(ideas, draftsList) {
+    localStorage.setItem("cadence.active_ideas", JSON.stringify(ideas));
+    localStorage.setItem("cadence.active_drafts", JSON.stringify(draftsList));
+  }
+
+  function updateGlobalTaskWidget() {
+    const { ideas, drafts: draftsList } = getActiveTasks();
+    const total = ideas.length + draftsList.length;
+    
+    let widget = document.getElementById("globalTaskWidget");
+    if (total === 0) {
+      if (widget) widget.remove();
+      return;
+    }
+    
+    if (!widget) {
+      widget = document.createElement("div");
+      widget.id = "globalTaskWidget";
+      widget.style = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--r-md);
+        box-shadow: var(--sh-lg);
+        padding: 12px 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 10000;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text);
+        border-left: 4px solid var(--primary);
+      `;
+      document.body.appendChild(widget);
+    }
+    
+    const taskName = ideas.length > 0 ? `AI writing: "${ideas[0].title}"` : `Regenerating: "${draftsList[0].title}"`;
+    const label = total > 1 ? `${taskName} (+${total - 1} more)` : taskName;
+    
+    widget.innerHTML = `
+      <i data-lucide="loader-circle" class="spin" style="color:var(--primary); width:16px; height:16px;"></i>
+      <span>${label}</span>
+    `;
+    C.refreshIcons();
+  }
+
+  let globalTaskPollerInterval = null;
+  
+  function initGlobalTaskPoller() {
+    if (globalTaskPollerInterval) return;
+    
+    updateGlobalTaskWidget();
+    const { ideas, drafts: draftsList } = getActiveTasks();
+    if (ideas.length === 0 && draftsList.length === 0) return;
+    
+    globalTaskPollerInterval = setInterval(async () => {
+      try {
+        const { ideas: curIdeas, drafts: curDraftsList } = getActiveTasks();
+        if (curIdeas.length === 0 && curDraftsList.length === 0) {
+          clearInterval(globalTaskPollerInterval);
+          globalTaskPollerInterval = null;
+          updateGlobalTaskWidget();
+          return;
+        }
+        
+        let changed = false;
+        
+        // 1. Poll Active Ideas
+        const remainingIdeas = [];
+        for (const idea of curIdeas) {
+          try {
+            const updated = await CadenceAPI.getIdeaDetail(idea.id);
+            if (updated && updated.status === 'done') {
+              C.toast({ type: "success", title: "Content Generated", desc: `"${idea.title}" draft is now ready!` });
+              changed = true;
+            } else if (updated && updated.status === 'failed') {
+              C.toast({ type: "error", title: "Generation Failed", desc: `Failed to generate "${idea.title}".` });
+              changed = true;
+            } else {
+              remainingIdeas.push(idea);
+            }
+          } catch(e) {
+            console.error("Error polling global task idea:", e);
+            remainingIdeas.push(idea); // Keep trying
+          }
+        }
+        
+        // 2. Poll Active Drafts
+        const remainingDrafts = [];
+        let currentDrafts = [];
+        if (curDraftsList.length > 0 && site?.id) {
+          try {
+            await window.MOCK.syncMockData(site.id);
+            currentDrafts = window.MOCK.content.filter(x => x.site === site.id);
+          } catch(e) {
+            console.error("Failed to sync mock data during global poll:", e);
+          }
+        }
+        
+        for (const d of curDraftsList) {
+          if (currentDrafts.length === 0) {
+            remainingDrafts.push(d);
+            continue;
+          }
+          
+          if (d.type === "image") {
+            const updated = currentDrafts.find(x => x.id === d.id);
+            if (updated && updated.cover_image !== d.oldCover) {
+              C.toast({ type: "success", title: "Cover Image Ready", desc: `Regenerated cover image for "${d.title}"` });
+              changed = true;
+            } else {
+              remainingDrafts.push(d);
+            }
+          } else {
+            const updatedOld = currentDrafts.find(x => x.id === d.id);
+            const hasNewDraft = currentDrafts.some(x => parseInt(x.id) > parseInt(d.id) && x.body && x.body !== "");
+            
+            if (hasNewDraft || (updatedOld && updatedOld.body && updatedOld.body !== "" && updatedOld.body !== d.oldBody)) {
+              C.toast({ type: "success", title: "Draft Regenerated", desc: `"${d.title}" content regenerated successfully!` });
+              changed = true;
+            } else {
+              remainingDrafts.push(d);
+            }
+          }
+        }
+        
+        if (changed || curIdeas.length !== remainingIdeas.length || curDraftsList.length !== remainingDrafts.length) {
+          saveActiveTasks(remainingIdeas, remainingDrafts);
+          updateGlobalTaskWidget();
+          
+          // Refresh the drafts list view automatically if present
+          if (site?.id) {
+            const oldDraftIds = drafts.map(d => parseInt(d.id));
+            const maxOldId = oldDraftIds.length > 0 ? Math.max(...oldDraftIds) : 0;
+            
+            await window.MOCK.syncMockData(site.id);
+            drafts = window.MOCK.content.filter(x => x.site === site.id);
+            
+            // If we completed an idea generation task
+            if (curIdeas.length > remainingIdeas.length) {
+              // Finish the progress bar
+              if (window._genProgressInterval) {
+                clearInterval(window._genProgressInterval);
+                window._genProgressInterval = null;
+              }
+              const progressBar = document.getElementById("generationProgressBar");
+              const progressPercent = document.getElementById("generationProgressPercent");
+              if (progressBar && progressPercent) {
+                progressBar.style.width = "100%";
+                progressPercent.textContent = "100%";
+              }
+              setTimeout(() => {
+                const progressContainer = document.getElementById("generationProgressContainer");
+                if (progressContainer) progressContainer.style.display = "none";
+              }, 1500);
+
+              // Map newly created drafts to sessionGeneratedDrafts based on maxOldId
+              drafts.forEach(d => {
+                const idNum = parseInt(d.id);
+                if (idNum > maxOldId && !sessionGeneratedDrafts.includes(String(d.id))) {
+                  sessionGeneratedDrafts.push(String(d.id));
+                }
+              });
+
+              // Auto-select the newly generated draft
+              const sorted = [...drafts].sort((a, b) => parseInt(b.id) - parseInt(a.id));
+              if (sorted.length > 0) {
+                selectedDraftId = sorted[0].id;
+              }
+            }
+            
+            renderDrafts();
+            await loadIdeaQueue();
+          }
+        }
+      } catch (globalErr) {
+        console.error("Error in global task poller tick:", globalErr);
+      }
+    }, 4000);
+  }
+
+  async function regenerate(d, type = "all") {
+    C.toast({ type: "info", title: "Regeneration Started", desc: "AI is rewriting draft in the background..." });
     const card = document.querySelector(`[data-card="${d.id}"] .draft__body`);
     if (card) {
       card.innerHTML = genLoadingHTML(); C.refreshIcons();
     }
+    
     try {
-      await CadenceAPI.regenerateDraft(d.id);
-      await window.MOCK.syncMockData(site.id);
-      drafts = window.MOCK.content.filter(x => x.site === site.id);
-      renderDrafts();
-      C.toast({ type: "success", title: "Regenerated a fresh draft" });
+      const res = await CadenceAPI.regenerateDraft(d.id, type);
+      
+      // Save to localStorage active registry
+      const { ideas: existingIdeas, drafts: existingDrafts } = getActiveTasks();
+      const newActiveDraft = {
+        id: d.id,
+        title: d.title,
+        type: type,
+        oldCover: d.cover_image,
+        oldBody: d.body
+      };
+      
+      saveActiveTasks(existingIdeas, [...existingDrafts, newActiveDraft]);
+      initGlobalTaskPoller();
     } catch (err) {
       C.toast({ type: "error", title: "Regeneration failed", desc: err.message });
       renderDrafts();
@@ -1004,6 +2685,64 @@
 
   /* ----- generate new draft ----- */
   async function startGenerate() {
+    const btn = document.getElementById("genBtn");
+    
+    if (curChan === "YouTube") {
+      const ytTitle = document.getElementById("ytTitle").value.trim();
+      const ytCaption = document.getElementById("ytCaption").value.trim();
+      const ytVideoBase64 = document.getElementById("ytVideoBase64").value;
+      
+      if (!ytTitle) {
+        C.toast({ type: "error", title: "Title Required", desc: "Please enter a video title." });
+        return;
+      }
+      if (!ytVideoBase64) {
+        C.toast({ type: "error", title: "Video Required", desc: "Please upload a video file." });
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Creating Draft…';
+      C.refreshIcons();
+      
+      try {
+        const draft = await CadenceAPI.createDraft({
+          website: site.id,
+          platform: "youtube",
+          title: ytTitle,
+          body: ytCaption,
+          cover_image: ytVideoBase64,
+          status: "draft"
+        });
+        
+        await window.MOCK.syncMockData(site.id);
+        drafts = window.MOCK.content.filter(x => x.site === site.id);
+        selectedDraftId = draft.id;
+        sessionGeneratedDrafts.push(String(draft.id));
+        
+        // Reset composer values
+        document.getElementById("ytTitle").value = "";
+        document.getElementById("ytCaption").value = "";
+        document.getElementById("ytVideoFile").value = "";
+        document.getElementById("ytVideoBase64").value = "";
+        document.getElementById("ytVideoFileName").textContent = "No video file selected";
+        
+        filter = "all";
+        document.querySelectorAll("#draftFilter button").forEach(x => x.classList.toggle("active", x.dataset.f === "all"));
+        renderDrafts();
+        
+        C.toast({ type: "success", title: "Draft Created", desc: "Successfully saved video draft to queue." });
+      } catch (err) {
+        console.error(err);
+        C.toast({ type: "error", title: "Failed to create draft", desc: err.message });
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="plus-circle"></i> Create Video Draft`;
+        C.refreshIcons();
+      }
+      return;
+    }
+
     const rawVal = document.getElementById("ideaTitle").value.trim();
     const titles = rawVal.split('\n').map(t => t.trim()).filter(t => t.length > 0);
     
@@ -1011,53 +2750,108 @@
       titles.push(`New ${curChan} post about ${site.name}`);
     }
     
-    const btn = document.getElementById("genBtn");
-    btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Generating…'; C.refreshIcons();
+    btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Submitting…'; C.refreshIcons();
     
     // Switch to generate panel visibly first
     document.querySelectorAll(".ws-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "generate"));
     document.querySelectorAll("#wsPanels .tab-panel").forEach(pp => pp.classList.toggle("active", pp.dataset.panel === "generate"));
 
     try {
+      const generatedIdeas = [];
       // Generate each title sequentially
       for (const title of titles) {
         const idea = await CadenceAPI.submitIdea(site.id, title, curChan.toLowerCase());
         await CadenceAPI.generateContent(idea.id);
+        generatedIdeas.push({ id: idea.id, title: idea.title });
       }
-      
-      await window.MOCK.syncMockData(site.id);
-      drafts = window.MOCK.content.filter(x => x.site === site.id);
-      
-      if (drafts.length > 0) {
-        let maxIdDraft = drafts[0];
-        drafts.forEach(d => {
-          if (parseInt(d.id) > parseInt(maxIdDraft.id)) {
-            maxIdDraft = d;
+
+      C.toast({ 
+        type: "info", 
+        title: "AI Generation Started", 
+        desc: `Started generating ${titles.length} draft(s) in the background...` 
+      });
+
+      // Show progress bar
+      const progressContainer = document.getElementById("generationProgressContainer");
+      const progressBar = document.getElementById("generationProgressBar");
+      const progressPercent = document.getElementById("generationProgressPercent");
+      if (progressContainer && progressBar && progressPercent) {
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressPercent.textContent = "0%";
+        let currentProgress = 0;
+        if (window._genProgressInterval) {
+          clearInterval(window._genProgressInterval);
+        }
+        window._genProgressInterval = setInterval(() => {
+          if (currentProgress < 90) {
+            currentProgress += Math.floor(Math.random() * 6) + 3;
+            if (currentProgress > 90) currentProgress = 90;
+            progressBar.style.width = `${currentProgress}%`;
+            progressPercent.textContent = `${currentProgress}%`;
           }
-        });
-        selectedDraftId = maxIdDraft.id;
+        }, 600);
       }
+
+      // Save to localStorage active registry
+      const { ideas: existingIdeas, drafts: existingDrafts } = getActiveTasks();
+      saveActiveTasks([...existingIdeas, ...generatedIdeas], existingDrafts);
       
-      filter = "all";
-      document.querySelectorAll("#draftFilter button").forEach(x => x.classList.toggle("active", x.dataset.f === "all"));
-      renderDrafts();
-      await loadIdeaQueue();
-      
-      const successMsg = titles.length > 1 ? `${titles.length} drafts generated` : `${curChan} content generated`;
-      C.toast({ type: "success", title: "Draft ready", desc: successMsg });
+      // Start global polling
+      initGlobalTaskPoller();
+
       document.getElementById("ideaTitle").value = "";
     } catch (err) {
       console.error(err);
       C.toast({ type: "error", title: "Generation failed", desc: err.message });
+      if (window._genProgressInterval) {
+        clearInterval(window._genProgressInterval);
+        window._genProgressInterval = null;
+      }
+      const progressContainer = document.getElementById("generationProgressContainer");
+      if (progressContainer) progressContainer.style.display = "none";
     } finally {
       btn.disabled = false; btn.innerHTML = I("sparkles") + " Generate with AI"; C.refreshIcons();
     }
   }
   document.getElementById("genBtn").addEventListener("click", startGenerate);
 
-  document.querySelectorAll("#draftFilter button").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll("#draftFilter button").forEach(x => x.classList.remove("active")); b.classList.add("active"); filter = b.dataset.f; renderDrafts();
+  // Layout Toggle controls
+  const layoutToggle = document.getElementById("genLayoutToggle");
+  const layoutEl = document.getElementById("generateLayoutEl");
+  if (layoutToggle && layoutEl) {
+    layoutToggle.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        layoutToggle.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        
+        const mode = btn.dataset.layout;
+        if (mode === "focus") {
+          layoutEl.classList.add("focus-mode");
+        } else {
+          layoutEl.classList.remove("focus-mode");
+        }
+      });
+    });
+  }
+
+  document.querySelectorAll("#draftFilter button, #wsDraftFilter button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#draftFilter button, #wsDraftFilter button").forEach(x => {
+      if (x.dataset.f === b.dataset.f) x.classList.add("active"); else x.classList.remove("active");
+    });
+    filter = b.dataset.f; draftsPage = 1; renderDrafts();
   }));
+
+  const channelFilterGroup = document.getElementById("wsDraftChannelFilter");
+  if (channelFilterGroup) {
+    channelFilterGroup.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      channelFilterGroup.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      channelFilter = b.dataset.c;
+      draftsPage = 1;
+      renderDrafts();
+    }));
+  }
 
   /* ----- edit modal ----- */
   let editing = null;
@@ -1149,9 +2943,16 @@
           const coverPreview = document.getElementById("editCoverPreview");
           document.getElementById("editCoverUrl").value = base64;
           if (coverPreview) {
-            coverPreview.style.backgroundImage = `url('${base64}')`;
-            coverPreview.style.border = "none";
-            coverPreview.innerHTML = "";
+            const isVid = file.type.startsWith("video/") || base64.startsWith("data:video/");
+            if (isVid) {
+              coverPreview.style.backgroundImage = "none";
+              coverPreview.style.border = "none";
+              coverPreview.innerHTML = `<video src="${base64}" controls style="width:100%; height:100%; object-fit:cover; border-radius:6px;"></video>`;
+            } else {
+              coverPreview.style.backgroundImage = `url('${base64}')`;
+              coverPreview.style.border = "none";
+              coverPreview.innerHTML = "";
+            }
           }
         };
         reader.readAsDataURL(file);
@@ -1261,6 +3062,12 @@
       tbLink.addEventListener("click", (e) => {
         e.preventDefault();
         restoreSelection();
+        const sanitizeUrl = (u) => {
+          if (!u) return u;
+          const t = u.trim();
+          if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(t)) return t;
+          return "https://" + t;
+        };
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
@@ -1270,7 +3077,7 @@
             const url = prompt("Enter the link URL (e.g., https://google.com):");
             if (url) {
               restoreSelection();
-              document.execCommand("createLink", false, url);
+              document.execCommand("createLink", false, sanitizeUrl(url));
             }
           } else {
             const linkText = prompt("Enter link text:");
@@ -1279,7 +3086,7 @@
               if (url) {
                 restoreSelection();
                 const a = document.createElement("a");
-                a.href = url;
+                a.href = sanitizeUrl(url);
                 a.textContent = linkText;
                 a.target = "_blank";
                 range.insertNode(a);
@@ -1342,19 +3149,34 @@
       richBody.innerHTML = d.body || "";
     }
     
-    // Load cover image
+    // Customize cover image section for video if channel is YouTube
+    const cardTitle = document.getElementById("coverCardTitle");
+    const urlLabel = document.getElementById("coverUrlLabel");
+    const isVideo = d.chan === "YouTube" || (d.cover_image && (d.cover_image.toLowerCase().endsWith(".mp4") || d.cover_image.toLowerCase().endsWith(".webm") || d.cover_image.startsWith("data:video/")));
+    
+    if (cardTitle) cardTitle.textContent = isVideo ? "Video File" : "Cover Image";
+    if (urlLabel) urlLabel.textContent = isVideo ? "Video URL" : "Image URL";
+
     const coverPreview = document.getElementById("editCoverPreview");
     const coverUrlInput = document.getElementById("editCoverUrl");
     if (coverPreview && coverUrlInput) {
       coverUrlInput.value = d.cover_image || "";
       if (d.cover_image) {
-        coverPreview.style.backgroundImage = `url('${d.cover_image}')`;
-        coverPreview.style.border = "none";
-        coverPreview.innerHTML = "";
+        if (isVideo || d.cover_image.startsWith("data:video/")) {
+          coverPreview.style.backgroundImage = "none";
+          coverPreview.style.border = "none";
+          coverPreview.innerHTML = `<video src="${d.cover_image}" controls style="width:100%; height:100%; object-fit:cover; border-radius:6px;"></video>`;
+        } else {
+          coverPreview.style.backgroundImage = `url('${d.cover_image}')`;
+          coverPreview.style.border = "none";
+          coverPreview.innerHTML = "";
+        }
       } else {
         coverPreview.style.backgroundImage = "none";
         coverPreview.style.border = "1.5px dashed var(--border)";
-        coverPreview.innerHTML = `<i data-lucide="image" class="muted" style="width:32px;height:32px"></i>`;
+        coverPreview.innerHTML = isVideo
+          ? `<i data-lucide="video" class="muted" style="width:32px;height:32px"></i>`
+          : `<i data-lucide="image" class="muted" style="width:32px;height:32px"></i>`;
         if (window.lucide) window.lucide.createIcons();
       }
     }
@@ -1430,6 +3252,12 @@
       const [yyyy, mm, dd] = dateVal.split("-").map(Number);
       const [hh, min] = timeVal.split(":").map(Number);
       const targetDate = new Date(yyyy, mm - 1, dd, hh, min, 0, 0);
+      
+      const now = new Date();
+      if (targetDate < now) {
+        C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule posts in the past." });
+        return;
+      }
       
       confirmScheduleBtn.disabled = true;
       try {
@@ -1530,6 +3358,173 @@
       openImageLightbox(e.target.src);
     }
   });
+
+  // Set min date for date inputs to prevent past scheduling
+  const todayObj = new Date();
+  const yyyy = todayObj.getFullYear();
+  const mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(todayObj.getDate()).padStart(2, '0');
+  const localTodayStr = `${yyyy}-${mm}-${dd}`;
+  const schedDateInput = document.getElementById("schedDate");
+  const schedTimeInput = document.getElementById("schedTime");
+  if (schedDateInput) {
+    schedDateInput.min = localTodayStr;
+  }
+
+  window.updateWorkspaceMinTime = function() {
+    if (schedDateInput && schedTimeInput) {
+      const tObj = new Date();
+      const y = tObj.getFullYear();
+      const m = String(tObj.getMonth() + 1).padStart(2, '0');
+      const d = String(tObj.getDate()).padStart(2, '0');
+      const todayStr = `${y}-${m}-${d}`;
+      
+      if (schedDateInput.value === todayStr) {
+        const hh = String(tObj.getHours()).padStart(2, '0');
+        const min = String(tObj.getMinutes()).padStart(2, '0');
+        schedTimeInput.min = `${hh}:${min}`;
+      } else {
+        schedTimeInput.removeAttribute("min");
+      }
+    }
+  };
+  if (schedDateInput) {
+    schedDateInput.addEventListener("change", window.updateWorkspaceMinTime);
+    schedDateInput.addEventListener("input", window.updateWorkspaceMinTime);
+  }
+
+  /* ----- usage stats dashboard logic ----- */
+  let usageChartInstance = null;
+
+  async function loadUsageStats() {
+    try {
+      const stats = await CadenceAPI.getTokenUsageStats(site.id);
+
+      // Render simple stats cards
+      document.getElementById("usageTotalTokens").textContent = C.fmt(stats.total_tokens);
+      document.getElementById("usagePromptTokens").textContent = C.fmt(stats.prompt_tokens);
+      document.getElementById("usageCompletionTokens").textContent = C.fmt(stats.completion_tokens);
+      document.getElementById("usageTotalCost").textContent = `$${stats.total_cost.toFixed(2)}`;
+
+      // Weekly trend label
+      const trendVal = document.getElementById("usageWeeklyTrend");
+      if (stats.total_tokens > 100000) {
+        trendVal.textContent = "High";
+        trendVal.style.color = "var(--danger)";
+      } else if (stats.total_tokens > 20000) {
+        trendVal.textContent = "Moderate";
+        trendVal.style.color = "var(--warning)";
+      } else {
+        trendVal.textContent = "Low";
+        trendVal.style.color = "var(--success)";
+      }
+
+      // Draw model breakdown list
+      const modelContainer = document.getElementById("usageModelBreakdown");
+      modelContainer.innerHTML = "";
+      const models = Object.keys(stats.model_breakdown);
+      if (models.length === 0) {
+        modelContainer.innerHTML = `<span class="tsm text-muted">No API usage recorded yet.</span>`;
+      } else {
+        models.forEach(model => {
+          const usage = stats.model_breakdown[model];
+          const div = document.createElement("div");
+          div.className = "row-between";
+          div.style = "font-size:13px; margin-bottom: 4px;";
+          div.innerHTML = `
+            <span class="fw5" style="color:var(--text)">${model}</span>
+            <span class="mono muted">${C.fmt(usage.tokens)} tokens ($${usage.cost.toFixed(4)})</span>
+          `;
+          modelContainer.appendChild(div);
+        });
+      }
+
+      // Draw feature breakdown list
+      const sectionContainer = document.getElementById("usageSectionBreakdown");
+      sectionContainer.innerHTML = "";
+      const sections = Object.keys(stats.section_breakdown);
+      if (sections.length === 0) {
+        sectionContainer.innerHTML = `<span class="tsm text-muted">No API usage recorded yet.</span>`;
+      } else {
+        sections.forEach(section => {
+          const usage = stats.section_breakdown[section];
+          const div = document.createElement("div");
+          div.className = "row-between";
+          div.style = "font-size:13px; margin-bottom: 4px;";
+          div.innerHTML = `
+            <span class="fw5" style="color:var(--text)">${section}</span>
+            <span class="mono muted">${C.fmt(usage.tokens)} tokens ($${usage.cost.toFixed(4)})</span>
+          `;
+          sectionContainer.appendChild(div);
+        });
+      }
+
+      // Render line chart
+      const chartCanvas = document.getElementById("usageChart");
+      if (!chartCanvas) return;
+
+      if (usageChartInstance) {
+        usageChartInstance.destroy();
+      }
+
+      const labels = stats.weekly_history.map(d => d.day);
+      const dataPoints = stats.weekly_history.map(d => d.tokens);
+
+      const computedStyles = getComputedStyle(document.documentElement);
+      const primaryColor = computedStyles.getPropertyValue('--primary').trim() || '#3b82f6';
+      const gridColor = computedStyles.getPropertyValue('--border').trim() || 'rgba(0, 0, 0, 0.05)';
+      const textColor = computedStyles.getPropertyValue('--text').trim() || '#1e293b';
+
+      usageChartInstance = new Chart(chartCanvas, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Tokens Used',
+            data: dataPoints,
+            borderColor: primaryColor,
+            backgroundColor: primaryColor + '15',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: primaryColor
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              grid: { color: gridColor },
+              ticks: { color: textColor, font: { family: 'Inter' } },
+              beginAtZero: true
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: textColor, font: { family: 'Inter' } }
+            }
+          }
+        }
+      });
+
+    } catch (err) {
+      console.error("Failed to load token usage statistics:", err);
+      C.toast({ type: "error", title: "Error Loading Stats", desc: err.message || "Unable to retrieve API token usage details." });
+    }
+  }
+
+  // Bind to Usage tab click
+  const usageTabBtn = document.querySelector('.ws-tabs button[data-tab="usage"]');
+  if (usageTabBtn) {
+    usageTabBtn.addEventListener("click", loadUsageStats);
+  }
+
+  // Initialize global poller on load in case there are running tasks from a previous session/page
+  initGlobalTaskPoller();
 
   renderDrafts();
   C.refreshIcons();

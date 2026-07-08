@@ -464,13 +464,13 @@
           <div class="field">
             <label class="label" for="email">Email</label>
             <div class="input-group"><span class="lead"><i data-lucide="mail"></i></span>
-              <input class="input" id="email" type="email" placeholder="you@company.com" value="maya@cadence.io" autocomplete="email" />
+              <input class="input" id="email" type="email" placeholder="you@company.com" autocomplete="email" />
             </div>
           </div>
           <div class="field" style="margin-bottom:var(--s4)">
             <label class="label" for="pw">Password</label>
             <div class="input-group"><span class="lead"><i data-lucide="lock"></i></span>
-              <input class="input" id="pw" type="password" placeholder="••••••••" value="demo1234" autocomplete="current-password" />
+              <input class="input" id="pw" type="password" placeholder="••••••••" autocomplete="current-password" />
             </div>
           </div>
           <div class="auth-row">
@@ -480,7 +480,7 @@
           <button class="btn-submit" type="submit">Sign in <i data-lucide="arrow-right"></i></button>
         </form>
 
-        <div class="auth-foot">Don't have an account? <a href="signup.html">Create one</a></div>
+
       </div>
     </div>
   </div>
@@ -490,16 +490,31 @@
   <script src="app.js"></script>
   <script>
     lucide.createIcons();
+
+    // Restore remember-me preference
+    const savedEmail = localStorage.getItem('cadence.remembered_email');
+    if (savedEmail) {
+      document.getElementById('email').value = savedEmail;
+      document.querySelector('.check input[type=checkbox]').checked = true;
+    }
+
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email").value.trim();
       const pw = document.getElementById("pw").value;
+      const rememberMe = document.querySelector('.check input[type=checkbox]').checked;
       if (!email || !pw) { Cadence.toast({ type: "error", title: "Enter your email and password" }); return; }
       const btn = e.target.querySelector("button[type=submit]");
       btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Signing in…'; lucide.createIcons();
       try {
-        const res = await CadenceAPI.login(email, pw);
+        const res = await CadenceAPI.login(email, pw, rememberMe);
         const name = res.user.first_name || res.user.username;
+        // Save/clear the email based on remember me
+        if (rememberMe) {
+          localStorage.setItem('cadence.remembered_email', email);
+        } else {
+          localStorage.removeItem('cadence.remembered_email');
+        }
         Cadence.toast({ type: "success", title: `Welcome back, ${name}`, desc: "Redirecting to your dashboard…" });
         setTimeout(() => location.href = "dashboard.html", 900);
       } catch (err) {

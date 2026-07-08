@@ -7,6 +7,8 @@ from django.contrib.auth import authenticate
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings as django_settings
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from ipware import get_client_ip # type: ignore
 import user_agents
 import requests
@@ -172,8 +174,11 @@ class UserListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         ip, _ = get_client_ip(self.request)
-        # Capture the raw password before hashing so we can send it in the invite email
-        raw_password = self.request.data.get('password', 'demo1234')
+        # Generate a random secure password for the invite
+        import secrets
+        raw_password = secrets.token_urlsafe(12)
+        # Override the password in serializer with the generated password
+        serializer.validated_data['password'] = raw_password
         user = serializer.save(created_by=self.request.user)
         ActivityLog.objects.create(
             actor=self.request.user, actor_name=self.request.user.get_full_name(),
@@ -354,4 +359,119 @@ class RegisterView(generics.CreateAPIView):
             actor=user, actor_name=user.get_full_name() or user.username,
             action='user_signup', target_description=user.get_full_name() or user.username,
             ip_address=ip
-        )
+        )
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PasswordResetRequestView(APIView):
+    """Send a password reset email with a token link."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        import secrets
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({'detail': 'Email is required.'}, status=400)
+
+        # Always return success to avoid email enumeration
+        try:
+            user = CustomUser.objects.get(email__iexact=email, deleted_at__isnull=True)
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'If this email exists, a reset link has been sent.'})
+
+        # Generate a secure token and store it with expiry
+        token = secrets.token_urlsafe(32)
+        user.password_reset_token = token
+        user.password_reset_token_expires = timezone.now() + timezone.timedelta(minutes=30)
+        user.save(update_fields=['password_reset_token', 'password_reset_token_expires'])
+
+        # Build the reset URL
+        if request:
+            reset_url = request.build_absolute_uri(f'/static/reset-password.html?token={token}')
+        else:
+            reset_url = f'http://127.0.0.1:8006/static/reset-password.html?token={token}'
+
+        full_name = user.get_full_name() or user.username
+
+        subject = "Reset your Cadence password"
+        text_body = f"""Hi {full_name},
+
+We received a request to reset your Cadence password.
+
+Click the link below to set a new password (expires in 30 minutes):
+{reset_url}
+
+If you didn't request this, you can safely ignore this email.
+
+The Cadence Team"""
+
+        html_body = f"""
+<div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8fafc">
+  <div style="background:#fff;border-radius:16px;padding:40px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px">
+      <div style="width:36px;height:36px;background:#095075;border-radius:10px;display:flex;align-items:center;justify-content:center">
+        <span style="color:#fff;font-size:18px;font-weight:700">&#9835;</span>
+      </div>
+      <span style="font-size:20px;font-weight:700;color:#1e293b">Cadence</span>
+    </div>
+    <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0 0 8px">Reset your password 🔐</h1>
+    <p style="color:#64748b;margin:0 0 28px;line-height:1.6">
+      Hi <strong>{full_name}</strong>, we received a request to reset your password.
+      Click the button below — the link expires in <strong>30 minutes</strong>.
+    </p>
+    <a href="{reset_url}" style="display:inline-block;background:#095075;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:600;font-size:15px">Reset Password</a>
+    <p style="margin:24px 0 0;font-size:12px;color:#94a3b8">If you didn't request a password reset, you can safely ignore this email.</p>
+  </div>
+</div>"""
+
+        try:
+            send_mail(
+                subject=subject,
+                message=text_body,
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=html_body,
+                fail_silently=False,
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f'Failed to send password reset email: {e}')
+            return Response({'detail': 'Failed to send email. Please try again later.'}, status=500)
+
+        return Response({'detail': 'If this email exists, a reset link has been sent.'})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PasswordResetConfirmView(APIView):
+    """Validate the reset token and set the new password."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.data.get('token', '').strip()
+        new_password = request.data.get('password', '').strip()
+
+        if not token or not new_password:
+            return Response({'detail': 'Token and new password are required.'}, status=400)
+
+        if len(new_password) < 8:
+            return Response({'detail': 'Password must be at least 8 characters.'}, status=400)
+
+        try:
+            user = CustomUser.objects.get(
+                password_reset_token=token,
+                deleted_at__isnull=True
+            )
+        except CustomUser.DoesNotExist:
+            return Response({'detail': 'Invalid or expired reset link.'}, status=400)
+
+        # Check token expiry
+        if user.password_reset_token_expires and timezone.now() > user.password_reset_token_expires:
+            return Response({'detail': 'Reset link has expired. Please request a new one.'}, status=400)
+
+        # Set new password and clear the token
+        user.set_password(new_password)
+        user.password_reset_token = None
+        user.password_reset_token_expires = None
+        user.save(update_fields=['password', 'password_reset_token', 'password_reset_token_expires'])
+
+        return Response({'detail': 'Password reset successfully. You can now log in.'})

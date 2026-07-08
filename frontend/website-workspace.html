@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="workspace.css" />
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -43,9 +44,11 @@
         <!-- Tabs -->
         <div class="tabs ws-tabs" data-tabs data-tabs-scope="wsPanels" style="margin-bottom:var(--s6)">
           <button class="tab active" data-tab="overview"><i data-lucide="layout-grid"></i> Overview</button>
+          <button class="tab" data-tab="drafts"><i data-lucide="file-edit"></i> Drafts</button>
           <button class="tab" data-tab="generate"><i data-lucide="sparkles"></i> Generate</button>
           <button class="tab" data-tab="calendar"><i data-lucide="calendar-days"></i> Calendar</button>
           <button class="tab" data-tab="published"><i data-lucide="send"></i> Published</button>
+          <button class="tab" data-tab="usage"><i data-lucide="bar-chart-3"></i> Usage</button>
           <button class="tab" data-tab="settings"><i data-lucide="settings"></i> Settings</button>
         </div>
 
@@ -66,14 +69,71 @@
             </div>
           </div>
 
+          <!-- DRAFTS -->
+          <div class="tab-panel" data-panel="drafts">
+            <div class="ws-draft-layout">
+              <!-- Left Column: Filter and Drafts List -->
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <div class="card card-pad" style="padding: 14px var(--s5); display: flex; flex-direction: column; gap: var(--s3);">
+                  <div class="row-between" style="flex-wrap:wrap; gap:12px; align-items:center;">
+                    <div>
+                      <h2 style="font-size:var(--fs-lg); font-weight:700;">Content Drafts</h2>
+                      <div class="muted txs">Manage drafts for this website.</div>
+                    </div>
+                    <div class="seg-pills" id="wsDraftFilter">
+                      <button class="active" data-f="all">All</button>
+                      <button data-f="Draft">Draft</button>
+                      <button data-f="Approved">Approved</button>
+                      <button data-f="Scheduled">Scheduled</button>
+                    </div>
+                  </div>
+                  <div class="row-between" style="border-top:1px solid var(--border); padding-top:10px; flex-wrap:wrap; gap:12px; align-items:center;">
+                    <span class="muted txs" style="font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+                      <i data-lucide="filter" style="width:12px;height:12px;"></i> Filter Channel:
+                    </span>
+                    <div class="seg-pills" id="wsDraftChannelFilter" style="background:var(--bg-app);">
+                      <button class="active" data-c="all">All Channels</button>
+                      <button data-c="Blog">Blog</button>
+                      <button data-c="LinkedIn">LinkedIn</button>
+                      <button data-c="YouTube">YouTube</button>
+                      <button data-c="Instagram">Instagram</button>
+                    </div>
+                  </div>
+                </div>
+                <div id="wsDraftList" class="col gap2"></div>
+                <!-- Pagination Controls -->
+                <div class="card__footer row-between" id="wsDraftListPagination" style="padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-card); border-radius:var(--r-lg); border:1px solid var(--border);"></div>
+              </div>
+
+              <!-- Right Column: Sticky Draft Preview -->
+              <div class="ws-draft-preview card" id="wsDraftPreview"></div>
+            </div>
+          </div>
+
           <!-- GENERATE -->
           <div class="tab-panel" data-panel="generate">
-            <div class="gen-grid">
-              <!-- Composer -->
-              <div>
-                <div class="card card-pad mb5">
-                  <div class="row gap3 mb4"><span class="icon-tile tile-blog"><i data-lucide="lightbulb"></i></span>
-                    <div><h3 style="font-size:var(--fs-lg)">New content idea</h3><div class="muted tsm">Pick a channel, give a topic — Cadence drafts it.</div></div></div>
+            <div class="row-between mb4" style="background:var(--bg-card); padding:10px var(--s4); border:1px solid var(--border); border-radius:var(--r-lg); align-items:center; margin-bottom:var(--s4);">
+              <div class="tsm bold text-secondary" style="display:flex; align-items:center; gap:6px;">
+                <i data-lucide="layout" style="width:15px;height:15px;color:var(--primary)"></i>
+                <span>Customize View Mode</span>
+              </div>
+              <div class="seg-pills" id="genLayoutToggle">
+                <button class="active" data-layout="split"><i data-lucide="layout-grid" style="width:13px;height:13px;margin-right:4px;vertical-align:middle;"></i> Split Screen</button>
+                <button data-layout="focus"><i data-lucide="maximize" style="width:13px;height:13px;margin-right:4px;vertical-align:middle;"></i> Focus Mode (Wide)</button>
+              </div>
+            </div>
+            <div class="generate-layout" id="generateLayoutEl">
+              <!-- Left Column: Composer & Drafts list (65% width) -->
+              <div class="gen-left-col">
+                <!-- Composer Card -->
+                <div class="card card-pad">
+                  <div class="row gap3 mb4" id="composerHeader">
+                    <span class="icon-tile tile-blog" id="composerHeaderIcon"><i data-lucide="lightbulb"></i></span>
+                    <div>
+                      <h3 style="font-size:var(--fs-lg)" id="composerHeaderTitle">New content idea</h3>
+                      <div class="muted tsm" id="composerHeaderSub">Pick a channel, give a topic — Cadence drafts it.</div>
+                    </div>
+                  </div>
 
                   <div class="field">
                     <label class="label">Channel</label>
@@ -84,54 +144,93 @@
                       <button class="chan" data-chan="Instagram"><span class="icon-tile tile-instagram"></span> Instagram</button>
                     </div>
                   </div>
-                  <div class="field">
-                    <label class="label" for="ideaTitle">Topic / title</label>
-                    <textarea class="textarea" id="ideaTitle" placeholder="e.g. The complete guide to pour-over coffee&#10;Enter multiple titles, one per line..." style="height: 80px; resize: vertical;"></textarea>
+
+                  <!-- Standard AI Idea Fields -->
+                  <div id="standardIdeaFields">
+                    <div class="field">
+                      <label class="label" for="ideaTitle">Topic / title</label>
+                      <textarea class="textarea" id="ideaTitle" placeholder="e.g. The complete guide to pour-over coffee&#10;Enter multiple titles, one per line..." style="height: 80px; resize: vertical;"></textarea>
+                    </div>
+                    <div class="field" style="margin-bottom:var(--s4)">
+                      <label class="label" for="ideaNotes">Notes <span class="opt">(optional)</span></label>
+                      <textarea class="textarea" id="ideaNotes" placeholder="Angle, key points, links to include, target keyword…"></textarea>
+                    </div>
                   </div>
-                  <div class="field" style="margin-bottom:var(--s4)">
-                    <label class="label" for="ideaNotes">Notes <span class="opt">(optional)</span></label>
-                    <textarea class="textarea" id="ideaNotes" placeholder="Angle, key points, links to include, target keyword…"></textarea>
+
+                  <!-- YouTube Direct Upload Fields -->
+                  <div id="youtubeUploadFields" style="display:none">
+                    <div class="field">
+                      <label class="label" for="ytTitle">Video Title</label>
+                      <input class="input" id="ytTitle" placeholder="e.g. How to Brew Espresso Like a Pro" />
+                    </div>
+                    <div class="field">
+                      <label class="label" for="ytCaption">Caption / Description</label>
+                      <textarea class="textarea" id="ytCaption" placeholder="Write video description, links, and hashtags..." style="height: 80px; resize: vertical;"></textarea>
+                    </div>
+                    <div class="field" style="margin-bottom:var(--s4)">
+                      <label class="label">Video File</label>
+                      <div class="row gap2" style="align-items:center; margin-bottom:var(--s2)">
+                        <button class="btn btn-secondary btn-sm" type="button" id="ytVideoUploadBtn"><i data-lucide="upload"></i> Upload Video</button>
+                        <span id="ytVideoFileName" class="muted tsm" style="font-style:italic; font-size:11px; word-break:break-all">No video file selected</span>
+                        <input type="file" id="ytVideoFile" accept="video/*" style="display:none" />
+                        <input type="hidden" id="ytVideoBase64" />
+                      </div>
+                      <div class="muted txs" style="display:flex; align-items:center; gap:4px; color:var(--primary); background:rgba(9,80,117,0.06); padding:6px 10px; border-radius:6px; border:1px solid rgba(9,80,117,0.1)">
+                        <i data-lucide="info" style="width:12px;height:12px"></i>
+                        <span><strong>Shorts Tip:</strong> Upload a vertical video (9:16 aspect ratio) under 60 seconds to automatically publish it as a YouTube Short.</span>
+                      </div>
+                    </div>
                   </div>
+
                   <button class="btn btn-primary btn-block btn-lg" id="genBtn"><i data-lucide="sparkles"></i> Generate with AI</button>
+                  
+                  <!-- Progress Bar / Generation Indicator -->
+                  <div id="generationProgressContainer" style="display:none; margin-top:var(--s4); padding:var(--s3); background:var(--surface-2); border-radius:var(--r-md); border:1px solid var(--border)">
+                    <div class="row-between mb2">
+                      <span class="bold tsm" style="display:flex; align-items:center; gap:6px;">
+                        <i data-lucide="loader-circle" class="spin" style="color:var(--primary); width:15px; height:15px;"></i>
+                        <span>AI Content Creation in Progress...</span>
+                      </span>
+                      <span class="bold tsm" id="generationProgressPercent" style="color:var(--primary);">0%</span>
+                    </div>
+                    <div style="width:100%; height:8px; background:var(--border); border-radius:4px; overflow:hidden; margin-bottom:8px;">
+                      <div id="generationProgressBar" style="width:0%; height:100%; background:var(--primary); transition:width 0.4s ease;"></div>
+                    </div>
+                    <div class="muted txs">This is creating within some minutes. Feel free to browse other tabs while we write.</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Generated Drafts & Idea Queue (50% width) -->
+              <div class="gen-right-col">
+                <!-- Session Generated Drafts Section (Hidden by default, shown only when new drafts are generated) -->
+                <div class="card card-pad" id="sessionDraftsSection" style="display:none; margin-bottom:var(--s4);">
+                  <div class="row-between mb3" style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:10px;">
+                    <div>
+                      <h3 style="font-size:var(--fs-md); font-weight:700; color:var(--primary); display:flex; align-items:center; gap:6px;">
+                        <i data-lucide="sparkles" style="width:16px;height:16px;"></i> Recently Generated
+                      </h3>
+                      <div class="muted txs">Drafts created during this workspace session.</div>
+                    </div>
+                  </div>
+                  <div class="drafts-list-pane-full">
+                    <div id="sessionDraftList" class="col gap2"></div>
+                  </div>
                 </div>
 
+                <!-- Idea Queue Card -->
                 <div class="card card-pad">
                   <div class="row-between mb3">
                     <h3 style="font-size:var(--fs-md)">Idea queue</h3>
                     <div style="display:flex;align-items:center;gap:var(--s2)">
                       <span class="badge badge-neutral" id="queueCount">0</span>
-                      <button class="icon-btn btn-sm" id="refreshIdeaQueue" title="Generate new AI suggestions" style="padding:4px 8px;border-radius:var(--radius-sm);display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--accent)">
+                      <button class="btn btn-ghost btn-sm" id="refreshIdeaQueue" title="Generate new AI suggestions" style="padding:4px 8px;border-radius:var(--radius-sm);display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--accent)">
                         <i data-lucide="refresh-cw" style="width:13px;height:13px"></i>
                         <span>Refresh</span>
                       </button>
                     </div>
                   </div>
-                  <div class="col gap2" id="ideaQueue"></div>
-                </div>
-              </div>
-
-              <!-- Drafts -->
-              <div class="drafts-section">
-                <div class="row-between mb4">
-                  <div><h2 style="font-size:var(--fs-xl)">Generated drafts</h2><div class="muted tsm">Review, edit and approve before scheduling</div></div>
-                  <div class="seg-pills" id="draftFilter">
-                    <button class="active" data-f="all">All</button>
-                    <button data-f="Draft">Draft</button>
-                    <button data-f="Approved">Approved</button>
-                    <button data-f="Scheduled">Scheduled</button>
-                  </div>
-                </div>
-                
-                <div class="drafts-split-container">
-                  <!-- Left Pane: Compact List -->
-                  <div class="drafts-list-pane">
-                    <div id="draftList" class="col gap2"></div>
-                  </div>
-                  
-                  <!-- Right Pane: Sticky Preview Details -->
-                  <div class="drafts-preview-pane">
-                    <div id="draftPreviewContent"></div>
-                  </div>
+                  <div class="col gap2" id="ideaQueue" style="max-height: 480px; overflow-y: auto; padding-right: 4px;"></div>
                 </div>
               </div>
             </div>
@@ -139,10 +238,34 @@
 
           <!-- CALENDAR -->
           <div class="tab-panel" data-panel="calendar">
-            <div class="card">
-              <div class="card__header"><h3>This week</h3><div class="sub">Scheduled content for this website</div><div class="spacer"></div><a class="btn btn-secondary btn-sm" href="calendar.html"><i data-lucide="maximize-2"></i> Full calendar</a></div>
-              <div class="card__body" style="padding:0"><div class="week-strip" id="wsWeek"></div></div>
+            <!-- Header bar -->
+            <div class="ws-cal-header">
+              <div style="display:flex; align-items:center; gap:var(--s3);">
+                <button class="btn btn-secondary btn-sm" id="wsPrevWeek"><i data-lucide="chevron-left"></i></button>
+                <span class="btn btn-secondary btn-sm" id="wsWeekLabel" style="min-width:200px; text-align:center; cursor:default; pointer-events:none;">This week</span>
+                <button class="btn btn-secondary btn-sm" id="wsNextWeek"><i data-lucide="chevron-right"></i></button>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap;">
+                <div class="seg-pills" id="wsCalPlatFilter">
+                  <button class="active" data-p="all">All</button>
+                  <button data-p="Blog">Blog</button>
+                  <button data-p="LinkedIn">LinkedIn</button>
+                  <button data-p="YouTube">YouTube</button>
+                  <button data-p="Instagram">Instagram</button>
+                </div>
+                <button class="btn btn-primary btn-sm" id="wsAutoScheduleBtn"><i data-lucide="wand-sparkles"></i> Auto-schedule</button>
+              </div>
             </div>
+            <!-- Legend -->
+            <div class="ws-cal-legend">
+              <span><span class="lg-dot" style="background:var(--blog)"></span> Blog</span>
+              <span><span class="lg-dot" style="background:var(--linkedin)"></span> LinkedIn</span>
+              <span><span class="lg-dot" style="background:var(--youtube)"></span> YouTube</span>
+              <span><span class="lg-dot" style="background:var(--instagram)"></span> Instagram</span>
+            </div>
+            <!-- Board -->
+            <div class="cal-board" id="wsCalBoard"></div>
+            <p class="muted tsm mt4 row gap2"><i data-lucide="grip-vertical" style="width:14px;height:14px"></i> Tip: drag a card to reschedule it. Click the time to edit.</p>
           </div>
 
           <!-- PUBLISHED -->
@@ -152,99 +275,312 @@
               <span class="muted tsm" id="pubCount"></span>
             </div>
             <div class="pub-grid" id="pubGrid"></div>
+            <div class="row-center mt6 gap2" id="pubPagination" style="display:flex; justify-content:center; align-items:center;"></div>
+          </div>
+
+          <!-- USAGE -->
+          <div class="tab-panel" data-panel="usage">
+            <div class="grid grid-3 mb5">
+              <div class="stat-card">
+                <div class="stat-card__meta">
+                  <span class="tsm bold muted">Total Tokens Used</span>
+                </div>
+                <div class="stat-card__val" id="usageTotalTokens">0</div>
+                <div class="stat-card__desc">
+                  <span id="usagePromptTokens">0</span> prompt / <span id="usageCompletionTokens">0</span> completion
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card__meta">
+                  <span class="tsm bold muted">Estimated Cost</span>
+                </div>
+                <div class="stat-card__val" id="usageTotalCost">$0.00</div>
+                <div class="stat-card__desc">Based on OpenAI & Gemini pricing</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card__meta">
+                  <span class="tsm bold muted">Weekly Active Trend</span>
+                </div>
+                <div class="stat-card__val" id="usageWeeklyTrend">Steady</div>
+                <div class="stat-card__desc">Daily average tracked below</div>
+              </div>
+            </div>
+
+            <div class="grid" style="grid-template-columns: 2fr 1fr; gap:var(--s5); align-items: start; margin-bottom: var(--s5);">
+              <!-- Line Chart Card -->
+              <div class="card card-pad">
+                <h3 class="mb4" style="font-size:var(--fs-md); font-weight:700;">Daily Token Consumption (Last 7 Days)</h3>
+                <div style="height: 250px; position: relative;">
+                  <canvas id="usageChart"></canvas>
+                </div>
+              </div>
+
+              <!-- Breakdowns Card -->
+              <div class="card card-pad">
+                <h3 class="mb4" style="font-size:var(--fs-md); font-weight:700;">Model & Feature Breakdown</h3>
+                <div class="col gap4">
+                  <div>
+                    <h4 class="tsm bold muted mb2">Model Breakdown</h4>
+                    <div id="usageModelBreakdown" class="col gap2"></div>
+                  </div>
+                  <hr style="border:0; border-top: 1px solid var(--border); margin: var(--s3) 0;" />
+                  <div>
+                    <h4 class="tsm bold muted mb2">Feature Breakdown</h4>
+                    <div id="usageSectionBreakdown" class="col gap2"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- SETTINGS -->
           <div class="tab-panel" data-panel="settings">
-            <div class="gen-grid">
-              <div>
-                <div class="card card-pad mb5">
-                  <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Website details</h3>
-                  <div class="field"><label class="label">Display name</label><input class="input" id="setName" /></div>
-                  <div class="field"><label class="label">URL</label><div class="input-prefix"><span class="pfx">https://</span><input class="input" id="setUrl" /></div></div>
-                  <div class="field"><label class="label">Brand tone</label><select class="select" id="setTone"><option>Warm &amp; artisanal</option><option>Energetic &amp; motivating</option><option>Calm &amp; informative</option></select></div>
-                  <div class="field"><label class="label">Contact Email</label><input class="input" id="setEmail" placeholder="e.g. contact@company.com" /></div>
-                  <div class="field"><label class="label">Contact Phone</label><input class="input" id="setPhone" placeholder="e.g. +1 555-019-2834" /></div>
-                  <div class="field">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--s5); align-items:start">
+
+              <!-- ── LEFT COLUMN ─────────────────────────────── -->
+              <div style="display:flex; flex-direction:column; gap:var(--s4)">
+
+                <!-- Card: Website Details -->
+                <div class="card card-pad">
+                  <h3 style="font-size:var(--fs-md);font-weight:700;margin-bottom:var(--s4);display:flex;align-items:center;gap:8px">
+                    <i data-lucide="globe" style="width:16px;height:16px;color:var(--primary)"></i> Website Details
+                  </h3>
+                  <div class="field" style="margin-bottom:var(--s3)">
+                    <label class="label">Display name</label>
+                    <input class="input" id="setName" />
+                  </div>
+                  <div class="field" style="margin-bottom:var(--s3)">
+                    <label class="label">URL</label>
+                    <div class="input-prefix"><span class="pfx">https://</span><input class="input" id="setUrl" /></div>
+                  </div>
+                  <div class="field" style="margin-bottom:var(--s3)">
+                    <label class="label">Brand tone</label>
+                    <select class="select" id="setTone">
+                      <option>Warm &amp; artisanal</option>
+                      <option>Energetic &amp; motivating</option>
+                      <option>Calm &amp; informative</option>
+                    </select>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);margin-bottom:var(--s3)">
+                    <div class="field" style="margin-bottom:0"><label class="label">Contact Email</label><input class="input" id="setEmail" placeholder="contact@company.com" /></div>
+                    <div class="field" style="margin-bottom:0"><label class="label">Contact Phone</label><input class="input" id="setPhone" placeholder="+1 555-019-2834" /></div>
+                  </div>
+                  <div class="field" style="margin-bottom:var(--s4)">
                     <label class="label">Company logo</label>
                     <div class="row gap3" style="align-items:center">
-                      <div id="logoPreview" style="width:60px;height:60px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden">
-                        <i data-lucide="image" class="muted" style="width:24px;height:24px"></i>
+                      <div id="logoPreview" style="width:48px;height:48px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden;flex-shrink:0">
+                        <i data-lucide="image" class="muted" style="width:20px;height:20px"></i>
                       </div>
-                      <div class="col gap1" style="flex:1">
+                      <div class="col gap1" style="flex:1;min-width:0">
                         <input type="file" id="logoUpload" accept="image/*" style="display:none" />
                         <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('logoUpload').click()"><i data-lucide="upload"></i> Upload logo</button>
-                        <input class="input" id="setLogoUrl" placeholder="Or paste logo URL" style="font-size:var(--fs-xs);margin-top:6px"/>
+                        <input class="input" id="setLogoUrl" placeholder="Or paste logo URL" style="font-size:var(--fs-xs);margin-top:4px"/>
                       </div>
                     </div>
                   </div>
-                  <div class="divider"></div>
                   <button class="btn btn-primary btn-block" id="saveDetailsBtn"><i data-lucide="check"></i> Save website details</button>
                 </div>
 
-                <div class="card card-pad mb5">
-                  <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Sample Content Management</h3>
-                  <p class="muted tsm mb4">Manage style samples used as reference. Up to 7 active samples per platform are supported.</p>
+                <!-- Card: Crawl Style -->
+                <div class="card card-pad">
+                  <div class="row-between mb4">
+                    <h3 style="font-size:var(--fs-md);font-weight:700;display:flex;align-items:center;gap:8px">
+                      <i data-lucide="palette" style="width:16px;height:16px;color:var(--primary)"></i> Crawl Style
+                    </h3>
+                    <span id="crawlStatusBadge" class="badge badge-neutral"></span>
+                  </div>
                   
-                  <div class="field">
-                    <label class="label" for="samplePlatformSelect">Select Platform</label>
+                  <!-- No crawl data message -->
+                  <div id="noCrawlDataMsg" class="muted tsm mb4" style="text-align:center;padding:var(--s4);background:var(--bg-subtle);border-radius:var(--r-sm)">
+                    <i data-lucide="radar" style="width:20px;height:20px;margin-bottom:8px;display:block;margin:0 auto 8px"></i>
+                    No crawl data yet. Click "Crawl website" to extract brand style.
+                  </div>
+
+                  <!-- Crawl data fields -->
+                  <div id="crawlDataFields" style="display:none">
+                    <!-- Brand Colors -->
+                    <div class="field mb4">
+                      <label class="label">Brand Colors</label>
+                      <div id="noBrandColors" class="muted txs" style="display:none">No colors found</div>
+                      <div id="brandColorSwatches" class="row gap2" style="flex-wrap:wrap;margin-top:8px"></div>
+                    </div>
+
+                    <!-- Heading Font -->
+                    <div class="field mb3" id="headingFontField">
+                      <label class="label">Heading Font</label>
+                      <input class="input" id="styleHeadingFont" readonly style="background:var(--bg-subtle)" />
+                    </div>
+
+                    <!-- Writing Tone -->
+                    <div class="field mb3" id="writingToneField">
+                      <label class="label">Writing Tone</label>
+                      <input class="input" id="styleTone" readonly style="background:var(--bg-subtle)" />
+                    </div>
+
+                    <!-- Vocabulary -->
+                    <div class="field mb4" id="vocabularyField">
+                      <label class="label">Vocabulary</label>
+                      <textarea class="textarea" id="styleVocabulary" readonly style="background:var(--bg-subtle);height:60px;resize:none"></textarea>
+                    </div>
+
+                    <button class="btn btn-secondary btn-block" id="editStyleGuideBtn"><i data-lucide="edit-3"></i> Edit Style Guide</button>
+                  </div>
+                </div>
+
+
+              </div><!-- /left col -->
+
+              <!-- ── RIGHT COLUMN ────────────────────────────── -->
+              <div style="display:flex; flex-direction:column; gap:var(--s4)">
+
+                <!-- Card: Connected Channels -->
+                <div class="card card-pad">
+                  <h3 style="font-size:var(--fs-md);font-weight:700;margin-bottom:var(--s4);display:flex;align-items:center;gap:8px">
+                    <i data-lucide="plug" style="width:16px;height:16px;color:var(--primary)"></i> Connected Channels
+                  </h3>
+                  <div class="col gap3" id="setChannels"></div>
+                </div>
+
+                <!-- Card: Danger Zone -->
+                <div class="card card-pad">
+                  <h4 style="font-size:var(--fs-sm);font-weight:700;color:var(--error);margin-bottom:4px;display:flex;align-items:center;gap:8px">
+                    <i data-lucide="triangle-alert" style="width:14px;height:14px"></i> Danger Zone
+                  </h4>
+                  <p class="muted txs mb3">Pausing stops all scheduled posting. Removing deletes all content.</p>
+                  <div class="row gap2">
+                    <button class="btn btn-secondary btn-sm" id="pauseSiteBtn"><i data-lucide="pause"></i> Pause website</button>
+                    <button class="btn btn-danger btn-sm" onclick="Cadence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button>
+                  </div>
+                </div>
+
+                <!-- Card: Sample Content -->
+                <div class="card card-pad">
+                  <h3 style="font-size:var(--fs-md);font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+                    <i data-lucide="file-text" style="width:16px;height:16px;color:var(--primary)"></i> Sample Content
+                  </h3>
+                  <p class="muted tsm mb4">Style samples used as AI reference. Up to 7 per platform.</p>
+                  <div class="field" style="margin-bottom:var(--s3)">
+                    <label class="label" for="samplePlatformSelect">Platform</label>
                     <select class="select" id="samplePlatformSelect">
                       <option value="blog">📝 Blog</option>
                       <option value="linkedin">💼 LinkedIn</option>
                       <option value="instagram">📸 Instagram</option>
                       <option value="youtube">🎥 YouTube</option>
-                      <option value="facebook">👥 Facebook</option>
-                      <option value="twitter">🐦 Twitter/X</option>
                     </select>
                   </div>
-
                   <div class="divider"></div>
-
-                  <!-- Upload new sample on the fly -->
-                  <div class="card card-pad" style="background:var(--bg-card); margin-bottom:var(--s4); border:1px dashed var(--border-strong);">
-                    <h4 style="font-size:var(--fs-md);margin-bottom:var(--s2)">Upload New Sample</h4>
-                    <div class="field">
-                      <label class="label">Choose File (HTML, TXT, MD)</label>
-                      <input type="file" id="workspaceSampleFile" class="input" style="padding:var(--s1) var(--s2); font-size:var(--fs-sm);" />
+                  <div style="background:var(--bg-card);border:1px dashed var(--border-strong);border-radius:var(--r-md);padding:var(--s3);margin-bottom:var(--s3)">
+                    <h4 style="font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--s3)">Upload New Sample</h4>
+                    <div class="field" style="margin-bottom:var(--s2)">
+                      <label class="label">File (HTML, TXT, MD)</label>
+                      <input type="file" id="workspaceSampleFile" class="input" style="padding:var(--s1) var(--s2);font-size:var(--fs-sm)" />
                     </div>
-                    <div class="field">
-                      <label class="label">Title / Label (optional)</label>
+                    <div class="field" style="margin-bottom:var(--s2)">
+                      <label class="label">Title / Label <span class="muted">(optional)</span></label>
                       <input type="text" id="workspaceSampleTitle" class="input" placeholder="e.g. Autumn promotion post" />
                     </div>
-                    <button type="button" class="btn btn-secondary btn-sm" id="uploadWorkspaceSampleBtn" style="margin-top:var(--s2)"><i data-lucide="upload"></i> Upload Sample</button>
+                    <button type="button" class="btn btn-secondary btn-sm btn-block" id="uploadWorkspaceSampleBtn"><i data-lucide="upload"></i> Upload Sample</button>
                   </div>
-
-                  <div class="divider"></div>
-
-                  <h4 style="font-size:var(--fs-md);margin-bottom:var(--s3)">Active Reference Samples</h4>
-                  <div class="sample-manager-list" id="sampleManagerList" style="display:flex; flex-direction:column; gap:var(--s3)">
+                  <h4 style="font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--s3)">Active Reference Samples</h4>
+                  <div class="sample-manager-list" id="sampleManagerList" style="display:flex;flex-direction:column;gap:var(--s3);max-height:200px;overflow-y:auto">
                     <!-- Dynamically populated -->
                   </div>
                 </div>
-                <div class="card card-pad">
-                  <h3 style="font-size:var(--fs-lg);margin-bottom:4px">Auto-publishing</h3>
-                  <p class="muted tsm mb4">Approved content posts automatically on its scheduled slot.</p>
-                  <label class="row-between" style="cursor:pointer"><span>Enable auto-publish</span><span class="switch"><input type="checkbox" checked /><span class="track"></span></span></label>
-                  <div class="divider"></div>
-                  <label class="row-between" style="cursor:pointer"><span>Require approval before posting</span><span class="switch"><input type="checkbox" checked /><span class="track"></span></span></label>
-                </div>
+
+              </div><!-- /right col -->
+
+            </div><!-- /grid -->
+          </div><!-- /settings tab panel -->
+
+        </div><!-- /wsPanels -->
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Connect Social Modal -->
+
+  <div class="modal-overlay" id="connectSocialModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Connect <span id="connectModalPlatName">Channel</span></h3>
+          <div class="sub">Configure a real publishing integration webhook</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding: var(--s5);">
+        <!-- URL field -->
+        <div class="field">
+          <label class="label" id="connectUrlLabel">Webhook URL (Make.com, Zapier, or API Endpoint)</label>
+          <input type="url" id="connectWebhookUrl" class="input" placeholder="e.g. https://hook.us1.make.com/..." required style="width:100%" />
+        </div>
+
+        <!-- Custom Blog Fields -->
+        <div id="blogSettingsFields" class="hide" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          <div class="field">
+            <label class="label">Security Authorization Type</label>
+            <select class="select" id="connectAuthType" style="width:100%">
+              <option value="none">None (No Auth)</option>
+              <option value="api_key">API Key (Custom Header)</option>
+              <option value="bearer_token">Bearer Token</option>
+              <option value="basic_auth">Basic Auth (Username/Password)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Request Payload Format</label>
+            <select class="select" id="connectBlogFormat" style="width:100%">
+              <option value="json">JSON (application/json)</option>
+              <option value="form_data">Form-Data (multipart/form-data)</option>
+            </select>
+          </div>
+
+          <!-- Dynamic API Key fields -->
+          <div id="connect_auth_fields_api_key" class="hide">
+            <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div class="field">
+                <label class="label">Header Name</label>
+                <input class="input" type="text" id="connect_api_key_name" value="X-API-Key" style="width:100%" />
               </div>
-              <div>
-                <div class="card card-pad mb5">
-                  <h3 style="font-size:var(--fs-lg);margin-bottom:var(--s4)">Connected channels</h3>
-                  <div class="col gap3" id="setChannels"></div>
-                </div>
-                <div class="card card-pad" style="border-color:var(--error-soft)">
-                  <h3 style="font-size:var(--fs-lg);color:var(--error);margin-bottom:4px">Danger zone</h3>
-                  <p class="muted tsm mb4">Pausing stops all scheduled posting. Removing deletes all content.</p>
-                  <div class="row gap2"><button class="btn btn-secondary" id="pauseSiteBtn"><i data-lucide="pause"></i> Pause website</button><button class="btn btn-danger" onclick="Cadence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button></div>
-                </div>
+              <div class="field">
+                <label class="label">Header Value</label>
+                <input class="input" type="password" id="connect_api_key_value" placeholder="Enter key..." style="width:100%" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Bearer Token fields -->
+          <div id="connect_auth_fields_bearer_token" class="hide">
+            <div class="field">
+              <label class="label">Token Value</label>
+              <input class="input" type="password" id="connect_bearer_token_value" placeholder="Enter token..." style="width:100%" />
+            </div>
+          </div>
+
+          <!-- Dynamic Basic Auth fields -->
+          <div id="connect_auth_fields_basic_auth" class="hide">
+            <div class="grid grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <div class="field">
+                <label class="label">Username</label>
+                <input class="input" type="text" id="connect_username" placeholder="Username" style="width:100%" />
+              </div>
+              <div class="field">
+                <label class="label">Password</label>
+                <input class="input" type="password" id="connect_password" placeholder="Password" style="width:100%" />
               </div>
             </div>
           </div>
         </div>
 
-      </main>
+        <div class="muted tsm" style="margin-top: 12px; line-height: 1.4;">
+          When a post is published, Cadence will send a POST request with the content title, body, and image URL to this endpoint.
+        </div>
+      </div>
+      <div class="modal__foot" style="display: flex; justify-content: flex-end; gap: var(--s2); padding: var(--s4) var(--s5); border-top: 1px solid var(--border); align-items: center;">
+        <span id="connectModalTestStatus" style="margin-right:auto; font-size:12px; display:flex; align-items:center; gap:6px;"></span>
+        <button class="btn btn-secondary" id="btnTestSocialConn">Test Connection</button>
+        <button class="btn btn-primary" id="btnSaveSocialConn">Connect Channel</button>
+      </div>
     </div>
   </div>
 
@@ -300,17 +636,17 @@
           <div class="editor-sidebar">
             <!-- Cover Image section -->
             <div class="sidebar-card">
-              <h4>Cover Image</h4>
+              <h4 id="coverCardTitle">Cover Image</h4>
               <div class="editor-cover-preview" id="editCoverPreview">
                 <i data-lucide="image" class="muted" style="width:32px;height:32px"></i>
               </div>
               <div class="field mt3">
-                <label class="label txs">Image URL</label>
+                <label class="label txs" id="coverUrlLabel">Image URL</label>
                 <input class="input input-sm" id="editCoverUrl" placeholder="https://example.com/image.jpg" />
               </div>
               <div class="row gap2 mt2">
                 <button type="button" class="btn btn-secondary btn-sm" id="uploadCoverBtn" style="flex:1">Upload</button>
-                <input type="file" id="editCoverFile" accept="image/*" style="display:none" />
+                <input type="file" id="editCoverFile" accept="image/*,video/*" style="display:none" />
                 <input type="file" id="inlineImageFile" accept="image/*" style="display:none" />
                 <button type="button" class="btn btn-ghost btn-sm text-danger" id="removeCoverBtn">Remove</button>
               </div>
@@ -397,15 +733,42 @@
       <div class="modal__body" style="padding:var(--s6); overflow-y:auto; max-height:75vh;">
         <div id="largePreviewBody"></div>
       </div>
-      <div class="modal__foot">
+      <div class="modal__foot" id="largePreviewFoot">
         <button class="btn btn-primary" data-close-modal>Close preview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit schedule modal (calendar card time-click) -->
+  <div class="modal-overlay" id="editScheduleModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Edit schedule</h3>
+          <div class="sub">Set a new publishing date and time.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body">
+        <div class="field">
+          <label class="label">Date</label>
+          <input class="input" type="date" id="esDate" style="width:100%;height:38px;padding:0 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);" />
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">Time</label>
+          <input class="input" type="time" id="esTime" style="width:100%;height:38px;padding:0 8px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);" />
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-ghost" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" id="esSave"><i data-lucide="calendar"></i> Update</button>
       </div>
     </div>
   </div>
 
   <script src="mock-data.js"></script>
   <script src="app.js"></script>
-  <script src="workspace.js"></script>
+  <script src="workspace.js?v=3"></script>
   <div id="__bundler_thumbnail" hidden></div>
 </body>
 </html>

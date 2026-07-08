@@ -18,10 +18,14 @@ urlpatterns = [
     path('drafts/<int:pk>/regenerate/', views.RegenerateDraftView.as_view()),
     path('drafts/<int:pk>/schedule/', views.ScheduleDraftView.as_view()),
     path('drafts/<int:pk>/unschedule/', views.UnscheduleDraftView.as_view()),
+    path('drafts/<int:pk>/internal-links/', views.InjectInternalLinksView.as_view()),
 
     # Schedule
     path('scheduled/', views.ScheduledPostListView.as_view()),
 
     # Approvals queue (cross-website pending drafts)
     path('approvals/', views.ApprovalsQueueView.as_view()),
+    
+    # Token & API usage stats
+    path('usage/stats/<int:pk>/', views.TokenUsageStatsView.as_view()),
 ]

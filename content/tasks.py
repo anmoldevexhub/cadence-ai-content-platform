@@ -1,5 +1,5 @@
 from celery import shared_task
-from .publisher import send_to_make, send_to_arogyra
+from .publisher import send_to_make
 import logging
 from logs.models import ActivityLog
 
@@ -23,17 +23,59 @@ def generate_content_task(self, idea_id: int):
 
 
 @shared_task(bind=True, max_retries=2)
-def regenerate_draft_task(self, draft_id: int):
+def regenerate_draft_task(self, draft_id: int, regenerate_type: str = 'all'):
     """Re-runs generation for an existing draft using its original idea."""
     try:
         from .models import ContentDraft
         from .generator import generate_for_idea
         
-        draft = ContentDraft.objects.get(pk=draft_id)
-        if draft.idea:
-            new_draft_id = generate_for_idea(draft.idea_id)
-            # Delete the old rejected draft
-            draft.delete()
+        draft = ContentDraft.objects.select_related('idea', 'website').get(pk=draft_id)
+        new_draft_id = draft_id
+        
+        if regenerate_type == 'image':
+            from .generator import generate_svg_cover_via_gpt
+            from django.conf import settings
+            import os
+            import uuid
+            
+            category_name = draft.category or 'General'
+            svg_code, png_filename = generate_svg_cover_via_gpt(
+                draft.title, 
+                category_name, 
+                excerpt=draft.excerpt or '', 
+                website=draft.website
+            )
+            
+            if png_filename:
+                draft.cover_image = f"/static/media/{png_filename}"
+            elif svg_code:
+                media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+                os.makedirs(media_dir, exist_ok=True)
+                
+                filename = f"cover_{uuid.uuid4().hex}.svg"
+                filepath = os.path.join(media_dir, filename)
+                
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(svg_code)
+                    
+                draft.cover_image = f"/static/media/{filename}"
+            
+            draft.cover_image_public_url = ""
+            draft.save(update_fields=['cover_image', 'cover_image_public_url'])
+            new_draft_id = draft.id
+        elif regenerate_type == 'content':
+            if draft.idea:
+                new_draft_id = generate_for_idea(draft.idea_id, generate_image=False)
+                new_draft = ContentDraft.objects.get(pk=new_draft_id)
+                new_draft.cover_image = draft.cover_image
+                new_draft.cover_image_public_url = draft.cover_image_public_url
+                new_draft.save(update_fields=['cover_image', 'cover_image_public_url'])
+                draft.delete()
+        else:
+            if draft.idea:
+                new_draft_id = generate_for_idea(draft.idea_id)
+                draft.delete()
+                
         return {'new_draft_id': new_draft_id}
     except Exception as exc:
         raise self.retry(exc=exc, countdown=30)
@@ -87,7 +129,7 @@ def publish_scheduled_posts():
     """
     from django.utils import timezone
     from .models import ScheduledPost
-    from .publisher import send_to_make, send_to_arogyra
+    from .publisher import send_to_make
     
     now = timezone.now()
     due = ScheduledPost.objects.filter(
@@ -98,37 +140,51 @@ def publish_scheduled_posts():
     
     for sp in due:
         responses = {}
-        arogyra_success = False
+        blog_success = False
         make_success = False
         errors = []
 
-        # 1. Send to Arogyra ONLY if platform is 'blog'
+        # 1. Send to Custom Blog ONLY if platform is 'blog'
         if sp.draft.platform == 'blog':
             try:
-                arogyra_result = send_to_arogyra(sp.draft)
-                responses['arogyra'] = arogyra_result
-                arogyra_success = True
-                logger.info(f"Successfully sent to Arogyra: {sp.draft.title}")
+                from websites.models import SocialConnection
+                from .publisher import publish_to_custom_blog
+                
+                # Check for active custom blog connection
+                custom_conn = SocialConnection.objects.filter(
+                    website=sp.draft.website,
+                    platform='blog',
+                    is_active=True
+                ).first()
+                
+                if custom_conn and custom_conn.make_webhook_url:
+                    blog_result = publish_to_custom_blog(sp.draft, custom_conn)
+                    responses['blog'] = blog_result
+                    blog_success = True
+                    logger.info(f"Successfully published to custom blog endpoint: {sp.draft.title}")
+                else:
+                    raise ValueError(f"No custom blog endpoint configured in database for website: {sp.draft.website.name}")
             except Exception as e:
-                error_msg = f"Arogyra publish failed: {e}"
+                error_msg = f"Blog publish failed: {e}"
                 logger.error(error_msg)
                 errors.append(error_msg)
         else:
-            logger.info(f"Skipping Arogyra for non-blog post: {sp.draft.title} (platform: {sp.draft.platform})")
+            logger.info(f"Skipping blog publishing for non-blog post: {sp.draft.title} (platform: {sp.draft.platform})")
 
-        # 2. Send to make.com (ALL platforms)
-        try:
-            make_result = send_to_make(sp)
-            responses['make'] = make_result
-            make_success = True
-            logger.info(f"Successfully sent to make.com: {sp.draft.title}")
-        except Exception as e:
-            error_msg = f"make.com publish failed: {e}"
-            logger.error(error_msg)
-            errors.append(error_msg)
+        # 2. Send to make.com (ONLY for social platforms)
+        if sp.draft.platform != 'blog':
+            try:
+                make_result = send_to_make(sp)
+                responses['make'] = make_result
+                make_success = True
+                logger.info(f"Successfully sent to make.com: {sp.draft.title}")
+            except Exception as e:
+                error_msg = f"make.com publish failed: {e}"
+                logger.error(error_msg)
+                errors.append(error_msg)
 
         # If at least one succeeded, mark as published
-        if arogyra_success or make_success:
+        if blog_success or make_success:
             sp.is_published = True
             sp.published_at = now
             sp.make_response = responses
@@ -139,8 +195,8 @@ def publish_scheduled_posts():
             ActivityLog.objects.create(
                 actor=None, actor_name='Scheduler',
                 action='content_published',
-                target_description=f"{sp.draft.title} → Arogyra: {arogyra_success}, make.com: {make_success}"
+                target_description=f"{sp.draft.title} → Blog: {blog_success}, make.com: {make_success}"
             )
-            logger.info(f"Published: {sp.draft.title} (Arogyra: {arogyra_success}, make.com: {make_success})")
+            logger.info(f"Published: {sp.draft.title} (Blog: {blog_success}, make.com: {make_success})")
         else:
-            logger.error(f"Both publishers failed for {sp.draft.title}: {errors}")
+            logger.error(f"Publishing failed for {sp.draft.title}: {errors}")

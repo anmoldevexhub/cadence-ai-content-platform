@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadence — AI Content Platform | Presentation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #070b14;
+      --surface: #0e1625;
+      --surface2: #151f33;
+      --border: rgba(255,255,255,0.07);
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --accent3: #38bdf8;
+      --accent4: #a78bfa;
+      --green: #34d399;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #475569;
+      --glow: rgba(99,102,241,0.3);
+    }
+
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); }
+
+    /* ── DECK WRAPPER ── */
+    #deck {
+      width: 100vw; height: 100vh;
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+
+    /* ── SLIDE CONTAINER ── */
+    .slide-stage {
+      flex: 1; position: relative; overflow: hidden;
+    }
+
+    .slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      padding: 4rem;
+      opacity: 0; pointer-events: none;
+      transform: translateX(60px);
+      transition: opacity 0.5s cubic-bezier(.4,0,.2,1), transform 0.5s cubic-bezier(.4,0,.2,1);
+    }
+    .slide.active {
+      opacity: 1; pointer-events: all; transform: translateX(0);
+    }
+    .slide.exit-left {
+      opacity: 0; transform: translateX(-60px);
+    }
+
+    /* ── BACKGROUND PARTICLES / GLOW ── */
+    .slide::before {
+      content: '';
+      position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse 70% 50% at 50% 50%, rgba(99,102,241,0.06) 0%, transparent 70%);
+    }
+
+    /* ── NAV BAR ── */
+    #nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(14,22,37,0.95);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      z-index: 100;
+    }
+
+    #nav .brand {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1rem; font-weight: 700; letter-spacing: 0.05em;
+      background: linear-gradient(135deg, var(--accent2), var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .nav-controls { display: flex; align-items: center; gap: 0.75rem; }
+
+    .btn-nav {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 0.5rem 1.25rem; border-radius: 8px;
+      cursor: pointer; font-size: 0.875rem; font-weight: 500;
+      transition: all 0.2s; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .btn-nav:hover { background: var(--accent); border-color: var(--accent); }
+    .btn-nav:disabled { opacity: 0.35; cursor: default; }
+
+    #slide-counter {
+      font-size: 0.8rem; color: var(--text-muted);
+      min-width: 70px; text-align: center;
+    }
+
+    /* ── DOT INDICATORS ── */
+    #dots {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-dim); cursor: pointer; transition: all 0.3s;
+    }
+    .dot.active { background: var(--accent2); width: 20px; border-radius: 3px; }
+
+    /* ── SLIDE LAYOUTS ── */
+    .slide-title { text-align: center; max-width: 900px; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+      color: var(--accent2); padding: 0.3rem 0.9rem; border-radius: 99px;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    h1.headline {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 800; line-height: 1.1;
+      background: linear-gradient(135deg, #fff 0%, var(--accent2) 50%, var(--accent3) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 1.25rem;
+    }
+
+    h2.slide-heading {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 700; line-height: 1.2;
+      background: linear-gradient(135deg, #fff 60%, var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 2rem; text-align: center; width: 100%;
+    }
+
+    .sub { font-size: 1.15rem; color: var(--text-muted); line-height: 1.7; max-width: 640px; text-align: center; }
+
+    /* ── CARD GRID ── */
+    .cards { display: grid; gap: 1rem; width: 100%; max-width: 1000px; }
+    .cards.cols-3 { grid-template-columns: repeat(3,1fr); }
+    .cards.cols-2 { grid-template-columns: repeat(2,1fr); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem;
+      position: relative; overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.6;
+    }
+    .card:hover { transform: translateY(-3px); border-color: rgba(99,102,241,0.3); }
+
+    .card-icon {
+      font-size: 2rem; margin-bottom: 0.75rem; display: block;
+    }
+    .card h3 {
+      font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+    .card p {
+      font-size: 0.8rem; color: var(--text-muted); line-height: 1.6;
+    }
+
+    /* ── FLOW DIAGRAM ── */
+    .flow {
+      display: flex; align-items: center; gap: 0.5rem;
+      flex-wrap: wrap; justify-content: center;
+      max-width: 1000px; width: 100%;
+    }
+    .flow-step {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.85rem 1.2rem;
+      text-align: center; min-width: 120px;
+      position: relative;
+    }
+    .flow-step .step-icon { font-size: 1.5rem; display: block; margin-bottom: 0.35rem; }
+    .flow-step .step-label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
+    .flow-step .step-title { font-size: 0.8rem; font-weight: 700; color: var(--text); }
+    .flow-arrow { color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+
+    /* ── PLATFORM BADGES ── */
+    .platforms { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; margin-top: 0.5rem; }
+    .platform-badge {
+      display: flex; align-items: center; gap: 0.4rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.4rem 0.8rem;
+      font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+    }
+    .platform-badge span { font-size: 1rem; }
+
+    /* ── TECH STACK ── */
+    .stack-row { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+    .stack-pill {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 99px; padding: 0.35rem 0.9rem;
+      font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+    }
+    .stack-pill.accent { border-color: rgba(99,102,241,0.4); color: var(--accent2); background: rgba(99,102,241,0.08); }
+    .stack-pill.green  { border-color: rgba(52,211,153,0.4); color: var(--green);   background: rgba(52,211,153,0.08); }
+    .stack-pill.yellow { border-color: rgba(251,191,36,0.4);  color: var(--yellow);  background: rgba(251,191,36,0.08); }
+    .stack-pill.blue   { border-color: rgba(56,189,248,0.4);  color: var(--accent3); background: rgba(56,189,248,0.08); }
+
+    /* ── STATS ── */
+    .stats { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+    .stat { text-align: center; }
+    .stat .num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 3rem; font-weight: 800; line-height: 1;
+      background: linear-gradient(135deg, var(--accent2), var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .stat .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem; }
+
+    /* ── LIST ── */
+    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; width: 100%; max-width: 700px; }
+    .feature-list li {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.9rem 1.2rem; font-size: 0.88rem;
+    }
+    .feature-list li .icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 0.05rem; }
+    .feature-list li strong { display: block; font-weight: 700; margin-bottom: 0.15rem; }
+    .feature-list li span { color: var(--text-muted); font-size: 0.8rem; }
+
+    /* ── TWO-COL ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; width: 100%; max-width: 1000px; align-items: start; }
+
+    /* ── GLOW ORBS ── */
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; opacity: 0.4;
+    }
+    .orb-1 { width: 400px; height: 400px; background: rgba(99,102,241,0.2); top: -100px; right: -100px; }
+    .orb-2 { width: 300px; height: 300px; background: rgba(56,189,248,0.15); bottom: -80px; left: -80px; }
+
+    /* ── CONCLUSION GLOW ── */
+    .conclusion-glow {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99,102,241,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ── DIVIDER ── */
+    .divider { width: 60px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent3)); margin: 0 auto 1.5rem; }
+
+    /* ── KEYBOARD HINT ── */
+    .key-hint { position: fixed; bottom: 80px; right: 24px; font-size: 0.72rem; color: var(--text-dim); pointer-events: none; }
+
+    /* ── PROGRESS BAR ── */
+    #progress-bar {
+      position: fixed; top: 0; left: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width 0.4s ease; z-index: 200;
+    }
+
+    /* responsive */
+    @media (max-width: 768px) {
+      .slide { padding: 2rem 1.5rem; }
+      .cards.cols-3, .cards.cols-2 { grid-template-columns: 1fr; }
+      .two-col { grid-template-columns: 1fr; }
+      .flow { gap: 0.3rem; }
+      .flow-step { min-width: 90px; padding: 0.6rem 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<div id="deck">
+  <div class="slide-stage">
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 1: HERO -->
+    <section class="slide active" data-slide="0">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="slide-title">
+        <div class="chip">✦ &nbsp;AI-Powered SaaS Platform</div>
+        <h1 class="headline">Cadence</h1>
+        <div class="divider"></div>
+        <p class="sub">Automatically generate, review, schedule and publish SEO-optimised content across every digital channel — from one intelligent dashboard.</p>
+        <div class="platforms" style="margin-top:2.5rem;">
+          <div class="platform-badge"><span>📝</span> Blog</div>
+          <div class="platform-badge"><span>📸</span> Instagram</div>
+          <div class="platform-badge"><span>💼</span> LinkedIn</div>
+          <div class="platform-badge"><span>🎬</span> YouTube</div>
+          <div class="platform-badge"><span>👍</span> Facebook</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 2: PROBLEM -->
+    <section class="slide" data-slide="1">
+      <div class="orb orb-1"></div>
+      <h2 class="slide-heading">The Problem</h2>
+      <div class="cards cols-3">
+        <div class="card">
+          <span class="card-icon">⏱️</span>
+          <h3>Time-Intensive</h3>
+          <p>Content teams spend 60%+ of their time writing, editing, and reformatting posts for different platforms, leaving no room for strategy.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🔀</span>
+          <h3>Fragmented Tooling</h3>
+          <p>Managing multiple websites across different social platforms means juggling 5+ tools — writers, schedulers, CMS, analytics — with no single source of truth.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🎨</span>
+          <h3>Brand Inconsistency</h3>
+          <p>Without a style-aware AI, generated content drifts from the brand voice, requires heavy editing, and still misses the tone that resonates with the audience.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 3: SOLUTION -->
+    <section class="slide" data-slide="2">
+      <div class="orb orb-2"></div>
+      <div class="chip">💡 &nbsp;Our Solution</div>
+      <h2 class="slide-heading">Cadence — One Platform, Every Channel</h2>
+      <ul class="feature-list">
+        <li>
+          <span class="icon">🤖</span>
+          <div><strong>AI Content Generation</strong><span>GPT-4o-mini generates brand-aware blogs, social captions, and scripts tailored to each website's tone and style guide.</span></div>
+        </li>
+        <li>
+          <span class="icon">🕷️</span>
+          <div><strong>Intelligent Website Crawler</strong><span>Automatically crawls & analyses your website to extract brand voice, colour palette, topics, and tone — zero manual setup.</span></div>
+        </li>
+        <li>
+          <span class="icon">✅</span>
+          <div><strong>Approval Workflow</strong><span>Admins review, approve, reject or regenerate AI drafts before anything goes live. Full editorial control without the overhead.</span></div>
+        </li>
+        <li>
+          <span class="icon">🗓️</span>
+          <div><strong>Automated Scheduler</strong><span>Celery Beat fires every minute, picks up approved posts, and publishes them to the right channel at exactly the right time.</span></div>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 4: HOW IT WORKS -->
+    <section class="slide" data-slide="3">
+      <h2 class="slide-heading">How It Works</h2>
+      <div class="flow" style="margin-bottom:1.5rem;">
+        <div class="flow-step" style="border-color:rgba(99,102,241,0.4);">
+          <span class="step-icon">🌐</span>
+          <div class="step-label">Step 1</div>
+          <div class="step-title">Add Website</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(56,189,248,0.4);">
+          <span class="step-icon">🕷️</span>
+          <div class="step-label">Step 2</div>
+          <div class="step-title">Auto-Crawl</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(167,139,250,0.4);">
+          <span class="step-icon">💡</span>
+          <div class="step-label">Step 3</div>
+          <div class="step-title">Submit Idea</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(251,191,36,0.4);">
+          <span class="step-icon">🤖</span>
+          <div class="step-label">Step 4</div>
+          <div class="step-title">AI Generates</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(52,211,153,0.4);">
+          <span class="step-icon">✅</span>
+          <div class="step-label">Step 5</div>
+          <div class="step-title">Review &amp; Approve</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:rgba(248,113,113,0.4);">
+          <span class="step-icon">🚀</span>
+          <div class="step-label">Step 6</div>
+          <div class="step-title">Auto-Publish</div>
+        </div>
+      </div>
+      <p style="font-size:0.82rem; color:var(--text-muted); text-align:center;">Celery Beat runs every minute · make.com webhooks push to social · custom blog API for website publishing</p>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 5: KEY FEATURES -->
+    <section class="slide" data-slide="4">
+      <h2 class="slide-heading">Key Features</h2>
+      <div class="cards cols-3" style="max-width:1050px;">
+        <div class="card">
+          <span class="card-icon">🗓️</span>
+          <h3>Content Calendar</h3>
+          <p>Visual Mon–Sun board, drag-to-reschedule, auto-schedule, cross-website filters.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">📊</span>
+          <h3>Analytics Dashboard</h3>
+          <p>Volume charts, platform mix, approval rates, and engagement metrics — all in one view.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🔗</span>
+          <h3>Platform Connections</h3>
+          <p>Per-website make.com webhooks &amp; custom blog API endpoints with auth configuration.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🖼️</span>
+          <h3>Banner Generation</h3>
+          <p>Auto-generated cover images for every blog post, uploaded to imgbb with public URLs.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">👥</span>
+          <h3>Multi-Role Access</h3>
+          <p>Admin vs Super Admin roles with granular permission matrix. Manage team members easily.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🗑️</span>
+          <h3>Soft Delete &amp; Trash</h3>
+          <p>Deleted drafts and websites go to trash for recovery — no data lost accidentally.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 6: TECH STACK -->
+    <section class="slide" data-slide="5">
+      <div class="orb orb-1"></div>
+      <h2 class="slide-heading">Technology Stack</h2>
+      <div class="two-col">
+        <div>
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:0.75rem;font-weight:700;">Backend</p>
+          <div class="stack-row" style="justify-content:flex-start;margin-bottom:1.2rem;">
+            <div class="stack-pill accent">Django 5</div>
+            <div class="stack-pill accent">Django REST Framework</div>
+            <div class="stack-pill green">Celery</div>
+            <div class="stack-pill green">Redis (Broker)</div>
+            <div class="stack-pill yellow">SQLite / PostgreSQL</div>
+          </div>
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:0.75rem;font-weight:700;">AI & Automation</p>
+          <div class="stack-row" style="justify-content:flex-start;margin-bottom:1.2rem;">
+            <div class="stack-pill blue">GPT-4o-mini</div>
+            <div class="stack-pill blue">OpenAI API</div>
+            <div class="stack-pill accent">make.com Webhooks</div>
+            <div class="stack-pill yellow">imgbb (Image Hosting)</div>
+          </div>
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:0.75rem;font-weight:700;">Web Scraping</p>
+          <div class="stack-row" style="justify-content:flex-start;">
+            <div class="stack-pill green">BeautifulSoup</div>
+            <div class="stack-pill green">Requests / httpx</div>
+            <div class="stack-pill accent">Readability</div>
+          </div>
+        </div>
+        <div>
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:0.75rem;font-weight:700;">Frontend</p>
+          <div class="stack-row" style="justify-content:flex-start;margin-bottom:1.2rem;">
+            <div class="stack-pill blue">HTML5 / CSS3</div>
+            <div class="stack-pill blue">Vanilla JavaScript</div>
+            <div class="stack-pill accent">Chart.js</div>
+            <div class="stack-pill accent">Lucide Icons</div>
+            <div class="stack-pill yellow">Inter (Google Fonts)</div>
+          </div>
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:0.75rem;font-weight:700;">Architecture</p>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;font-size:0.78rem;line-height:1.8;color:var(--text-muted);">
+            <p>🏗️ <strong style="color:var(--text);">Multi-app Django</strong> — accounts · websites · content · logs</p>
+            <p>⚡ <strong style="color:var(--text);">Async Tasks</strong> — Celery workers + beat scheduler</p>
+            <p>🔐 <strong style="color:var(--text);">JWT Auth</strong> — token-based API authentication</p>
+            <p>🌐 <strong style="color:var(--text);">REST API</strong> — full CRUD with DRF serializers</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 7: CONTENT PIPELINE -->
+    <section class="slide" data-slide="6">
+      <div class="orb orb-2"></div>
+      <h2 class="slide-heading">AI Content Pipeline</h2>
+      <div class="cards cols-2" style="max-width:900px;">
+        <div class="card" style="border-color:rgba(99,102,241,0.3);">
+          <span class="card-icon">🕷️</span>
+          <h3>Website Intelligence</h3>
+          <p>Crawler extracts brand voice, tone, colors, key phrases, headings, and sentiment from the live site — building a rich style guide used in every generation prompt.</p>
+        </div>
+        <div class="card" style="border-color:rgba(56,189,248,0.3);">
+          <span class="card-icon">📝</span>
+          <h3>Context-Aware Prompts</h3>
+          <p>Each AI generation bundles the website style guide, sample content, target platform, meta-tags, and admin brief into a precision-crafted prompt for GPT-4o-mini.</p>
+        </div>
+        <div class="card" style="border-color:rgba(52,211,153,0.3);">
+          <span class="card-icon">🔄</span>
+          <h3>Regeneration Support</h3>
+          <p>Admins can reject and regenerate a draft. Celery re-runs the generation task using the original idea, deletes the old draft, and presents a fresh alternative.</p>
+        </div>
+        <div class="card" style="border-color:rgba(251,191,36,0.3);">
+          <span class="card-icon">🚀</span>
+          <h3>Multi-Channel Publishing</h3>
+          <p>Blogs go through the custom website API endpoint; social posts fire through make.com webhooks to Instagram, LinkedIn, Facebook, and YouTube simultaneously.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 8: ROLES & SECURITY -->
+    <section class="slide" data-slide="7">
+      <h2 class="slide-heading">Roles, Permissions &amp; Security</h2>
+      <div class="two-col">
+        <div>
+          <div class="card" style="margin-bottom:1rem;border-color:rgba(99,102,241,0.3);">
+            <span class="card-icon">👤</span>
+            <h3>Admin</h3>
+            <p>Manages their own websites, submits content ideas, approves/rejects drafts, views analytics, and configures platform connections for their assigned sites.</p>
+          </div>
+          <div class="card" style="border-color:rgba(251,191,36,0.4);">
+            <span class="card-icon">👑</span>
+            <h3>Super Admin</h3>
+            <p>Full platform access — manages all websites across all admins, configures roles &amp; permissions, accesses billing, and sees platform-wide analytics.</p>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <span class="card-icon">🔐</span>
+            <h3>Security Highlights</h3>
+            <ul style="margin-top:0.5rem;display:flex;flex-direction:column;gap:0.4rem;">
+              <li style="font-size:0.8rem;color:var(--text-muted);display:flex;gap:0.5rem;align-items:flex-start;"><span style="color:var(--green);">✓</span> JWT token authentication on all API routes</li>
+              <li style="font-size:0.8rem;color:var(--text-muted);display:flex;gap:0.5rem;align-items:flex-start;"><span style="color:var(--green);">✓</span> Role-based object permissions (DRF)</li>
+              <li style="font-size:0.8rem;color:var(--text-muted);display:flex;gap:0.5rem;align-items:flex-start;"><span style="color:var(--green);">✓</span> Social auth credentials stored encrypted</li>
+              <li style="font-size:0.8rem;color:var(--text-muted);display:flex;gap:0.5rem;align-items:flex-start;"><span style="color:var(--green);">✓</span> Soft-delete for drafts and websites</li>
+              <li style="font-size:0.8rem;color:var(--text-muted);display:flex;gap:0.5rem;align-items:flex-start;"><span style="color:var(--green);">✓</span> Activity log for all key actions</li>
+              <li style="font-size:0.8rem;color:var(--text-muted);display:flex;gap:0.5rem;align-items:flex-start;"><span style="color:var(--green);">✓</span> CORS &amp; CSRF protection via Django</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 9: DEMO OVERVIEW -->
+    <section class="slide" data-slide="8">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <h2 class="slide-heading">Demo Walkthrough</h2>
+      <div class="cards cols-3" style="max-width:1050px;">
+        <div class="card">
+          <span class="card-icon">🔑</span>
+          <h3>1. Authentication</h3>
+          <p>Login / Signup with JWT — role is detected and the correct dashboard variant is loaded instantly.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🌐</span>
+          <h3>2. Add &amp; Crawl Website</h3>
+          <p>Enter a URL → live crawling animation → site summary, brand colors, and topics extracted automatically.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">✍️</span>
+          <h3>3. Submit Content Idea</h3>
+          <p>Admin writes a brief topic + platform choice → Celery task queues AI generation in the background.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🃏</span>
+          <h3>4. Review Draft Cards</h3>
+          <p>AI-generated draft appears with full preview (platform-styled). Approve, Edit, Regenerate, or Reject.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">🗓️</span>
+          <h3>5. Schedule &amp; Publish</h3>
+          <p>Pick a date/time on the calendar → Celery Beat auto-publishes at the scheduled moment via webhooks.</p>
+        </div>
+        <div class="card">
+          <span class="card-icon">📊</span>
+          <h3>6. Analytics</h3>
+          <p>Track output volume, platform distribution, approval rates, and publishing history across all websites.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════ SLIDE 10: CONCLUSION -->
+    <section class="slide" data-slide="9">
+      <div class="conclusion-glow"></div>
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="slide-title">
+        <div class="chip">🎯 &nbsp;Summary</div>
+        <h1 class="headline" style="font-size:clamp(2rem,4vw,3.5rem);">Built for Scale.<br/>Designed for Control.</h1>
+        <div class="divider"></div>
+        <p class="sub" style="margin-bottom:2rem;">Cadence closes the loop between <strong style="color:var(--text);">AI generation</strong> and <strong style="color:var(--text);">real publishing</strong> — with brand awareness, editorial oversight, and a fully automated scheduler baked in from day one.</p>
+        <div class="stats">
+          <div class="stat"><div class="num">5+</div><div class="label">Publishing Channels</div></div>
+          <div class="stat"><div class="num">∞</div><div class="label">Websites Managed</div></div>
+          <div class="stat"><div class="num">GPT‑4o</div><div class="label">AI Engine</div></div>
+          <div class="stat"><div class="num">1 min</div><div class="label">Publish Latency</div></div>
+        </div>
+        <div class="platforms" style="margin-top:2rem;">
+          <div class="platform-badge"><span>🐍</span> Django 5</div>
+          <div class="platform-badge"><span>⚡</span> Celery</div>
+          <div class="platform-badge"><span>🤖</span> GPT-4o-mini</div>
+          <div class="platform-badge"><span>🔗</span> make.com</div>
+          <div class="platform-badge"><span>🌐</span> Vanilla JS</div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /slide-stage -->
+
+  <!-- ── NAV BAR ── -->
+  <nav id="nav">
+    <div class="brand">⟡ Cadence</div>
+    <div id="dots"></div>
+    <div class="nav-controls">
+      <span id="slide-counter">1 / 10</span>
+      <button class="btn-nav" id="prev-btn">← Prev</button>
+      <button class="btn-nav" id="next-btn">Next →</button>
+    </div>
+  </nav>
+</div>
+
+<div class="key-hint">← → arrow keys to navigate</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.getElementById('dots');
+  const counter = document.getElementById('slide-counter');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const progressBar = document.getElementById('progress-bar');
+  let current = 0;
+  let animating = false;
+
+  // Build dots
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dots.appendChild(d);
+  });
+
+  function updateUI() {
+    const total = slides.length;
+    counter.textContent = `${current + 1} / ${total}`;
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === current));
+    progressBar.style.width = `${((current + 1) / total) * 100}%`;
+  }
+
+  function goTo(next) {
+    if (animating || next === current || next < 0 || next >= slides.length) return;
+    animating = true;
+    const prev = current;
+    slides[prev].classList.remove('active');
+    slides[prev].classList.add('exit-left');
+    current = next;
+    slides[current].classList.add('active');
+    updateUI();
+    setTimeout(() => {
+      slides[prev].classList.remove('exit-left');
+      animating = false;
+    }, 520);
+  }
+
+  nextBtn.addEventListener('click', () => goTo(current + 1));
+  prevBtn.addEventListener('click', () => goTo(current - 1));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goTo(current + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   goTo(current - 1);
+  });
+
+  // Swipe support
+  let touchStartX = 0;
+  document.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX, {passive:true});
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) dx < 0 ? goTo(current+1) : goTo(current-1);
+  }, {passive:true});
+
+  updateUI();
+</script>
+</body>
+</html>

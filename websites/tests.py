@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from django.utils import timezone
 import datetime
 
-from websites.models import Website, ScrapeResult
+from websites.models import Website, ScrapeResult, SocialConnection
 from websites.scraper import (
     get_url_priority,
     parse_pub_date,
@@ -367,3 +367,71 @@ class WebsiteSoftDeleteAPITests(APITestCase):
         
         # Verify the old soft-deleted website is hard-deleted to prevent conflict
         self.assertFalse(Website.objects.filter(id=self.website.id).exists())
+
+
+class SecureConnectionsTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="superuser@cadence.io",
+            username="superuser",
+            password="superpassword",
+            role="super_admin"
+        )
+        self.website = Website.objects.create(
+            name="Test Connections Cafe",
+            domain="testconns.com",
+            url="https://testconns.com",
+            owner=self.user,
+            status="active"
+        )
+        from rest_framework_simplejwt.tokens import RefreshToken
+        token = str(RefreshToken.for_user(self.user).access_token)
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
+
+    def test_encryption_decryption(self):
+        """Test encryption and decryption utility helper."""
+        from websites.utils import encrypt_value, decrypt_value
+        val = "secret_api_key_12345"
+        enc = encrypt_value(val)
+        self.assertNotEqual(val, enc)
+        dec = decrypt_value(enc)
+        self.assertEqual(val, dec)
+
+    def test_social_connection_serializer_encryption_and_masking(self):
+        """Test that serializer encrypts auth payload on write and masks secrets on read."""
+        url = f"/api/websites/{self.website.id}/social/"
+        payload = {
+            "platform": "blog",
+            "make_webhook_url": "https://testconns.com/api/publish",
+            "auth_type": "api_key",
+            "auth_payload_write": {
+                "api_key_name": "X-Auth-Token",
+                "api_key_value": "super_secret_value_999"
+            }
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, 201)
+        
+        # Verify database value is encrypted
+        conn = SocialConnection.objects.get(website=self.website, platform="blog")
+        self.assertNotEqual(conn.auth_payload, "")
+        self.assertNotIn("super_secret_value_999", conn.auth_payload)
+        
+        # Verify read response is masked
+        response_data = response.json()
+        self.assertEqual(response_data["auth_payload"]["api_key_name"], "X-Auth-Token")
+        self.assertEqual(response_data["auth_payload"]["api_key_value"], "••••••••")
+
+    def test_test_connection_view(self):
+        """Test connection testing view endpoint."""
+        url = f"/api/websites/{self.website.id}/social/blog/test/"
+        payload = {
+            "make_webhook_url": "https://httpbin.org/post",
+            "auth_type": "bearer_token",
+            "auth_payload_write": {
+                "token_value": "test_bearer_token"
+            }
+        }
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("connected", response.json())

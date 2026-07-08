@@ -22,6 +22,8 @@ class CustomUser(AbstractUser):
     timezone = models.CharField(max_length=100, default='(GMT+05:30) India (Kolkata)')
     bio = models.TextField(blank=True, default='Managing content for specialty brands at Cadence.')
     deleted_at = models.DateTimeField(null=True, blank=True)  # soft-delete / trash
+    password_reset_token = models.CharField(max_length=128, null=True, blank=True)
+    password_reset_token_expires = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'accounts_user'

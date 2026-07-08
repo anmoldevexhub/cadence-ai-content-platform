@@ -158,7 +158,13 @@ class SocialConnectionView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         website = Website.objects.get(pk=self.kwargs['pk'])
-        conn = serializer.save(website=website)
+        platform = serializer.validated_data.get('platform')
+        existing = SocialConnection.objects.filter(website=website, platform=platform).first()
+        if existing:
+            serializer.instance = existing
+            conn = serializer.save(is_active=True)
+        else:
+            conn = serializer.save(website=website)
         ActivityLog.objects.create(
             actor=self.request.user, actor_name=self.request.user.get_full_name(),
             action='social_connected',
@@ -179,14 +185,30 @@ class WebsiteStatsView(APIView):
 
     def get(self, request, pk):
         from content.models import ContentDraft, ScheduledPost
+        from django.utils import timezone
+        from datetime import timedelta
+        
         drafts = ContentDraft.objects.filter(website_id=pk)
+        
+        # Calculate current week boundaries (Monday to Sunday)
+        now = timezone.now()
+        start_of_week = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_week = start_of_week + timedelta(days=7)
+        
+        scheduled_count = ScheduledPost.objects.filter(
+            draft__website_id=pk,
+            scheduled_for__range=(start_of_week, end_of_week)
+        ).count()
+        
         return Response({
             'published': drafts.filter(status='published').count(),
-            'scheduled': drafts.filter(status='scheduled').count(),
+            'scheduled': scheduled_count,
             'pending': drafts.filter(status='draft').count(),
             'approved': drafts.filter(status='approved').count(),
             'rejected': drafts.filter(status='rejected').count(),
+            'pages': ScrapeResult.objects.filter(website_id=pk).count(),
         })
+
 
 
 class WebsitePagesListView(generics.ListAPIView):
@@ -232,3 +254,35 @@ class SampleContentDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrSuperAdmin]
     queryset = SampleContent.objects.all()
     lookup_url_kwarg = 'sample_pk'
+
+
+class TestConnectionView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request, pk, platform):
+        url = request.data.get('make_webhook_url', '')
+        auth_type = request.data.get('auth_type', 'none')
+        auth_payload_raw = request.data.get('auth_payload_write', {})
+
+        if not url:
+            return Response({'connected': False, 'detail': 'URL is required'}, status=400)
+
+        # Restore password/token if placeholder is passed
+        if any(v == "••••••••" for v in auth_payload_raw.values()):
+            try:
+                conn = SocialConnection.objects.filter(website_id=pk, platform=platform).first()
+                if conn and conn.auth_payload:
+                    from websites.utils import decrypt_value
+                    import json
+                    existing_payload = json.loads(decrypt_value(conn.auth_payload))
+                    for k, v in auth_payload_raw.items():
+                        if v == "••••••••" and k in existing_payload:
+                            auth_payload_raw[k] = existing_payload[k]
+            except Exception:
+                pass
+
+        # Call backend test connection helper
+        from websites.utils import test_connection_helper
+        success = test_connection_helper(platform, url, auth_type, auth_payload_raw)
+
+        return Response({'connected': success})

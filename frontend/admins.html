@@ -105,10 +105,7 @@
       <div class="modal__body">
         <div class="field"><label class="label">Full name</label><input class="input" id="invName" placeholder="Jordan Rivera"/></div>
         <div class="field"><label class="label">Email</label><input class="input" id="invEmail" type="email" placeholder="jordan@company.com"/></div>
-        <div class="grid grid-2">
-          <div class="field"><label class="label">Role</label><select class="select" id="invRole"><option>Admin</option><option>Editor</option><option>Super Admin</option></select></div>
-          <div class="field"><label class="label">Assign websites</label><select class="select" id="invWebsites"><option value="">Choose later</option></select></div>
-        </div>
+        <div class="field"><label class="label">Role</label><select class="select" id="invRole"><option>Admin</option><option>Super Admin</option></select></div>
       </div>
       <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="sendInvite"><i data-lucide="send"></i> Send invite</button></div>
     </div>
@@ -126,7 +123,6 @@
           <label class="label">Role</label>
           <select class="select" id="editAdminRole">
             <option value="Admin">Admin</option>
-            <option value="Editor">Editor</option>
             <option value="Super Admin">Super Admin</option>
           </select>
         </div>
@@ -140,7 +136,7 @@
     <div class="modal">
       <div class="modal__head"><div class="mtxt"><h3>Assign websites</h3><div class="sub" id="assignSub"></div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
       <div class="modal__body"><div class="col gap2" id="assignList"></div></div>
-      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" data-close-modal onclick="Cadence.toast({type:'success',title:'Website assignments updated'})">Save</button></div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="assignSave"><i data-lucide="check"></i> Save</button></div>
     </div>
   </div>
 
@@ -161,7 +157,7 @@
     const admins = M.admins;
     document.getElementById("cntPeople").textContent = admins.length;
 
-    // Populate Assign Websites select
+    // Populate Assign Websites select (removed from UI, keeping check for safety)
     const invWebsitesSelect = document.getElementById("invWebsites");
     if (invWebsitesSelect) {
       let optionsHtml = '<option value="">Choose later</option>';
@@ -216,18 +212,20 @@
           <td><span class="badge ${roleBadge[a.role]||'badge-neutral'}">${a.role}</span></td>
           <td><div class="row gap2 wrap">${a.websites.slice(0,2).map(w=>`<span class="badge badge-neutral">${w}</span>`).join("")}${a.websites.length>2?`<span class="muted tsm">+${a.websites.length-2}</span>`:""}</div></td>
           <td>
+            ${a.role === "Super Admin" ? '<span style="color:var(--text-muted);font-size:13px;font-weight:500;">Always active</span>' : `
             <label class="switch" style="display:inline-block">
               <input type="checkbox" class="status-toggle" data-id="${a.id}" ${a.status==="Active"?'checked':''} />
               <span class="track"></span>
             </label>
+            `}
           </td>
           <td>${lastActiveHtml(a.last)}</td>
           <td style="text-align:right">
             <div class="dropdown" style="display:inline-block">
               <button class="icon-btn btn-sm" data-menu="m${i}">${I("more-horizontal")}</button>
               <div class="menu" id="m${i}">
-                <button class="menu-item" onclick="Cadence.closeModal();document.getElementById('assignSub').textContent='${a.name}';openAssign()">${I("globe")} Assign websites</button>
-                <button class="menu-item" onclick="Cadence.closeModal();openEditAdmin('${a.id}', '${a.name.replace(/'/g, "\\'")}', '${a.email.replace(/'/g, "\\'")}', '${a.role}')">${I("pencil")} Edit</button>
+                <button class="menu-item" onclick="Cadence.closeModal();document.getElementById('assignSub').textContent='${a.name}';openAssign('${a.id}')"><i data-lucide="globe"></i> Assign websites</button>
+                <button class="menu-item" onclick="Cadence.closeModal();openEditAdmin('${a.id}', '${a.name.replace(/'/g, "\\'")}', '${a.email.replace(/'/g, "\\'")}', '${a.role}')"><i data-lucide="pencil"></i> Edit</button>
                 <button class="menu-item" onclick="resetPassword('${a.id}', '${a.name}')">${I("key-round")} Reset password</button>
                 <div class="menu-sep"></div>
                 <button class="menu-item danger" onclick="confirmDeleteAdmin('${a.id}', '${a.name}')">${I("trash-2")} Delete admin</button>
@@ -290,8 +288,16 @@
       }
     };
 
-    window.openAssign = function () {
-      document.getElementById("assignList").innerHTML = M.websites.map((w,i) => `
+    let currentAssignAdminId = null;
+
+    window.openAssign = function (adminId) {
+      currentAssignAdminId = adminId;
+      // Find which website IDs this admin owns
+      const ownedWebsiteIds = M.websites
+        .filter(w => w.owner_id === String(adminId))
+        .map(w => w.id);
+
+      document.getElementById("assignList").innerHTML = M.websites.map((w) => `
         <label class="chan-conn" style="cursor:pointer">
           <span class="favicon" style="background:${w.color}">${w.short}</span>
           <div class="cc-meta">
@@ -299,12 +305,63 @@
             <div class="cc-st">${w.url}</div>
           </div>
           <span class="switch">
-            <input type="checkbox" ${i<2?'checked':''} />
+            <input type="checkbox" data-website-id="${w.id}" ${ownedWebsiteIds.includes(w.id) ? 'checked' : ''} />
             <span class="track"></span>
           </span>
         </label>`).join("");
       C.openModal("assignModal");
     };
+
+    document.getElementById("assignSave").addEventListener("click", async function () {
+      if (!currentAssignAdminId) return;
+      const btn = this;
+      btn.disabled = true;
+      btn.innerHTML = `<svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Saving…`;
+
+      const checkboxes = document.querySelectorAll("#assignList input[type=checkbox][data-website-id]");
+      const errors = [];
+
+      for (const cb of checkboxes) {
+        const websiteId = cb.dataset.websiteId;
+        const website = M.websites.find(w => w.id === websiteId);
+        if (!website) continue;
+        const currentOwner = website.owner_id;
+        const wantAssigned = cb.checked;
+        const isAssigned = currentOwner === String(currentAssignAdminId);
+
+        if (wantAssigned && !isAssigned) {
+          // Assign this website to the admin
+          try {
+            await CadenceAPI.updateWebsite(websiteId, { owner: currentAssignAdminId });
+          } catch (e) {
+            errors.push(website.name);
+          }
+        } else if (!wantAssigned && isAssigned) {
+          // Unassign: revert to superadmin (find superadmin id)
+          const superAdmin = admins.find(a => a.role === 'Super Admin');
+          if (superAdmin) {
+            try {
+              await CadenceAPI.updateWebsite(websiteId, { owner: superAdmin.id });
+            } catch (e) {
+              errors.push(website.name);
+            }
+          }
+        }
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="check"></i> Save`;
+      C.refreshIcons();
+
+      if (errors.length) {
+        C.toast({ type: 'error', title: 'Some updates failed', desc: errors.join(', ') });
+      } else {
+        C.closeModal("assignModal");
+        C.toast({ type: 'success', title: 'Website assignments updated' });
+        await M.syncMockData();
+        renderAdmins();
+      }
+    });
 
 
     window.openEditAdmin = function (id, name, email, role) {
@@ -331,7 +388,7 @@
         return;
       }
       
-      const roleVal = roleSel === "Super Admin" ? "super" : roleSel === "Editor" ? "editor" : "admin";
+      const roleVal = roleSel === "Super Admin" ? "super" : "admin";
       const nameParts = name.split(/\s+/);
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
@@ -385,7 +442,7 @@
         const res = await CadenceAPI.addAdmin(firstName, lastName, email, roleVal, tempPassword);
         const newUserId = res.id;
         
-        const websiteVal = document.getElementById("invWebsites").value;
+        const websiteVal = document.getElementById("invWebsites")?.value;
         if (websiteVal && websiteVal !== "all" && newUserId) {
           await CadenceAPI.updateWebsite(websiteVal, { owner: newUserId });
         }

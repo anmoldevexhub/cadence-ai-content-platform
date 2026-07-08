@@ -159,7 +159,8 @@ def _scrape_page_playwright(url: str) -> Optional[dict]:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.goto(url, timeout=20000, wait_until='networkidle')
+            page.goto(url, timeout=25000, wait_until='domcontentloaded')
+            page.wait_for_timeout(3000)
             html = page.content()
             browser.close()
         
@@ -251,11 +252,13 @@ def _classify_page_type_helper(url: str, soup, author: str, pub_date) -> str:
     # 2. About page heuristics
     if any(k in path for k in ['/about', '/team', '/who-we-are', '/our-story', '/careers']):
         return 'about page'
-    if soup.title and any(k in soup.title.string.lower() for k in ['about us', 'about company', 'our team', 'who we are']):
+    if soup.title and any(k in soup.title.get_text().lower() for k in ['about us', 'about company', 'our team', 'who we are']):
         return 'about page'
         
     # 3. Blog post heuristics
     if any(k in path for k in ['/blog/', '/post/', '/article/', '/news/', '/stories/', '/posts/']) or re.search(r'/\d{4}/\d{2}/', path):
+        return 'blog post'
+    if soup.find('meta', property='og:type', content='article') or soup.find('meta', attrs={'name': 'og:type', 'content': 'article'}):
         return 'blog post'
     if soup.find('article') or (author and pub_date):
         return 'blog post'
@@ -284,7 +287,7 @@ def _classify_page_type_helper(url: str, soup, author: str, pub_date) -> str:
 
 def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
     """Extracts structured metadata, headings, main content, CTAs, comments, and page types."""
-    title = soup.title.string.strip() if soup.title else ''
+    title = soup.title.get_text().strip() if soup.title else ''
     meta_title = ""
     meta_desc = ""
     og_properties = {}
@@ -476,12 +479,16 @@ def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
         # 3. Body text color
         color_match = re.search(r'body\s*{[^}]*color:\s*([^;}]+)', style_content, re.I)
         if color_match:
-            text_color = color_match.group(1).strip()
+            val = color_match.group(1).strip().lower()
+            if val != 'transparent':
+                text_color = color_match.group(1).strip()
             
         # 4. Heading text color
         h_color_match = re.search(r'h[1-6]\s*{[^}]*color:\s*([^;}]+)', style_content, re.I)
         if h_color_match:
-            heading_color = h_color_match.group(1).strip()
+            val = h_color_match.group(1).strip().lower()
+            if val != 'transparent':
+                heading_color = h_color_match.group(1).strip()
             
     # 1. Extract Logo
     logo_url = ""

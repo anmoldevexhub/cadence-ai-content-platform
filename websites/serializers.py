@@ -2,10 +2,68 @@ from rest_framework import serializers
 from .models import Website, SocialConnection, ScrapeResult, SampleContent
 
 class SocialConnectionSerializer(serializers.ModelSerializer):
+    auth_payload = serializers.SerializerMethodField()
+    auth_payload_write = serializers.JSONField(write_only=True, required=False)
+
     class Meta:
         model = SocialConnection
-        fields = ['id', 'platform', 'make_webhook_url', 'is_active', 'connected_at']
-        read_only_fields = ['id', 'connected_at']
+        fields = ['id', 'platform', 'make_webhook_url', 'is_active', 'connected_at', 'auth_type', 'auth_payload', 'auth_payload_write']
+        read_only_fields = ['id', 'connected_at', 'auth_payload']
+
+    def get_auth_payload(self, obj):
+        if not obj.auth_payload:
+            return {}
+        try:
+            from websites.utils import decrypt_value
+            import json
+            decrypted = decrypt_value(obj.auth_payload)
+            data = json.loads(decrypted)
+            masked = {}
+            for k, v in data.items():
+                # Mask sensitive key names but keep name fields visible (like api_key_name)
+                if any(sec in k.lower() for sec in ['value', 'password', 'token', 'secret', 'pass']) and 'name' not in k.lower():
+                    masked[k] = "••••••••" if v else ""
+                else:
+                    masked[k] = v
+            return masked
+        except Exception:
+            return {}
+
+    def create(self, validated_data):
+        auth_payload_write = validated_data.pop('auth_payload_write', None)
+        instance = super().create(validated_data)
+        if auth_payload_write:
+            from websites.utils import encrypt_value
+            import json
+            instance.auth_payload = encrypt_value(json.dumps(auth_payload_write))
+            instance.save(update_fields=['auth_payload'])
+        return instance
+
+    def update(self, instance, validated_data):
+        auth_payload_write = validated_data.pop('auth_payload_write', None)
+        instance = super().update(instance, validated_data)
+        if auth_payload_write is not None:
+            from websites.utils import encrypt_value, decrypt_value
+            import json
+            
+            existing_data = {}
+            if instance.auth_payload:
+                try:
+                    existing_data = json.loads(decrypt_value(instance.auth_payload))
+                except Exception:
+                    pass
+            
+            # Merge and preserve old values if placeholder is sent
+            merged_data = {}
+            for k, v in auth_payload_write.items():
+                if v == "••••••••" and k in existing_data:
+                    merged_data[k] = existing_data[k]
+                else:
+                    merged_data[k] = v
+            
+            instance.auth_payload = encrypt_value(json.dumps(merged_data))
+            instance.save(update_fields=['auth_payload'])
+        return instance
 
 class ScrapeResultSerializer(serializers.ModelSerializer):
     class Meta:

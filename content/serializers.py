@@ -39,7 +39,7 @@ class ContentDraftSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         cover_image = data.get('cover_image')
-        if cover_image and cover_image.startswith('data:image/'):
+        if cover_image and (cover_image.startswith('data:image/') or cover_image.startswith('data:video/')):
             # Convert internal data to mutable dict copy
             mutable_data = data.copy()
             mutable_data['cover_image'] = self.save_cover_from_base64(cover_image)
@@ -61,6 +61,14 @@ class ContentDraftSerializer(serializers.ModelSerializer):
                 ext = "jpg"
             elif "image/gif" in header:
                 ext = "gif"
+            elif "video/mp4" in header:
+                ext = "mp4"
+            elif "video/webm" in header:
+                ext = "webm"
+            elif "video/ogg" in header:
+                ext = "ogv"
+            elif "video/quicktime" in header:
+                ext = "mov"
                 
             data = base64.b64decode(encoded)
             
@@ -73,11 +81,41 @@ class ContentDraftSerializer(serializers.ModelSerializer):
             with open(filepath, 'wb') as f:
                 f.write(data)
                 
+            # Compress image files using Pillow to prevent 413 Payload Too Large errors
+            if ext in ["png", "jpg", "jpeg", "svg"]: # svg is text, skip compression
+                if ext != "svg":
+                    try:
+                        from PIL import Image
+                        with Image.open(filepath) as img:
+                            # Convert to RGB mode (needed for JPEG format)
+                            if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+                                background = Image.new('RGB', img.size, (255, 255, 255))
+                                # Handle transparency mask
+                                mask = img.split()[3] if img.mode == 'RGBA' else None
+                                background.paste(img, mask=mask)
+                                img = background
+                            elif img.mode != 'RGB':
+                                img = img.convert('RGB')
+                            
+                            # Replace filename and filepath with optimized JPEG
+                            orig_filepath = filepath
+                            filename = f"cover_{uuid.uuid4().hex}.jpg"
+                            filepath = os.path.join(covers_dir, filename)
+                            img.save(filepath, 'JPEG', quality=85, optimize=True)
+                            
+                            # Clean up the original uncompressed file if it's different
+                            if os.path.exists(orig_filepath) and orig_filepath != filepath:
+                                os.remove(orig_filepath)
+                    except Exception as compression_err:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Image compression failed, using original file: {compression_err}")
+                
             return f"/static/media/covers/{filename}"
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to save base64 cover image: {e}")
+            logger.error(f"Failed to save base64 cover image/video: {e}")
             return base64_data
 
 class ScheduledPostSerializer(serializers.ModelSerializer):

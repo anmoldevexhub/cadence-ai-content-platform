@@ -164,6 +164,7 @@ window.MOCK = (function () {
         color: w.color || "#095075",
         industry: w.industry || "General",
         owner: w.owner_name || "Admin",
+        owner_id: w.owner ? String(w.owner) : null,
         status: w.status === 'active' ? 'Active' : w.status === 'paused' ? 'Paused' : 'Draft',
         statusClass: w.status === 'paused' ? 'paused' : w.status === 'draft' ? 'draft' : '',
         tone: w.tone || "Friendly",
@@ -177,7 +178,7 @@ window.MOCK = (function () {
         contact_email: w.contact_email || "",
         contact_phone: w.contact_phone || "",
         logo_url: w.logo_url || "",
-        pages: 10 + (w.id * 5),
+        pages: wstats.pages || 0,
         posts: wstats.published + wstats.scheduled + wstats.pending,
         scheduled: wstats.scheduled,
         pending: wstats.pending,
@@ -195,7 +196,7 @@ window.MOCK = (function () {
       const day = days[d.getDay()];
       const hours = String(d.getHours()).padStart(2, '0');
       const minutes = String(d.getMinutes()).padStart(2, '0');
-      scheduledMap[sp.draft] = { day, time: `${hours}:${minutes}` };
+      scheduledMap[sp.draft] = { day, time: `${hours}:${minutes}`, date: sp.scheduled_for };
     });
 
     // 4. Fetch drafts
@@ -205,11 +206,15 @@ window.MOCK = (function () {
       const createdDate = new Date(d.created_at);
       let day = days[createdDate.getDay()];
       let time = "09:00";
+      let scheduledFor = null;
 
       // If scheduled post info is found, use it
       if (scheduledMap[d.id]) {
         day = scheduledMap[d.id].day;
         time = scheduledMap[d.id].time;
+        scheduledFor = scheduledMap[d.id].date;
+      } else if (d.status === 'published') {
+        scheduledFor = d.created_at;
       }
 
       return {
@@ -221,6 +226,7 @@ window.MOCK = (function () {
         status: d.status === 'draft' ? 'Draft' : d.status.charAt(0).toUpperCase() + d.status.slice(1),
         day: day,
         time: time,
+        scheduled_for: scheduledFor,
         words: d.word_count || 120,
         author: d.reviewed_by_name || "AI · GPT-draft",
         excerpt: d.excerpt || (d.body ? d.body.substring(0, 150) + "..." : ""),
@@ -234,8 +240,8 @@ window.MOCK = (function () {
       };
     });
 
-    // 5. Populate approvals queue
-    const approvals = content.filter(c => c.status === "Draft").map(c => {
+    // 5. Populate approvals queue (include Approved drafts so they can be scheduled or managed)
+    const approvals = content.filter(c => c.status === "Draft" || c.status === "Approved").map(c => {
       const w = websites.find(s => s.id === c.site) || websites[0] || { name: "Unknown", color: "#095075", short: "U" };
       return { ...c, siteName: w.name, siteColor: w.color, siteShort: w.short };
     });
@@ -253,7 +259,7 @@ window.MOCK = (function () {
           email: u.email,
           initials: initials,
           color: u.avatar_color || '#095075',
-          websites: u.role === 'super_admin' ? ["All websites"] : ["Assigned websites"],
+          websites: u.role === 'super_admin' ? ["All websites"] : websitesRes.filter(w => String(w.owner) === String(u.id)).map(w => w.name),
           status: u.is_active ? "Active" : "Disabled",
           role: u.role === 'super_admin' ? "Super Admin" : "Admin",
           last: u.last_login_display || "Never"
@@ -283,7 +289,7 @@ window.MOCK = (function () {
         who: log.actor_name || "AI Engine",
         initials: actorInitials,
         color: "#095075",
-        action: log.action.replace('_', ' '),
+        action: log.action.replace(/_/g, ' '),
         target: log.target_description || "",
         time: timeStr,
         icon: icon
@@ -302,6 +308,7 @@ window.MOCK = (function () {
     const showDraftNotif = (!notificationsPref || !notificationsPref[0] || notificationsPref[0].inapp !== false);
     if (showDraftNotif && approvals.length > 0) {
       notifications.push({ 
+        id: `approvals-${approvals.length}`,
         text: `<b>${approvals.length} drafts</b> are waiting for your approval`, 
         time: "Just now", 
         icon: "check-check", 
@@ -314,6 +321,7 @@ window.MOCK = (function () {
     const showActivityNotif = (!notificationsPref || !notificationsPref[4] || notificationsPref[4].inapp !== false);
     if (showActivityNotif && activity.length > 0) {
       notifications.push({
+        id: `activity-${activity[0].id || activity[0].time || "default"}`,
         text: `Recent activity: <b>${activity[0].who}</b> ${activity[0].action} ${activity[0].target}`,
         time: activity[0].time,
         icon: activity[0].icon,
@@ -393,7 +401,7 @@ window.MOCK = (function () {
       schedule,
       PLAT,
       platMeta: (p) => PLAT[p] || PLAT.Blog,
-      site: (id) => websites.find(w => w.id === id)
+      site: (id) => websites.find(w => w.id == id)
     };
     document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return finalResult;
@@ -404,7 +412,7 @@ window.MOCK = (function () {
     const savedEmail = localStorage.getItem("cadence.settings.email");
     const finalResult = {
       ...defaultMock,
-      site: (id) => defaultMock.websites.find(w => w.id === id)
+      site: (id) => defaultMock.websites.find(w => w.id == id)
     };
     if (savedName) {
       finalResult.users.admin.name = savedName;

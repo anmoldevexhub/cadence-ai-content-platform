@@ -59,7 +59,7 @@ class GenerateContentView(APIView):
         return Response({'status': 'generating', 'idea_id': pk})
 
 
-class ContentDraftListView(generics.ListAPIView):
+class ContentDraftListView(generics.ListCreateAPIView):
     serializer_class = ContentDraftSerializer
     permission_classes = [IsAuthenticated]
 
@@ -187,18 +187,37 @@ class RegenerateDraftView(APIView):
     def post(self, request, pk):
         draft = ContentDraft.objects.get(pk=pk)
         old_status = draft.status
-        draft.status = 'draft'
-        draft.body = ''
-        draft.save()
-        regenerate_draft_task.delay(pk)
+        regenerate_type = request.data.get('type', 'all')
+        
+        if regenerate_type in ['all', 'content']:
+            draft.status = 'draft'
+            draft.body = ''
+            draft.save()
+        
+        idea_id = draft.idea_id if draft.idea else None
+        
+        regenerate_draft_task.delay(pk, regenerate_type=regenerate_type)
+        
+        new_draft_id = pk
+        if idea_id and regenerate_type in ['all', 'content']:
+            new_draft = ContentDraft.objects.filter(idea_id=idea_id).order_by('-id').first()
+            if new_draft:
+                new_draft_id = new_draft.id
+                
         ip, _ = get_client_ip(request)
+        action_name = 'content_regenerated'
+        if regenerate_type == 'image':
+            action_name = 'image_regenerated'
+        elif regenerate_type == 'content':
+            action_name = 'content_text_regenerated'
+            
         ActivityLog.objects.create(
             actor=request.user, actor_name=request.user.get_full_name(),
-            action='content_regenerated', target_description=draft.title,
+            action=action_name, target_description=draft.title,
             ip_address=ip,
             metadata={'changes': {'status': {'old': old_status, 'new': 'draft'}}}
         )
-        return Response({'status': 'regenerating', 'draft_id': pk})
+        return Response({'status': 'regenerating', 'draft_id': pk, 'new_draft_id': new_draft_id})
 
 
 class ScheduleDraftView(APIView):
@@ -309,4 +328,106 @@ class IdeaSuggestionsView(APIView):
             return Response({'detail': 'Website not found.'}, status=404)
 
         suggestions = generate_idea_suggestions(website)
-        return Response(suggestions)
+        return Response(suggestions)
+
+
+class InjectInternalLinksView(APIView):
+    """
+    Manually triggers the internal linking processor on a draft blog post,
+    scanning other published articles and wrapping matching keywords in <a> tags.
+    """
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request, pk):
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Draft not found.'}, status=404)
+            
+        if draft.platform != 'blog':
+            return Response({'detail': 'Internal links can only be injected into blog posts.'}, status=400)
+            
+        from .utils import inject_internal_links
+        inject_internal_links(draft)
+        
+        return Response(ContentDraftSerializer(draft).data)
+
+
+class TokenUsageStatsView(APIView):
+    """
+    Returns aggregated token and cost usage statistics for a specific website.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from .models import TokenUsage
+        from django.db.models import Sum
+        from datetime import timedelta
+        
+        # Verify website exists
+        from websites.models import Website
+        try:
+            website = Website.objects.get(pk=pk)
+        except Website.DoesNotExist:
+            return Response({'detail': 'Website not found.'}, status=404)
+            
+        usages = TokenUsage.objects.filter(website_id=pk)
+        
+        # Aggregates
+        totals = usages.aggregate(
+            total_tokens=Sum('total_tokens'),
+            prompt_tokens=Sum('prompt_tokens'),
+            completion_tokens=Sum('completion_tokens'),
+            total_cost=Sum('cost')
+        )
+        
+        total_tokens = totals.get('total_tokens') or 0
+        prompt_tokens = totals.get('prompt_tokens') or 0
+        completion_tokens = totals.get('completion_tokens') or 0
+        total_cost = float(totals.get('total_cost') or 0.0)
+        
+        # Weekly trend (last 7 days)
+        weekly_history = []
+        today = timezone.now().date()
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            day_start = timezone.datetime.combine(day, timezone.datetime.min.time())
+            day_end = timezone.datetime.combine(day, timezone.datetime.max.time())
+            # Make aware if timezone support is active
+            if timezone.is_aware(timezone.now()):
+                day_start = timezone.make_aware(day_start)
+                day_end = timezone.make_aware(day_end)
+            
+            day_total = usages.filter(created_at__range=(day_start, day_end)).aggregate(Sum('total_tokens')).get('total_tokens__sum') or 0
+            weekly_history.append({
+                'day': day.strftime('%a'),
+                'date': day.strftime('%Y-%m-%d'),
+                'tokens': day_total
+            })
+            
+        # Model breakdown
+        model_breakdown = {}
+        for usage in usages.values('model_name').annotate(total=Sum('total_tokens'), cost=Sum('cost')):
+            model_breakdown[usage['model_name']] = {
+                'tokens': usage['total'] or 0,
+                'cost': float(usage['cost'] or 0.0)
+            }
+            
+        # Section breakdown
+        section_breakdown = {}
+        for usage in usages.values('section').annotate(total=Sum('total_tokens'), cost=Sum('cost')):
+            label = dict(TokenUsage.SECTION_CHOICES).get(usage['section'], usage['section'])
+            section_breakdown[label] = {
+                'tokens': usage['total'] or 0,
+                'cost': float(usage['cost'] or 0.0)
+            }
+            
+        return Response({
+            'total_tokens': total_tokens,
+            'prompt_tokens': prompt_tokens,
+            'completion_tokens': completion_tokens,
+            'total_cost': total_cost,
+            'weekly_history': weekly_history,
+            'model_breakdown': model_breakdown,
+            'section_breakdown': section_breakdown
+        })

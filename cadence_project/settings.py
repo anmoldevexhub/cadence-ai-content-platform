@@ -188,7 +188,8 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'protocol': 2   # Force RESP2 protocol for Redis 5.0
 }
-CELERY_TASK_ALWAYS_EAGER = True
+import sys
+CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv   # Run synchronously ONLY during unit tests
 CELERY_TASK_EAGER_PROPAGATES = True
 
 

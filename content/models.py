@@ -71,6 +71,8 @@ class ContentDraft(models.Model):
     ai_model = models.CharField(max_length=50, default='gpt-4o-mini')
     generation_prompt = models.TextField(blank=True)  # stored for debugging / regen
     cover_image = models.CharField(max_length=500, blank=True)
+    cover_image_public_url = models.URLField(max_length=1000, blank=True, default="",
+        help_text="Permanent public URL of cover image uploaded to imgbb. Used for social/blog publishing.")
     category = models.CharField(max_length=100, blank=True)
     author_name = models.CharField(max_length=100, blank=True, default="")
     custom_date = models.CharField(max_length=50, blank=True, default="")
@@ -112,3 +114,31 @@ class ScheduledPost(models.Model):
 
     def __str__(self):
         return f"{self.draft.title} @ {self.scheduled_for}"
+
+
+class TokenUsage(models.Model):
+    """Tracks token and cost usage for LLM requests (OpenAI/Gemini)."""
+    SECTION_CHOICES = [
+        ('crawler_summary', 'Website Crawler & Tone Summary'),
+        ('idea_generation', 'Content Idea Suggestions'),
+        ('blog_generation', 'Blog Post Body Generation'),
+        ('social_generation', 'Social Post Generation'),
+        ('visual_strategy', 'Visual Strategy Generation'),
+        ('prompt_engineering', 'DALL-E Prompt Engineering'),
+        ('image_generation', 'DALL-E Image Generation'),
+    ]
+
+    website = models.ForeignKey('websites.Website', on_delete=models.CASCADE, related_name='token_usages', null=True, blank=True)
+    section = models.CharField(max_length=50, choices=SECTION_CHOICES)
+    model_name = models.CharField(max_length=100)
+    prompt_tokens = models.IntegerField(default=0)
+    completion_tokens = models.IntegerField(default=0)
+    total_tokens = models.IntegerField(default=0)
+    cost = models.DecimalField(max_digits=15, decimal_places=8, default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.section} ({self.model_name}): {self.total_tokens} tokens"

@@ -811,3 +811,50 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
   font-weight: 600;
 }
 
+/* Dashboard Week Strip Uniformity & Scrollable Columns */
+.week-items {
+  height: 250px !important;
+  overflow-y: auto !important;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.week-chip {
+  flex-shrink: 0 !important;
+}
+.week-empty {
+  margin: auto 0 !important;
+}
+
+/* Dashboard Activity & Approvals Feed Height Alignment */
+#activityFeed, #pendingList {
+  height: 380px !important;
+  overflow-y: auto !important;
+  padding-right: 8px;
+}
+
+/* Custom Scrollbars for Dashboard Slots & Feeds */
+.week-items::-webkit-scrollbar,
+#activityFeed::-webkit-scrollbar,
+#pendingList::-webkit-scrollbar {
+  width: 4px;
+}
+.week-items::-webkit-scrollbar-track,
+#activityFeed::-webkit-scrollbar-track,
+#pendingList::-webkit-scrollbar-track {
+  background: transparent;
+}
+.week-items::-webkit-scrollbar-thumb,
+#activityFeed::-webkit-scrollbar-thumb,
+#pendingList::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+.week-items::-webkit-scrollbar-thumb:hover,
+#activityFeed::-webkit-scrollbar-thumb:hover,
+#pendingList::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+

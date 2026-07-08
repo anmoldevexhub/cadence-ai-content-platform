@@ -17,7 +17,7 @@ class Website(models.Model):
     needs_crawl = models.BooleanField(default=True)  # Flag to indicate if website needs crawling
     topics = models.JSONField(default=list)                  # ["Specialty coffee", ...]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    color = models.CharField(max_length=7, default='#6366f1')  # for avatar
+    color = models.CharField(max_length=7, default='#095075')  # for avatar
     brand_colors = models.JSONField(default=list)                  # ["#b45309", ...]
     avg_read_time = models.CharField(max_length=50, blank=True, default='4.0m')
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='websites')
@@ -60,6 +60,8 @@ class SocialConnection(models.Model):
     website = models.ForeignKey(Website, on_delete=models.CASCADE, related_name='social_connections')
     platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES)
     make_webhook_url = models.URLField(blank=True)   # platform-specific make.com hook
+    auth_type = models.CharField(max_length=50, default='none')  # none, api_key, bearer_token, basic_auth
+    auth_payload = models.TextField(blank=True, default='')      # Encrypted credentials JSON
     is_active = models.BooleanField(default=True)
     connected_at = models.DateTimeField(auto_now_add=True)
     

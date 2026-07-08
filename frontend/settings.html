@@ -26,8 +26,7 @@
           <!-- Settings nav -->
           <nav class="set-nav" id="setNav">
             <button class="set-link active" data-s="profile"><i data-lucide="user"></i> Profile</button>
-            <button class="set-link" data-s="scheduler"><i data-lucide="calendar-clock"></i> Scheduler</button>
-            <button class="set-link" data-s="connections"><i data-lucide="link"></i> Connections</button>
+
           </nav>
 
           <div class="set-content">
@@ -60,32 +59,9 @@
 
 
 
-            <!-- SCHEDULER -->
-            <section class="set-panel" data-panel="scheduler">
-              <div class="card card-pad mb5">
-                <h3 class="set-h">Weekly run</h3>
-                <p class="muted tsm" style="margin-top:-8px;margin-bottom:var(--s5)">Cadence drafts the week's content on a schedule. You review, approve, and it publishes daily.</p>
-                <div class="grid grid-2">
-                  <div class="field"><label class="label">Run day</label><select class="select" id="sRunDay"><option selected>Monday</option><option>Sunday</option><option>Friday</option></select></div>
-                  <div class="field"><label class="label">Run time</label><input class="input" type="time" id="sRunTime" value="09:00"/></div>
-                </div>
-                <label class="set-row" style="border-top:1px solid var(--border);padding-top:var(--s4)"><div><div class="fw6">Auto-generate drafts</div><div class="muted tsm">Create drafts from your idea queue automatically</div></div><span class="switch"><input type="checkbox" id="sAutoGenerate" checked/><span class="track"></span></span></label>
-                <label class="set-row"><div><div class="fw6">Auto-publish approved content</div><div class="muted tsm">Post on the scheduled slot without manual send</div></div><span class="switch"><input type="checkbox" id="sAutoPublish" checked/><span class="track"></span></span></label>
-              </div>
-              <div class="card card-pad">
-                <h3 class="set-h">Posting times per platform</h3>
-                <div id="postTimes" class="col gap3"></div>
-              </div>
-            </section>
 
-            <!-- CONNECTIONS -->
-            <section class="set-panel" data-panel="connections">
-              <div class="card card-pad">
-                <h3 class="set-h">Social platform connections</h3>
-                <p class="muted tsm" style="margin-top:-8px;margin-bottom:var(--s5)">Connect channels so Cadence can publish directly.</p>
-                <div id="connList" class="col gap3"></div>
-              </div>
-            </section>
+
+            <!-- CONNECTIONS PANEL REMOVED -->
 
             <div class="set-actions">
               <button class="btn btn-ghost" id="btnCancel">Cancel</button>
@@ -265,18 +241,24 @@
     }
 
     function renderConnections() {
-      document.getElementById("connList").innerHTML = conns.map((c) => `
-        <div class="chan-conn">
-          <span class="icon-tile tile-${c.key}">${I(getPlatIcon(c.name === "X / Twitter" ? "Blog" : c.name))}</span>
-          <div class="cc-meta">
-            <div class="cc-nm">${c.name}</div>
-            <div class="cc-st">${c.status}</div>
-          </div>
-          ${c.connected 
-            ? `<button class="btn btn-secondary btn-sm btn-conn-toggle" data-key="${c.key}" data-action="disconnect">Disconnect</button>`
-            : `<button class="btn btn-primary btn-sm btn-conn-toggle" data-key="${c.key}" data-action="connect">Connect</button>`
-          }
-        </div>`).join("");
+      document.getElementById("connList").innerHTML = conns.map((c) => {
+        const detailsHTML = c.connected && c.webhook_url
+          ? `<div class="cc-st" style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); word-break:break-all; margin-top:2px;">Webhook: ${c.webhook_url}</div>`
+          : `<div class="cc-st">${c.status}</div>`;
+          
+        return `
+          <div class="chan-conn">
+            <span class="icon-tile tile-${c.key}">${I(getPlatIcon(c.name === "X / Twitter" ? "Blog" : c.name))}</span>
+            <div class="cc-meta">
+              <div class="cc-nm">${c.name}</div>
+              ${detailsHTML}
+            </div>
+            ${c.connected 
+              ? `<button class="btn btn-secondary btn-sm btn-conn-toggle" data-key="${c.key}" data-action="disconnect">Disconnect</button>`
+              : `<button class="btn btn-primary btn-sm btn-conn-toggle" data-key="${c.key}" data-action="connect">Connect</button>`
+            }
+          </div>`;
+      }).join("");
       
       document.querySelectorAll(".btn-conn-toggle").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -287,23 +269,42 @@
           if (action === "disconnect") {
             connItem.connected = false;
             connItem.status = "Not connected";
+            connItem.webhook_url = "";
             localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
             renderConnections();
             C.toast({ type: "info", title: `${connItem.name} disconnected` });
           } else {
-            const handle = prompt(`Enter account/page name for ${connItem.name}:`, connItem.key === "linkedin" ? "Northwind Coffee" : "@northwind");
-            if (handle !== null) {
-              connItem.connected = true;
-              connItem.status = "Connected as " + (handle.trim() || "Guest");
-              localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
-              renderConnections();
-              C.toast({ type: "success", title: `${connItem.name} connected`, desc: connItem.status });
-            }
+            document.getElementById("connectModalPlatName").textContent = connItem.name;
+            document.getElementById("connectWebhookUrl").value = "";
+            const saveBtn = document.getElementById("btnSaveSocialConn");
+            if (saveBtn) saveBtn.dataset.key = key;
+            C.openModal("connectSocialModal");
           }
         });
       });
       C.refreshIcons();
     }
+
+    const btnSaveSocialConn = document.getElementById("btnSaveSocialConn");
+    if (btnSaveSocialConn) {
+      btnSaveSocialConn.addEventListener("click", () => {
+        const key = btnSaveSocialConn.dataset.key;
+        const url = document.getElementById("connectWebhookUrl").value.trim();
+        if (!url) {
+          C.toast({ type: "error", title: "URL required", desc: "Please enter a valid webhook URL" });
+          return;
+        }
+        const connItem = conns.find(c => c.key === key);
+        connItem.connected = true;
+        connItem.status = "Connected with Webhook";
+        connItem.webhook_url = url;
+        localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
+        C.closeModal("connectSocialModal");
+        renderConnections();
+        C.toast({ type: "success", title: `${connItem.name} connected`, desc: "Webhook configured successfully!" });
+      });
+    }
+
     renderConnections();
 
     // theme buttons
@@ -436,6 +437,32 @@
     .plan-banner { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s6); background:linear-gradient(120deg,var(--primary),#1e8fc6); flex-wrap:wrap; }
   </style>
 
+
+  <!-- Connect Social Modal -->
+  <div class="modal-overlay" id="connectSocialModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Connect <span id="connectModalPlatName">Channel</span></h3>
+          <div class="sub">Configure a real publishing integration webhook</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding: var(--s5);">
+        <div class="field">
+          <label class="label">Webhook URL (Make.com, Zapier, or API Endpoint)</label>
+          <input type="url" id="connectWebhookUrl" class="input" placeholder="e.g. https://hook.us1.make.com/..." required style="width:100%" />
+          <div class="muted tsm" style="margin-top: 8px; line-height: 1.4;">
+            Enter a real webhook URL. When a post is published globally, Cadence will send a POST request with the content payload.
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot" style="display: flex; justify-content: flex-end; gap: var(--s2); padding: var(--s4) var(--s5); border-top: 1px solid var(--border);">
+        <button class="btn btn-secondary" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" id="btnSaveSocialConn">Connect Channel</button>
+      </div>
+    </div>
+  </div>
 
   <div id="__bundler_thumbnail" hidden></div>
 </body>

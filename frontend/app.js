@@ -112,11 +112,43 @@
         </div>
       </div>`;
   }
+  function markNotificationsAsRead() {
+    const notifs = window.MOCK?.notifications || [];
+    if (!notifs.length) return;
+    
+    let readIds = [];
+    try {
+      readIds = JSON.parse(localStorage.getItem("cadence.read_notifications")) || [];
+    } catch(e) {}
+    
+    notifs.forEach(n => {
+      if (n.id && !readIds.includes(n.id)) {
+        readIds.push(n.id);
+      }
+    });
+    
+    localStorage.setItem("cadence.read_notifications", JSON.stringify(readIds));
+    
+    // Hide the badge-count element
+    const badge = document.querySelector("[data-menu='notifs'] .badge-count");
+    if (badge) {
+      badge.remove();
+    }
+  }
 
   function buildTopbar() {
     const role = store.role;
     const usersObj = window.MOCK?.users || {};
     const user = (role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || { name: "User", initials: "U", color: "#095075" };
+    
+    let readIds = [];
+    try {
+      readIds = JSON.parse(localStorage.getItem("cadence.read_notifications")) || [];
+    } catch(e) {}
+    
+    const notifs = window.MOCK?.notifications || [];
+    const unreadCount = notifs.filter(n => n.id && !readIds.includes(n.id)).length;
+    
     return `
       <button class="icon-btn sidebar-toggle" data-action="toggle-sidebar" aria-label="Menu">${I("menu")}</button>
       <label class="topbar__search">
@@ -126,11 +158,11 @@
       </label>
       <div class="topbar__actions">
         <div class="dropdown">
-          <button class="icon-btn" data-menu="notifs" aria-label="Notifications">${I("bell")}${(window.MOCK?.notifications || []).length > 0 ? `<span class="badge-count">${window.MOCK.notifications.length}</span>` : ''}</button>
+          <button class="icon-btn" data-menu="notifs" aria-label="Notifications">${I("bell")}${unreadCount > 0 ? `<span class="badge-count">${unreadCount}</span>` : ''}</button>
           <div class="menu" id="notifs" style="min-width:320px">
-            <div class="row-between" style="padding:8px 10px 10px"><strong>Notifications</strong><a class="tsm" style="color:var(--primary)" href="#">Mark all read</a></div>
+            <div class="row-between" style="padding:8px 10px 10px"><strong>Notifications</strong><a class="tsm" id="markAllReadBtn" style="color:var(--primary); cursor:pointer;">Mark all read</a></div>
             <div class="menu-sep"></div>
-            ${(window.MOCK?.notifications || []).map(n => `
+            ${notifs.map(n => `
               <a class="menu-item" href="${n.href}" style="align-items:flex-start">
                 <span class="icon-tile tile-${n.tile}" style="width:30px;height:30px;border-radius:8px">${I(n.icon, "style='width:15px;height:15px'")}</span>
                 <span style="flex:1"><span style="display:block;color:var(--text);font-weight:500">${n.text}</span><span class="txs muted">${n.time}</span></span>
@@ -145,7 +177,6 @@
           <div class="menu" id="topuser">
             <a class="menu-item" href="settings.html">${I("user")}Profile</a>
             <a class="menu-item" href="settings.html">${I("settings")}Settings</a>
-            <a class="menu-item" href="analytics.html">${I("activity")}Usage</a>
             <div class="menu-sep"></div>
             <a class="menu-item danger" href="login.html">${I("log-out")}Sign out</a>
           </div>
@@ -159,8 +190,113 @@
     const tb = document.getElementById("topbar");
     if (sb) sb.innerHTML = buildSidebar(sb.dataset.active || "");
     if (tb) tb.innerHTML = buildTopbar();
+    
+    // Inject global search modal if it doesn't exist
+    if (!document.getElementById("globalSearchModal")) {
+      const searchModalDiv = document.createElement("div");
+      searchModalDiv.className = "modal-overlay";
+      searchModalDiv.id = "globalSearchModal";
+      searchModalDiv.style.alignItems = "flex-start";
+      searchModalDiv.style.paddingTop = "10vh";
+      searchModalDiv.style.zIndex = "2000";
+      searchModalDiv.innerHTML = `
+        <div class="modal" style="max-width: 600px; width: 90vw; border-radius: var(--r-lg); box-shadow: var(--sh-xl);">
+          <div class="modal__body" style="padding: var(--s4);">
+            <div class="topbar__search" style="border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 12px; font-size: 16px; margin-bottom: var(--s4); width: 100%; display: flex; gap: 8px;">
+              ${I("search", "style='width:20px; height:20px; color:var(--text-muted)'")}
+              <input type="text" id="gSearchInput" placeholder="Search websites, content, ideas..." style="border:none; outline:none; background:none; color:var(--text); flex:1; font-size:16px;" autofocus />
+            </div>
+            <div id="gSearchResults" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+              <div class="muted tsm" style="padding: 10px; text-align: center;">Type to search...</div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(searchModalDiv);
+      wireGlobalSearch();
+    }
+    
     refreshIcons();
     wireShell();
+  }
+
+  function wireGlobalSearch() {
+    const searchInput = document.getElementById("gSearchInput");
+    const searchResults = document.getElementById("gSearchResults");
+    if (!searchInput || !searchResults) return;
+    
+    searchInput.addEventListener("input", (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      if (!query) {
+        searchResults.innerHTML = `<div class="muted tsm" style="padding: 10px; text-align: center;">Type to search...</div>`;
+        return;
+      }
+      
+      const sites = (window.MOCK?.websites || []).filter(s => !s.is_deleted && (s.name.toLowerCase().includes(query) || s.url.toLowerCase().includes(query)));
+      const drafts = (window.MOCK?.content || []).filter(d => !d.is_deleted && d.title.toLowerCase().includes(query));
+      
+      let html = "";
+      
+      if (sites.length) {
+        html += `<div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 8px 0 4px; padding-left: 6px;">Websites</div>`;
+        sites.forEach(s => {
+          html += `
+            <a class="menu-item" href="website-workspace.html?site=${s.id}" style="padding: 10px; border-radius: var(--r-md); display: flex; align-items: center; gap: var(--s3); background: var(--bg-subtle);">
+              <span class="favicon" style="background:${s.color}; width:20px; height:20px; border-radius:4px; font-size:10px; display: grid; place-items: center; color: white;">${s.short}</span>
+              <span style="font-weight: 550; color: var(--text);">${s.name}</span>
+              <span class="muted txs" style="margin-left: auto;">${s.url}</span>
+            </a>`;
+        });
+      }
+      
+      if (drafts.length) {
+        html += `<div style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 12px 0 4px; padding-left: 6px;">Content & Drafts</div>`;
+        drafts.forEach(d => {
+          const s = window.MOCK?.site(d.site) || { name: "Unknown", color: "#095075", short: "U" };
+          const p = window.MOCK?.platMeta ? window.MOCK.platMeta(d.platform) : { icon: "file-text", color: "var(--primary)" };
+          
+          html += `
+            <a class="menu-item" href="website-workspace.html?site=${d.site}&tab=generate" style="padding: 10px; border-radius: var(--r-md); display: flex; align-items: center; gap: var(--s3); background: var(--bg-subtle);">
+              <span class="icon-tile tile-${d.platform.toLowerCase()}" style="width:20px; height:20px; border-radius:4px; display: grid; place-items: center; background: ${p.color}20; color: ${p.color};">${I(p.icon || 'file-text', "style='width:12px; height:12px'")}</span>
+              <div style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
+                <span style="font-weight: 550; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${d.title}</span>
+                <span class="muted txs" style="display: flex; align-items: center; gap: 4px;">
+                  <span class="badge badge-${d.status.toLowerCase()}" style="padding: 1px 4px; font-size: 9px;">${d.status}</span> on ${s.name}
+                </span>
+              </div>
+            </a>`;
+        });
+      }
+      
+      if (!html) {
+        html = `<div class="muted tsm" style="padding: 20px; text-align: center;">No matches found for "${query}"</div>`;
+      }
+      
+      searchResults.innerHTML = html;
+      refreshIcons();
+    });
+    
+    // Bind click listener on topbar search input
+    document.addEventListener("click", (e) => {
+      const trigger = e.target.closest(".topbar__search");
+      if (trigger && !trigger.closest("#globalSearchModal")) {
+        e.preventDefault();
+        window.Cadence.openModal("globalSearchModal");
+        searchInput.value = "";
+        searchInput.focus();
+        searchResults.innerHTML = `<div class="muted tsm" style="padding: 10px; text-align: center;">Type to search...</div>`;
+      }
+    });
+
+    // Keyboard shortcut (⌘K or Ctrl+K)
+    document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        window.Cadence.openModal("globalSearchModal");
+        searchInput.value = "";
+        searchInput.focus();
+        searchResults.innerHTML = `<div class="muted tsm" style="padding: 10px; text-align: center;">Type to search...</div>`;
+      }
+    });
   }
 
   /* ---------- interactivity ---------- */
@@ -171,7 +307,6 @@
   function wireShell() {
     if (window._shellWired) return;
     window._shellWired = true;
-
     // dropdown menus
     document.addEventListener("click", (e) => {
       const trigger = e.target.closest("[data-menu]");
@@ -182,9 +317,23 @@
           const willOpen = !menu.classList.contains("open");
           closeAllMenus(menu);
           menu.classList.toggle("open", willOpen);
+          
+          if (trigger.dataset.menu === "notifs" && willOpen) {
+            markNotificationsAsRead();
+          }
         }
       } else {
         closeAllMenus();
+      }
+    });
+
+    // mark all read button click
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("#markAllReadBtn");
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        markNotificationsAsRead();
       }
     });
 

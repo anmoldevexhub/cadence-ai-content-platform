@@ -10,9 +10,37 @@ from websites.models import Website, ScrapeResult
 from .models import ContentIdea, ContentDraft
 
 logger = logging.getLogger(__name__)
-client = OpenAI(api_key=config('OPENAI_API_KEY'))
+client = OpenAI(api_key=config('OPENAI_API_KEY'), timeout=90.0, max_retries=5)
 
 MODEL = 'gpt-4o-mini'   # cheapest OpenAI model, ~$0.15/1M input tokens
+
+
+def log_token_usage(website, section, model_name, prompt_tokens, completion_tokens):
+    """Logs LLM token usage and calculates estimated cost."""
+    try:
+        from .models import TokenUsage
+        cost = 0.0
+        # pricing rules
+        if 'gpt-4o-mini' in model_name:
+            cost = (prompt_tokens * 0.00000015) + (completion_tokens * 0.00000060)
+        elif 'dall-e-3' in model_name:
+            cost = 0.040
+        elif 'gemini' in model_name:
+            cost = (prompt_tokens * 0.000000075) + (completion_tokens * 0.00000030)
+        else:
+            cost = (prompt_tokens + completion_tokens) * 0.0000002
+            
+        TokenUsage.objects.create(
+            website=website,
+            section=section,
+            model_name=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            cost=cost
+        )
+    except Exception as e:
+        logger.error(f"Error logging token usage: {e}")
 
 
 def summarize_website_style(structure_text: str) -> str:
@@ -40,6 +68,8 @@ when creating content for this website. Be specific and actionable."""
             max_tokens=600,
             temperature=0.3,
         )
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(None, 'crawler_summary', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"Failed to summarize website style: {e}")
@@ -55,14 +85,27 @@ def build_system_prompt(website: Website, platform: str = 'blog') -> str:
     or falls back to crawled style guide metrics if no samples are active for the platform."""
     has_samples = website.samples.filter(platform=platform, is_active=True).exists()
     
+    blog_guidelines = ""
+    if platform == 'blog':
+        blog_guidelines = """When writing blog posts:
+- Always write a detailed, comprehensive, deep-dive article of at least 900 to 1200 words. Do not stop until you have covered the topic in full depth.
+- Avoid brief outlines or summaries. Write in simple, everyday English (no corporate jargon or complex AI words like "leverage", "optimize", "streamline", "redouble", "game changer", "testament", or "delve").
+- Vary sentence lengths dramatically. Use very short, punchy sentences alongside longer, conversational ones.
+- Avoid perfectly symmetrical section structures. Make layout, section length, and bullet points uneven and varied.
+- Never write textbook-like or encyclopedia-style explanations. Talk like a real, experienced practitioner.
+- Never break character or mention that you are an AI."""
+    
     if has_samples:
-        return f"""You are an expert content writer for {website.name} ({website.domain}).
+        prompt_str = f"""You are an expert content writer for {website.name} ({website.domain}).
 
 BRAND: {website.name}
 INDUSTRY: {website.industry or "General"}
 KEY TOPICS: {", ".join(website.topics) if website.topics else "General content"}
 
 Write in the same style as the samples provided in the user prompt."""
+        if blog_guidelines:
+            prompt_str += f"\n\n{blog_guidelines}"
+        return prompt_str
 
     # Fallback to crawler/style guide
     style_details = ""
@@ -115,12 +158,8 @@ WEBSITE STYLE GUIDE:
 BRAND VOICE: {website.tone or "Conversational and engaging"}
 KEY TOPICS: {", ".join(website.topics) if website.topics else "General content"}
 INDUSTRY: {website.industry or "General"}
-When writing blog posts:
-- Always write a detailed, comprehensive, deep-dive article of at least 900 to 1200 words. Do not stop until you have covered the topic in full depth.
-- Avoid brief outlines or summaries. Write in simple, everyday English (no corporate jargon or complex AI words).
-- Vary sentence lengths dramatically. Use very short, punchy sentences alongside longer, conversational ones.
-- Avoid perfectly symmetrical section structures. Make layout, section length, and bullet points uneven and varied.
-- Never break character or mention that you are an AI."""
+
+{blog_guidelines if blog_guidelines else "Write in a natural, engaging tone."}"""
 
 
 def get_style_reference(website: Website, platform: str) -> str:
@@ -286,6 +325,8 @@ Required JSON format:
             title = str(item.get("title", "")).strip()
             if not title:
                 continue
+            import re
+            title = re.sub(r'^\d+\s*\.\s*', '', title).strip()
             plat = str(item.get("platform", "blog")).lower()
             if plat not in valid_platforms:
                 plat = "blog"
@@ -322,7 +363,7 @@ def search_live_data(query: str) -> str:
     }
     url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, timeout=5.0)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
         
@@ -674,6 +715,11 @@ def generate_via_gemini(system_prompt: str, user_prompt: str) -> dict:
     result = response.json()
     
     try:
+        usage = result.get('usageMetadata', {})
+        prompt_tokens = usage.get('promptTokenCount', 0)
+        completion_tokens = usage.get('candidatesTokenCount', 0)
+        if prompt_tokens or completion_tokens:
+            log_token_usage(None, 'blog_generation', 'gemini-1.5-flash', prompt_tokens, completion_tokens)
         text_content = result['candidates'][0]['content']['parts'][0]['text']
         content = json.loads(text_content.strip())
         content['generation_prompt'] = user_prompt
@@ -728,6 +774,11 @@ def generate_social_via_gemini(system_prompt: str, user_prompt: str) -> dict:
     result = response.json()
     
     try:
+        usage = result.get('usageMetadata', {})
+        prompt_tokens = usage.get('promptTokenCount', 0)
+        completion_tokens = usage.get('candidatesTokenCount', 0)
+        if prompt_tokens or completion_tokens:
+            log_token_usage(None, 'social_generation', 'gemini-1.5-flash', prompt_tokens, completion_tokens)
         text_content = result['candidates'][0]['content']['parts'][0]['text']
         content = json.loads(text_content.strip())
         content['generation_prompt'] = user_prompt
@@ -756,16 +807,14 @@ def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
 
     system_prompt = build_system_prompt(website, 'blog')
     import json
-    
     user_prompt = f"""
-You are a senior content strategist, editor, SEO specialist, and B2B technology writer.
+You are a senior content strategist, editor, SEO specialist, and B2B writer.
 
-Write an ORIGINAL blog post for {website.name}.
+Write an ORIGINAL, human-written blog post for {website.name} ({website.domain}).
 
 ====================
-INPUT
+INPUT DETAILS
 ====================
-
 Topic: {idea.title}
 Context: {idea.context or "None provided"}
 Target Keywords: {target_keywords}
@@ -777,628 +826,39 @@ Verified Search Data:
 {live_data}
 
 ====================
-PRIMARY OBJECTIVE
+WRITING DIRECTIVES (TO SOUND HUMAN-WRITTEN)
 ====================
 
-Create an editorial-quality article that feels genuinely written by an experienced practitioner.
-
-The writing must feel:
-
-• practical
-• natural
-• observational
-• useful
-• grounded in execution
-• written from experience rather than explanation
-
-The reader should feel:
-
-"This person has worked through these problems before."
-
-Study the reference samples to understand:
-
-• tone
-• formatting
-• pacing
-• reading level
-• CTA placement
-
-Learn patterns only.
-
-Never imitate:
-
-• wording
-• sentence structures
-• examples
-• transitions
-• headings
-• metaphors
-• opening styles
-
-====================
-CONTENT REQUIREMENTS
-====================
-
-Length: 900–1300 words.
-
-Requirements:
-
-• Match search intent precisely.
-• Use H2 and H3 headings naturally.
-• Vary paragraph lengths.
-• Every section must introduce new information.
-• Prefer practical insight over broad explanation.
-• Focus on decisions, constraints, tradeoffs, and outcomes.
-• Use lists only when they genuinely improve clarity.
-• Avoid textbook writing.
-• Avoid encyclopedia-style explanations.
-• Avoid writing merely to fill sections.
-
-The article should prioritize usefulness over completeness.
-
-It is acceptable to leave obvious concepts unexplained if the audience would already understand them.
-
-====================
-INTRODUCTION RULES
-====================
-
-Start near a real problem.
-
-Choose naturally from:
-
-• workflow friction
-• operational bottlenecks
-• implementation mistakes
-• difficult decisions
-• recurring team challenges
-• observations from execution
-• customer or internal process issues
-
-The opening must feel immediate and relevant.
-
-Never begin with:
-
-• definitions
-• industry overviews
-• historical summaries
-• future predictions
-• motivational framing
-• broad statements
-
-Forbidden openings:
-
-• "In today's digital world..."
-• "Technology is changing rapidly..."
-• "AI is transforming industries..."
-• "Every business today..."
-• "Organizations increasingly..."
-• "Imagine a world where..."
-• "As companies continue to grow..."
-• "The future of..."
-
-The first paragraph should feel like it starts in the middle of a real conversation.
-
-====================
-HEADINGS
-====================
-
-Avoid educational headings:
-
-• What Is X
-• Benefits Of X
-• Challenges Of X
-• Future Of X
-• Applications Of X
-• Key Features
-• Final Thoughts
-• Conclusion
-
-Prefer headings that communicate:
-
-• difficult choices
-• operational realities
-• implementation lessons
-• hidden constraints
-• tradeoffs
-• workflow consequences
-• mistakes teams repeatedly make
-• decisions that changed outcomes
-
-Headings should feel editorial, not instructional.
-
-====================
-ARTICLE STRUCTURE
-====================
-
-Never force this structure:
-
-Introduction
-→ Definition
-→ Features
-→ Benefits
-→ Challenges
-→ Conclusion
-
-Prefer natural structures:
-
-• observation → implication
-• challenge → consequence
-• decision → outcome
-• workflow → bottleneck
-• mistake → lesson
-• tradeoff → recommendation
-• implementation → adjustment
-
-Different sections should use different structures.
-
-Some sections may contain no examples.
-Some sections may contain no recommendations.
-Some sections may focus on a single observation.
-
-Natural variation is more important than structural balance.
-
-Do not make every section symmetrical.
-
-Natural variation is preferred.
-
-Never expose internal labels.
-
-Forbidden headings:
-
-• Example
-• Insight
-• Recommendation
-• Outcome
-• Situation
-• Lessons Learned
-• Implementation Advice
-• Call To Action
-
-Use these concepts internally only.
-
-NATURAL WRITING BEHAVIOR
-
-Do not force every section to contain:
-
-• a problem
-• a tradeoff
-• a recommendation
-• an example
-• a lesson
-
-Some sections may simply:
-
-• clarify a misconception
-• describe a constraint
-• compare approaches
-• explain a practical limitation
-• point out hidden costs
-• raise unanswered questions
-
-Human writers do not package every section into a complete teaching framework.
-
-Allow occasional ambiguity and unresolved tradeoffs when appropriate.
-
-
-====================
-HUMAN WRITING SIGNALS
-====================
-
-The article should occasionally include:
-
-• short paragraphs
-• incomplete explanatory symmetry
-• mild opinion grounded in experience
-• nuanced tradeoffs
-• practical observations
-• moments of uncertainty where appropriate
-
-Not every issue needs a perfect solution.
-
-Avoid presenting every topic as clean, obvious, or universally accepted.
-
-Allow room for:
-
-• competing approaches
-• contextual decisions
-• operational compromises
-
-This creates authenticity.
-
-====================
-EXPERIENCE SIGNALS
-====================
-
-Write as though the author has seen these situations repeatedly.
-
-Avoid explaining concepts from first principles unless necessary.
-
-Focus on:
-
-• execution realities
-• workflow constraints
-• organizational decisions
-• implementation friction
-• maintenance costs
-• unintended consequences
-• lessons from failures
-• adjustments made over time
-
-Readers should trust the writer because of practical understanding.
-
-Not because of authority claims.
-
-PERSONAL EXPERIENCE CLAIMS
-
-ABSOLUTE RULE:
-
-Never claim personal experience.
-
-Forbidden phrases:
-
-• In my experience
-• I have seen
-• I worked with
-• One team I worked with
-• We discovered
-• We implemented
-• Over the years
-• I have found
-
-Do not invent:
-
-• clients
-• projects
-• teams
-• deployments
-• case studies
-• firsthand observations
-
-If examples are necessary, describe common implementation patterns without implying direct involvement.
-
-The authority of the article must come from practical reasoning and operational understanding—not fabricated experience.
-
-====================
-SPECIFICITY
-====================
-
-Avoid generic actors:
-
-• businesses
-• organizations
-• enterprises
-• companies
-
-Prefer:
-
-• engineering teams
-• support teams
-• marketing operations
-• product managers
-• platform teams
-• development workflows
-• IT departments
-• customer success groups
-• revenue operations teams
-
-Whenever describing situations, explain:
-
-• what changed
-• why it mattered
-• what constraints existed
-• what options were considered
-• what decisions followed
-• what happened afterward
-
-
-SUBJECT VARIETY
-
-Do not make teams the subject of every paragraph.
-
-Vary subjects naturally across the article:
-
-• workflows
-• approval processes
-• release cycles
-• infrastructure constraints
-• reporting structures
-• customer expectations
-• maintenance requirements
-• documentation gaps
-• data dependencies
-• operational realities
-• platform limitations
-• support processes
-• deployment patterns
-
-Avoid repetitive constructions such as:
-
-• Teams struggle with...
-• Teams often discover...
-• Teams should...
-• Teams frequently...
-• Teams must...
-
-Use a wider range of observations and actors.
-
-====================
-LANGUAGE
-====================
-
-Write in clear professional English.
-
-Target readability:
-
-Grade 7–9.
-
-Prefer:
-
-• common vocabulary
-• shorter sentences
-• direct explanations
-• conversational clarity
-
-Use simple words whenever possible.
-
-Avoid:
-
-• academic writing
-• motivational language
-• exaggerated marketing language
-• dramatic technology narratives
-• executive buzzwords
-• over-polished corporate copy
-
-Avoid repeated use of:
-
-leverage
-optimize
-enhance
-transform
-facilitate
-streamline
-robust
-innovation
-impactful
-cutting-edge
-powerful
-seamless
-revolutionize
-significant
-groundbreaking
-synergy
-enable
-empower
-accelerate
-redefine
-next-generation
-
-====================
-TRANSITIONS
-====================
-
-Avoid generic AI transitions:
-
-• In practical terms
-• The fundamental difference
-• Looking ahead
-• In conclusion
-• As technology evolves
-• Despite these advantages
-• The future of
-• As organizations continue to grow
-• On the other hand
-• Furthermore
-• Moreover
-• Ultimately
-
-Transitions should emerge naturally.
-Sometimes no transition is better.
-
-ADDITIONAL TRANSITION RULES
-
-Avoid repetitive connective phrases such as:
-
-• On the other hand
-• For instance
-• Ultimately
-• In many cases
-• At the same time
-• In reality
-• Here are some steps
-• Here are some questions to consider
-• That said
-• Meanwhile
-• As a result
-• Therefore
-• In contrast
-
-Do not force transitions between every paragraph.
-
-Direct continuation is often more natural than explicit connectors.
-
-====================
-EXAMPLES
-====================
-
-Examples must include:
-
-• constraints
-• tradeoffs
-• decisions
-• consequences
-
-Never create fictional case studies.
-
-Avoid:
-
-• imaginary startups
-• invented companies
-• fabricated teams
-• fake statistics
-
-Avoid overused examples:
-
-• chatbots
-• recommendation engines
-• personalized emails
-• social media campaigns
-
-Unless genuinely central to the topic.
-
-If no meaningful example exists:
-
-Use observations instead.
-
-====================
-AUTHORITY
-====================
-
-Use statistics ONLY from Verified Search Data.
-
-Never invent:
-
-• numbers
-• percentages
-• surveys
-• studies
-• reports
-
-If no verified data exists:
-
-Focus on:
-
-• operational realities
-• implementation experience
-• tradeoffs
-• practical reasoning
-
-====================
-SEO
-====================
-
-Requirements:
-
-• Use target keywords naturally.
-• Include semantically related concepts.
-• Avoid keyword stuffing.
-• Prioritize readability.
-• Optimize for humans first.
-• Align headings with search intent.
-• Write compelling metadata.
-• Keep keyword density natural.
-
-Never sacrifice clarity for SEO.
-
-====================
-BRAND MENTIONS
-====================
-
-Mention {website.name} only if genuinely relevant.
-
-Maximum:
-
-ONE natural mention.
-
-No promotional language.
-
-No forced branding.
-
-====================
-CTA RULES
-====================
-
-The ending must feel useful.
-
-Prefer:
-
-• practical next steps
-• operational recommendations
-• implementation checklists
-• questions readers should ask internally
-
-Avoid:
-
-• Contact us today
-• Get started now
-• Transform your business
-• Reach out to our experts
-• Book a consultation
-• Unlock your potential
-
-The reader should leave with something actionable.
-
-====================
-ANTI-AI DETECTION RULES
-====================
-
-Avoid:
-
-• repetitive sentence openings
-• identical paragraph structures
-• perfect symmetry
-• predictable rhythms
-• over-explaining obvious ideas
-• excessive transitions
-• keyword repetition
-• emotional exaggeration
-
-Mix:
-
-• short sentences
-• medium sentences
-• longer explanatory sentences
-
-Occasionally use single-sentence paragraphs when natural.
-
-Allow sections to end abruptly if the point has been made.
-
-Do not force elegant conclusions everywhere.
-
-Human writers move on when a point is complete.
-
-FINAL EDITORIAL REVIEW
-
-Before producing the final article, silently rewrite any section that:
-
-• feels generic
-• sounds educational
-• repeats transitions
-• repeats examples
-• lacks operational detail
-• follows textbook structures
-• overuses keywords
-• explains obvious concepts
-• reads like AI output
-• ends too neatly
-• resolves every tradeoff
-• forces recommendations where none are needed
-
-The final article should:
-
-• vary sentence lengths naturally
-• include occasional short paragraphs
-• avoid predictable rhythms
-• leave some complexity unresolved
-• avoid wrapping every section with a lesson
-• maintain conversational professionalism
-• prioritize usefulness over completeness
-
-Readers should feel they are reading a thoughtful practitioner—not a system attempting to teach everything perfectly.
+1. Grounded in Execution & Practical Insight:
+   - Write from operational experience rather than general explanation. The article should prioritize usefulness over theoretical completeness. Leave simple, obvious concepts unexplained if the target audience (practitioners) would already know them.
+   - Address actual tradeoffs, operational constraints, decisions, and outcomes. Focus on real-world workflow bottlenecks, implementation friction, or common recurring mistakes.
+   - Absolutely do NOT claim direct personal experience (avoid "in my experience", "I have found", "my team discovered", "over the years"). Focus on explaining common patterns and choices from an objective but deeply knowledgeable perspective.
+
+2. Tone, Style & Pacing:
+   - Use clear, plain, conversational B2B English. Vary paragraph and sentence lengths dramatically—mix very short, punchy sentences with longer ones. Use occasional single-sentence paragraphs.
+   - Strictly avoid AI clichés, corporate buzzwords, and marketing fluff. Do NOT use words like: leverage, optimize, enhance, transform, facilitate, streamline, robust, innovation, impactful, cutting-edge, powerful, seamless, revolutionize, groundbreaking, synergy, enable, empower, accelerate, redefine, or next-generation.
+   - Keep transitions completely natural. Do NOT start paragraphs or sections with generic AI transitions like: "Furthermore", "Moreover", "Ultimately", "On the other hand", "In conclusion", "Looking ahead", "In practical terms", "As a result", "Therefore", or "That said".
+
+3. Headings & Structure:
+   - Avoid educational or predictable headings like "Introduction", "Conclusion", "What is X", "Benefits of X", "Key Features", "Final Thoughts".
+   - Instead, write editorial headings that reflect choices, operational realities, implementation lessons, or tradeoffs (e.g. "The Hidden Costs of...", "Tradeoffs in...", "Where Teams Repeatedly Stumble").
+   - Allow sections to end abruptly when the point has been made. Do not force neat summaries or lessons at the end of every section.
+
+4. SEO & Authority:
+   - Integrate target keywords and semantically related terms naturally.
+   - Use statistics, percentages, and reports ONLY if they are explicitly present in the "Verified Search Data" section above. Never fabricate statistics.
 
 ====================
 OUTPUT
 ====================
-
-Return ONLY valid JSON.
-
+Return ONLY valid JSON in the following format:
 {{
-    "title": "",
-    "meta_description": "",
-    "category": "",
-    "tags": [],
-    "excerpt": "",
-    "body": "clean HTML only"
+    "title": "A practitioner-level, engaging title matching the style guide",
+    "meta_description": "An engaging, natural SEO description under 160 characters",
+    "category": "A relevant single-word or short phrase category (e.g., Marketing, Engineering)",
+    "tags": ["tag1", "tag2"],
+    "excerpt": "A brief 2-3 sentence overview of the article",
+    "body": "Your full, deep-dive article content formatted in clean HTML (containing only h2, h3, p, ul, ol, li, strong, a, and blockquote tags. No markdown formatting inside HTML)"
 }}
 """
 
@@ -1611,6 +1071,8 @@ Return ONLY valid JSON.
             temperature=0.7,
             response_format={"type": "json_object"}
         )
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(website, 'blog_generation', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         content = json.loads(response.choices[0].message.content.strip())
         content['generation_prompt'] = user_prompt
         content['ai_model'] = MODEL
@@ -1687,6 +1149,8 @@ def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> 
         )
         
         import json
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(website, 'social_generation', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         content = json.loads(response.choices[0].message.content)
         content['generation_prompt'] = user_prompt
         content['ai_model'] = MODEL
@@ -1806,6 +1270,45 @@ def build_svg_from_data(data: dict, website=None) -> str:
         logo_url = website.logo_url
 
     custom_logo_data_uri = None
+    logo_is_light = False
+    
+    def detect_luminance_from_bytes(img_bytes) -> bool:
+        try:
+            from PIL import Image
+            import io
+            with Image.open(io.BytesIO(img_bytes)) as limg:
+                limg = limg.convert("RGBA")
+                l_pixels = limg.load()
+                l_w, l_h = limg.size
+                l_r, l_g, l_b = 0, 0, 0
+                l_count = 0
+                l_step = max(1, l_w // 50)
+                for ly in range(0, l_h, l_step):
+                    for lx in range(0, l_w, l_step):
+                        r, g, b, a = l_pixels[lx, ly]
+                        if a > 30:
+                            if r > 240 and g > 240 and b > 240:
+                                continue
+                            l_r += r
+                            l_g += g
+                            l_b += b
+                            l_count += 1
+                if l_count == 0:
+                    for ly in range(0, l_h, l_step):
+                        for lx in range(0, l_w, l_step):
+                            r, g, b, a = l_pixels[lx, ly]
+                            if a > 30:
+                                l_r += r
+                                l_g += g
+                                l_b += b
+                                l_count += 1
+                if l_count > 0:
+                    lum = 0.299 * (l_r / l_count) + 0.587 * (l_g / l_count) + 0.114 * (l_b / l_count)
+                    return lum > 200
+        except Exception:
+            pass
+        return False
+
     try:
         if logo_url:
             if logo_url.startswith('/static/'):
@@ -1815,9 +1318,11 @@ def build_svg_from_data(data: dict, website=None) -> str:
                 if logo_path is not None and os.path.exists(logo_path):
                     ext = logo_path.split('.')[-1].lower()
                     with open(logo_path, 'rb') as f:
-                        encoded = base64.b64encode(f.read()).decode('utf-8')
+                        file_bytes = f.read()
+                    encoded = base64.b64encode(file_bytes).decode('utf-8')
                     mime = f"image/{ext}" if ext != 'svg' else "image/svg+xml"
                     custom_logo_data_uri = f"data:{mime};base64,{encoded}"
+                    logo_is_light = detect_luminance_from_bytes(file_bytes)
             elif logo_url.startswith('http://') or logo_url.startswith('https://'):
                 resp = requests.get(logo_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
                 if resp.status_code == 200:
@@ -1827,6 +1332,7 @@ def build_svg_from_data(data: dict, website=None) -> str:
                     mime = f"image/{ext}" if ext != 'svg' else "image/svg+xml"
                     encoded = base64.b64encode(resp.content).decode('utf-8')
                     custom_logo_data_uri = f"data:{mime};base64,{encoded}"
+                    logo_is_light = detect_luminance_from_bytes(resp.content)
     except Exception as logo_err:
         logger.warning(f"Failed to load logo_url: {logo_err}")
         
@@ -1838,18 +1344,22 @@ def build_svg_from_data(data: dict, website=None) -> str:
                 print("DEBUG: logo_path 2 is", logo_path)
                 if logo_path is not None and os.path.exists(logo_path):
                     with open(logo_path, 'rb') as f:
-                        encoded = base64.b64encode(f.read()).decode('utf-8')
+                        file_bytes = f.read()
+                    encoded = base64.b64encode(file_bytes).decode('utf-8')
                     mime = f"image/{ext}" if ext != 'svg' else "image/svg+xml"
                     custom_logo_data_uri = f"data:{mime};base64,{encoded}"
+                    logo_is_light = detect_luminance_from_bytes(file_bytes)
                     break
         except Exception:
             pass
         
     if custom_logo_data_uri:
+        card_fill = "#0f172a" if logo_is_light else "#ffffff"
+        card_stroke = "#334155" if logo_is_light else "#cbd5e1"
         if theme == "theme3":
             logo_content_svg = f'<image href="{custom_logo_data_uri}" x="0" y="0" width="100" height="100"/>'
         else:
-            logo_content_svg = f"""<rect x="-10" y="-10" width="120" height="120" rx="12" fill="#ffffff" filter="url(#shadow)"/>
+            logo_content_svg = f"""<rect x="-10" y="-10" width="120" height="120" rx="12" fill="{card_fill}" stroke="{card_stroke}" stroke-width="1" filter="url(#shadow)"/>
     <image href="{custom_logo_data_uri}" x="0" y="0" width="100" height="100"/>"""
     else:
         logo_content_svg = """<rect x="0" y="0" width="56" height="56" rx="10" fill="none" stroke="currentColor" stroke-width="3"/>
@@ -2178,26 +1688,103 @@ def build_svg_from_data(data: dict, website=None) -> str:
     return svg
 
 
-def generate_dalle_prompt_via_gpt(title: str, category: str, excerpt: str, website=None) -> str:
+def generate_dalle_prompt_via_gpt(title: str, category: str, excerpt: str, website=None, is_dark_logo=True) -> str:
     """Uses GPT-4o to write a highly creative, custom DALL-E 3 image generation prompt for the blog post."""
-    primary_color = "#00537e"
-    secondary_color = "#008bf2"
+    # Universal modern color defaults
+    primary_color = "#0f172a"  # Slate/Dark Blue
+    secondary_color = "#3b82f6"  # Royal Blue
     email = "info@devexhub.com"
     phone = "+91 98759 05952"
     domain = "devexhub.com"
     
+    industry = "General"
+    topics = "General content"
+    all_colors = []
+    
     if website:
-        if website.brand_colors and isinstance(website.brand_colors, list):
-            if len(website.brand_colors) > 0:
-                primary_color = website.brand_colors[0]
-            if len(website.brand_colors) > 1:
-                secondary_color = website.brand_colors[1]
+        # Resolve brand colors cleanly
+        if website.brand_colors and isinstance(website.brand_colors, list) and len(website.brand_colors) > 0:
+            all_colors = website.brand_colors
+            # Filter to find vibrant accent colors (non-neutrals)
+            non_neutrals = []
+            for c in all_colors:
+                c_clean = c.lstrip('#')
+                if len(c_clean) in [3, 6]:
+                    try:
+                        if len(c_clean) == 3:
+                            c_clean = "".join(x*2 for x in c_clean)
+                        r = int(c_clean[0:2], 16)
+                        g = int(c_clean[2:4], 16)
+                        b = int(c_clean[4:6], 16)
+                        # Check if color has saturation (non-neutral) and isn't pure black/white
+                        if max(r, g, b) - min(r, g, b) >= 30 and 15 < (0.299*r + 0.587*g + 0.114*b) < 240:
+                            non_neutrals.append(c)
+                    except ValueError:
+                        pass
+            
+            if len(non_neutrals) > 0:
+                primary_color = non_neutrals[0]
+                if len(non_neutrals) > 1:
+                    secondary_color = non_neutrals[1]
+                else:
+                    remaining = [c for c in all_colors if c != primary_color]
+                    secondary_color = remaining[0] if remaining else primary_color
+            else:
+                primary_color = all_colors[0]
+                secondary_color = all_colors[1] if len(all_colors) > 1 else all_colors[0]
+
+        if website.domain:
+            domain = website.domain.strip().rstrip('/')
+        
+        # Build email (use contact_email, or fallback to info@domain)
         if website.contact_email:
             email = website.contact_email
+        else:
+            email_domain = domain.replace('www.', '').split('/')[0]
+            email = f"info@{email_domain}"
+            
+        # Avoid falling back to Devex Hub phone if website has no phone
         if website.contact_phone:
             phone = website.contact_phone
-        if website.domain:
-            domain = website.domain
+        else:
+            phone = ""
+            
+        if website.industry:
+            industry = website.industry
+        if website.topics:
+            topics = ", ".join(website.topics) if isinstance(website.topics, list) else str(website.topics)
+            
+    # Construct footer dynamically based on available fields
+    footer_parts = []
+    if email:
+        footer_parts.append(email)
+    if phone:
+        footer_parts.append(phone)
+    if domain:
+        footer_parts.append(domain)
+    footer_text = " | ".join(footer_parts)
+    
+    # Format brand colors description
+    colors_desc = f"Primary: '{primary_color}', Secondary: '{secondary_color}'"
+    if all_colors:
+        colors_desc += f" (Full Palette: {', '.join(all_colors)})"
+
+    # Brand contrast instruction based on logo brightness
+    if is_dark_logo:
+        contrast_instruction = (
+            f"The company logo is dark-colored (like dark blue, purple, or black). Therefore, you MUST design the top-left safety zone "
+            f"(the top-left 25% width and 20% height corner area of the banner) to be a clean, solid, very light-colored background "
+            f"(e.g., bright off-white, extremely light pastel blue, or light warm gray gradient) that fades softly into the darker "
+            f"brand background color '{primary_color}' towards the center. This creates a high-contrast light corner that ensures a dark logo placed "
+            f"there is 100% visible and readable. There must be no text, illustrations, or graphics in this zone."
+        )
+    else:
+        contrast_instruction = (
+            f"The company logo is light-colored (white/silver). Therefore, you MUST design the top-left safety zone "
+            f"(the top-left 25% width and 20% height corner area of the banner) to be a clean, solid, very deep and dark backdrop "
+            f"(e.g., deep dark blue, slate charcoal, or dark navy) to provide excellent natural contrast for a white/light logo. "
+            f"There must be no text, illustrations, or graphics in this zone."
+        )
 
     prompt = f"""You are a professional creative director and graphic designer.
 Your task is to write ONE highly detailed, descriptive DALL-E 3 prompt to generate a PREMIUM WEBSITE BLOG HERO BANNER.
@@ -2205,38 +1792,58 @@ Your task is to write ONE highly detailed, descriptive DALL-E 3 prompt to genera
 You must design the banner specifically for this blog post:
 - Blog Title: "{title}"
 - Blog Category: "{category}"
+- Blog Industry: "{industry}"
 - Blog Excerpt: "{excerpt}"
 
-CRITICAL BRANDING DETAILS:
-- Brand Colors: Primary: "{primary_color}", Secondary: "{secondary_color}"
-- Contact Info for Footer: Email: "{email}", Phone: "{phone}", Website: "{domain}"
+CRITICAL BRANDING & COLOR DETAILS:
+- Brand Colors to use: {colors_desc}
+  * IMPORTANT: You MUST strictly design the entire visual using these website colors so it integrates seamlessly with the website's brand identity. The primary brand color '{primary_color}' (or deep slate/charcoal if primary is neutral) MUST be the dominant, primary background color of the entire banner, extending 100% all the way to the absolute edges of the image canvas. The secondary brand color '{secondary_color}' (and other accents) MUST be used ONLY as an accent color for smaller detail highlights (like the text highlights, the button color, or small lighting glows in the illustration). Under NO circumstances should the secondary brand color '{secondary_color}' be used as an outer border, frame, margin, or padding surrounding the main content. This avoids creating a harsh or high-contrast border frame and ensures the layout is premium and elegant.
+- Contact Info: Do NOT write any contact details (email, phone, or website URL) on the banner. Leave the bottom area completely blank and clear.
 - Call-To-Action (CTA) Text: "Read More"
 
 DALL-E 3 PROMPT GENERATION INSTRUCTIONS:
-
 Generate a DALL-E 3 prompt describing a banner with the following layout, content, and quality requirements:
 
-1. THE COMPOSITION & LAYOUT:
-   - It is a split layout banner optimized for a website hero.
-   - Left side: A clean, solid background (white, soft cream, or a very light brand-aligned gradient) containing the typography panel.
-   - Right side: A stunning, high-quality, premium 3D illustration or mockup that visually represents the core topic of the article.
-   - Center/Right (Topic Interpretation): Visually communicate the article topic using clean SaaS graphics, glassmorphism UI/UX dashboard panels, high-end isometric technology visuals, or stylized characters/workflows. Avoid literal or cheap stock-photo tropes.
-   - **CONDITIONAL RULE FOR COMPARISONS**: If the title "{title}" implies a comparison (e.g. SEO vs AEO vs GEO, or A vs B), design the right-side illustration as a LEFT vs RIGHT split comparison using contrasting visual identities, with a clear center separator, while maintaining unified branding.
+1. THE COMPOSITION & LAYOUT (INTEGRATED, FULL-BLEED & NO PADDING):
+- Design a single, unified, continuous background that flows seamlessly from the left typography area into the right visual area.
+- The background should be a soft, premium gradient, subtle texture, or atmospheric environment using the resolved primary brand color '{primary_color}' as the dominant backdrop.
+- **STRICT FULL-BLEED / NO-PADDING REQUIREMENT**: The image must be completely borderless, edge-to-edge, and full-bleed. The primary background color and design elements must extend all the way to the absolute boundaries of the image canvas. Under NO circumstances should there be any outer dark or light margins, empty space borders, padding, rounded corners for the outer image, shadows around the edges, or frame borders around the canvas. The background must cover 100% of the image space. There must be absolutely no outer colored frame (e.g., no gold or yellow outer border padding) surrounding the central content card. The main background must extend fully to all four edges of the image file.
+- **NO CARDS OR CONTAINERS**: Do NOT draw any cards, containers, panels, device frames, laptop screens, or rounded-corner boxes to hold the text or the illustration. All text and illustrations must reside directly on the main continuous canvas background, completely unframed and borderless.
+- **EXPANDED HERO VISUAL**: The visual illustration on the right side must be extremely large, bold, and cover-filling. It should occupy at least 60-70% of the banner space (right side and extending into the center), rather than being a small isolated graphic. The background elements of this illustration should flow and blend seamlessly into the left side behind the text.
+- Left side: A spacious area for text with excellent readability, achieved through light gradients, depth, and negative space.
+- Right side: A cinematic, high-end 3D illustration, isometric scene, or stylized visual metaphor that represents the core idea of the article.
+- Elements from the right side (lighting, shadows, gradients, shapes, particles, or reflections) should subtly extend or blend into the left side, creating a natural visual flow.
+- **DYNAMIC VISUAL METAPHOR POLICY**: Brainstorm a highly relevant, creative, and engaging visual metaphor for the right side based on the blog title "{title}", industry "{industry}", and excerpt "{excerpt}". Do NOT default to generic laptop mockups, desktop monitors, or stacks of screens unless the article is strictly a tutorial or product feature release for a specific software, dashboard, or mobile app.
+- **CONDITIONAL RULE FOR COMPARISONS**: If the title "{title}" implies a comparison (e.g., SEO vs AEO vs GEO, or A vs B), design the right-side illustration as a LEFT vs RIGHT comparison that blends seamlessly at the center. Use contrasting visual themes, lighting, and symbols on each side with a soft, integrated transition in the middle—avoid any hard dividing line.
 
-2. THE TYPOGRAPHY (LEFT SIDE):
-   - Headline: Instruct DALL-E 3 to write the exact title "{title}" in large, bold, clean, professional sans-serif typography.
-   - Subtitle: Generate a short supporting subtitle (maximum 10 words, e.g., explaining the core value) and instruct DALL-E to render it clearly under the headline.
-   - CTA Section: Include a modern, rounded pill-shaped button at the bottom of the text panel that says "Read More" with a small arrow icon.
+2. THE TYPOGRAPHY & RICH TEXT DENSITY (LEFT SIDE):
+- **COMPACT HEADLINE SIZE & PUSHED-DOWN LAYOUT (OVERLAP PREVENTION)**: Write a shortened, punchy version of the title (maximum 3-4 words based on "{title}") in a medium-sized, compact, elegant, and highly readable geometric sans-serif typeface. The text must NOT be overly large or loud. PUSH all text down so that it starts strictly below the 20% height mark, keeping the top-left safety zone completely clear and avoiding any logo overlap.
+- Subtitle: Generate a short, compelling subtitle (maximum 8-10 words) that highlights the core value or benefit. Render it clearly under the headline.
+- **BODY DESCRIPTION / PARAGRAPH TEXT**: Beneath the subtitle, include a detailed, informative, and clean block of body text/paragraph (about 25-30 words, or 2-3 lines based on the blog excerpt: "{excerpt}") to give premium context. Ensure this text has excellent readability and spacing, making it look like a high-end corporate editorial magazine layout.
+- Typography should be high contrast, crisp, and easy to read, with excellent hierarchy and spacing.
+- CTA Section: Include a modern, rounded pill-shaped button at the bottom of the text panel that says "Read More" with a small arrow/chevron icon (->), styled in the accent color.
 
 3. BRAND INTEGRATION & EMPTY SPACES:
-   - Leave the TOP-LEFT corner of the banner clean, empty, and blank of any content so that the company logo can be overlaid there later in post-processing. Do NOT write any text or render a logo yourself in this area.
-   - Footer: Include a minimal, elegant footer strip at the very bottom of the banner containing: "{email} | {phone} | {domain}" in clean, small, readable typography with subtle vertical separators.
+- **STRICT LOGO SAFETY ZONE**: The entire top-left area of the banner (specifically from the top-left corner down to 20% of the height and extending to 25% of the width) MUST be completely empty, blank, and contain only the flat background color. {contrast_instruction} The headline/title text must begin strictly below this 20% height line, ensuring it never overlaps the company logo.
+- **NO CATEGORY TEXT OR EXTRA HEADERS**: Under no circumstances should you write the category name ("{category}") or any other labels, tags, or small text headers anywhere on the banner. The category name "{category}" must be completely absent from the image. Do NOT write the word "{category}" or depict any category label under the logo or anywhere on the banner. Keep the top-left safety zone completely clean and free of all text.
+- Do NOT write any text or render a logo in this area.
+- Footer: Do NOT write any text, phone number, email, or website URL at the bottom of the banner. Keep the bottom 15% of the banner completely blank and empty (solid background only) so that we can overlay a custom footer bar later in post-processing.
 
-4. VISUAL STYLE & DEPTH:
-   - The style should feel like a premium SaaS or luxury business website hero.
-   - Use soft gradients, realistic lighting, ambient glow effects, frosted glass, and premium shadows.
-   - Ensure the image has rich depth and clean art direction, feeling like a modern, professional campaign or magazine cover.
-   - Strictly avoid clutter, stock-photo appearances, excessive/generic icons, or low-detail artwork.
+4. VISUAL STYLE & ATMOSPHERE (EYE-CATCHING & CINEMATIC):
+- The banner must be visually striking, cinematic, and emotionally engaging within the first second.
+- Use dramatic yet balanced lighting, depth, and atmosphere to create a sense of scale and storytelling.
+- The right-side hero visual should be the focal masterpiece—premium 3D, ultra-detailed, and intelligently symbolic.
+- Use premium materials such as glassmorphism, soft-touch surfaces, metallic accents, acrylics, glowing edges, volumetric light, reflections, and ambient occlusion.
+- Ensure the overall color grading, contrast, and composition feel like a magazine cover or high-end campaign.
+- The banner should spark curiosity and motivate readers to click and read the article.
+- **STRICTLY AVOID**: Card-in-card designs, rounded outer canvas frames, margins or padded borders around the image, clipart aesthetics, generic stock illustrations, multiple laptops, multiple monitors, random dashboards, flat icon collections, cartoon styles, busy compositions, visual clutter, low-detail objects, meme aesthetics, gaming-inspired visuals, excessive symmetry, placeholder graphics, cheap gradients, overused AI visual tropes, floating unrelated elements, corporate handshake imagery, people pointing at screens, generic office scenes, generic 3D robot/AI characters with glowing eyes, and simple stock-icon visual trees.
+- Every visual decision must feel intentional and professionally art-directed.
+
+5. RENDER QUALITY & TECHNICAL DETAILS:
+- Ultra-high detail, 8K quality, professional 3D rendering.
+- Smooth gradients, perfect typography, realistic materials, soft shadows, depth of field, and cinematic composition.
+- The final image should look like a premium website hero banner designed by a world-class creative agency.
+- Quality references to draw design inspiration from: Apple keynote visuals, Stripe editorial campaigns, Linear brand illustrations, Notion marketing design, Airbnb storytelling graphics, IBM Think conference branding, Deloitte technology reports, Behance award-winning digital artwork.
 
 Output ONLY the final DALL-E 3 prompt. Do not add any extra explanation or markdown formatting."""
 
@@ -2247,6 +1854,8 @@ Output ONLY the final DALL-E 3 prompt. Do not add any extra explanation or markd
             max_tokens=600,
             temperature=0.7,
         )
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(website, 'prompt_engineering', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.warning(f"Failed to generate custom DALL-E prompt using GPT: {e}")
@@ -2255,7 +1864,7 @@ Output ONLY the final DALL-E 3 prompt. Do not add any extra explanation or markd
 
 def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", website=None) -> tuple:
     """
-    Generates a high-quality blog cover banner using the 'gpt-image-1' model for full visual generation
+    Generates a high-quality blog cover banner using the 'gpt-image-1-mini' model for full visual generation
     (including custom background, typography, illustration, and button) and then composites the company logo
     onto the top-right corner using Pillow before wrapping it in a minimal SVG wrapper.
     """
@@ -2266,11 +1875,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
     from django.conf import settings
     from PIL import Image, ImageDraw
 
-    # 1. Generate dynamic, highly descriptive DALL-E prompt based on title/content using GPT-4o
-    image_prompt = generate_dalle_prompt_via_gpt(title, category, excerpt, website=website)
-    logger.info(f"Custom DALL-E prompt generated: {image_prompt[:200]}...")
-
-    # Extract corporate logo dynamically if website is provided
+    # Extract corporate logo dynamically if website is provided (done first to check contrast requirements)
     logo_file_path = None
     try:
         logo_url = website.logo_url if website else ""
@@ -2305,6 +1910,47 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
         except Exception:
             pass
 
+    # Determine if the logo is primarily dark or light to instruct DALL-E to adjust the background color accordingly
+    is_dark_logo = True
+    if logo_file_path and os.path.exists(logo_file_path):
+        try:
+            logo_img = Image.open(logo_file_path).convert("RGBA")
+            lw, lh = logo_img.size
+            l_pixels = logo_img.load()
+            t_r, t_g, t_b, t_cnt = 0, 0, 0, 0
+            for ly in range(lh):
+                for lx in range(lw):
+                    r, g, b, a = l_pixels[lx, ly]
+                    if a > 40:
+                        if r > 240 and g > 240 and b > 240:
+                            continue
+                        t_r += r
+                        t_g += g
+                        t_b += b
+                        t_cnt += 1
+            if t_cnt == 0:
+                for ly in range(lh):
+                    for lx in range(lw):
+                        r, g, b, a = l_pixels[lx, ly]
+                        if a > 40:
+                            t_r += r
+                            t_g += g
+                            t_b += b
+                            t_cnt += 1
+            if t_cnt > 0:
+                avg_r = t_r / t_cnt
+                avg_g = t_g / t_cnt
+                avg_b = t_b / t_cnt
+                logo_lum = 0.299 * avg_r + 0.587 * avg_g + 0.114 * avg_b
+                if logo_lum >= 140:
+                    is_dark_logo = False
+        except Exception as lum_err:
+            logger.warning(f"Could not compute logo luminance: {lum_err}")
+
+    # 1. Generate dynamic, highly descriptive DALL-E prompt based on title/content using GPT-4o
+    image_prompt = generate_dalle_prompt_via_gpt(title, category, excerpt, website=website, is_dark_logo=is_dark_logo)
+    logger.info(f"Custom DALL-E prompt generated (is_dark_logo={is_dark_logo}): {image_prompt[:200]}...")
+
     b64_data = ""
     try:
         logger.info(f"Calling client.images.generate using gpt-image-1 for full banner...")
@@ -2314,6 +1960,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
             n=1,
             size="1536x1024"
         )
+        log_token_usage(website, 'image_generation', 'dall-e-3', 0, 0)
         generated_url = response.data[0].url
         b64_data = getattr(response.data[0], 'b64_json', None)
 
@@ -2335,53 +1982,206 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
             with open(temp_filepath, 'wb') as f:
                 f.write(raw_img_bytes)
 
-            # Composite the logo using Pillow
-            if logo_file_path and os.path.exists(logo_file_path):
+            # Composite the logo and draw footer using Pillow
+            try:
+                bg = Image.open(temp_filepath).convert("RGBA")
+                bg_w, bg_h = bg.size
+                
+                # Create a single transparent overlay for all programmatic shapes and text
+                overlay = Image.new("RGBA", bg.size, (0, 0, 0, 0))
+                overlay_draw = ImageDraw.Draw(overlay)
+                
+                # 1. Overlay the logo if it exists
+                if logo_file_path and os.path.exists(logo_file_path):
+                    try:
+                        logo = Image.open(logo_file_path).convert("RGBA")
+                        logo_w, logo_h = logo.size
+                        
+                        # Remove solid white background from the logo using flood-fill from corners
+                        corners = [logo.getpixel((0, 0)), logo.getpixel((logo_w - 1, 0)), 
+                                   logo.getpixel((0, logo_h - 1)), logo.getpixel((logo_w - 1, logo_h - 1))]
+                        is_white_bg = any(p[0] > 230 and p[1] > 230 and p[2] > 230 and p[3] > 100 for p in corners)
+                        if is_white_bg:
+                            try:
+                                for corner in [(0, 0), (logo_w - 1, 0), (0, logo_h - 1), (logo_w - 1, logo_h - 1)]:
+                                    p = logo.getpixel(corner)
+                                    if p[0] > 220 and p[1] > 220 and p[2] > 220 and p[3] > 100:
+                                        ImageDraw.floodfill(logo, corner, (255, 255, 255, 0), thresh=45)
+                                logger.info("Successfully converted logo white background to transparent.")
+                            except Exception as flood_err:
+                                logger.warning(f"Failed to floodfill logo background: {flood_err}")
+
+                        # Resize logo: height is 11% of background height
+                        new_h = int(bg_h * 0.11)
+                        new_w = int(logo_w * (new_h / logo_h))
+                        logo_resized = logo.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                        
+                        # Coordinates in top-left with margins
+                        margin_x = int(bg_w * 0.05)
+                        margin_y = int(bg_h * 0.05)
+                        paste_x = margin_x
+                        paste_y = margin_y
+                        
+                        # Sample background color in the logo area to determine luminance
+                        logo_bg_crop = bg.crop((margin_x, margin_y, margin_x + new_w, margin_y + new_h))
+                        logo_bg_avg = logo_bg_crop.resize((1, 1)).convert("RGB")
+                        logo_bg_r, logo_bg_g, logo_bg_b = logo_bg_avg.getpixel((0, 0))
+                        logo_bg_lum = 0.299 * logo_bg_r + 0.587 * logo_bg_g + 0.114 * logo_bg_b
+                        
+                        # Fallback check: only apply glow if logo color clashes with background color
+                        need_glow = False
+                        glow_color = None
+                        
+                        if is_dark_logo:
+                            # Dark logo on dark background is not visible -> needs white glow fallback
+                            if logo_bg_lum < 75:
+                                need_glow = True
+                                glow_color = (255, 255, 255, 140)  # 55% opacity white halo
+                        else:
+                            # Light logo on light background is not visible -> needs dark glow fallback
+                            if logo_bg_lum >= 120:
+                                need_glow = True
+                                glow_color = (0, 0, 0, 80)          # 31% opacity dark shadow
+                                
+                        if need_glow and glow_color:
+                            from PIL import ImageFilter
+                            alpha = logo_resized.split()[3]
+                            
+                            # Expand the alpha mask by shifting in 8 directions (dilation)
+                            glow_mask = Image.new("L", logo_resized.size, 0)
+                            for dx, dy in [(-2, -2), (2, -2), (-2, 2), (2, 2), (-2, 0), (2, 0), (0, -2), (0, 2)]:
+                                glow_mask.paste(alpha, (dx, dy), alpha)
+                                
+                            # Soften/blur the expanded glow mask
+                            glow_mask_blurred = glow_mask.filter(ImageFilter.GaussianBlur(2))
+                            
+                            # Create solid color image with glow color and apply blurred alpha mask
+                            glow_img = Image.new("RGBA", logo_resized.size, glow_color)
+                            glow_img.putalpha(glow_mask_blurred)
+                            
+                            # Composite the glow shadow onto overlay
+                            overlay.alpha_composite(glow_img, (paste_x, paste_y))
+                            logger.info("Luminance contrast is low: applied fallback contour halo glow/shadow.")
+
+                        # Always composite the original transparent logo on top
+                        overlay.alpha_composite(logo_resized, (paste_x, paste_y))
+                        logger.info("Successfully pasted company logo onto overlay.")
+                    except Exception as logo_err:
+                        logger.warning(f"Failed to overlay logo: {logo_err}")
+
+                # 2. Draw the programmatic footer bar using an alpha overlay to prevent alpha flattening issues
                 try:
-                    bg = Image.open(temp_filepath).convert("RGBA")
-                    logo = Image.open(logo_file_path).convert("RGBA")
-                    bg_w, bg_h = bg.size
+                    # Resolve contact info
+                    email = "info@devexhub.com"
+                    phone = "+91 98759 05952"
+                    domain = "devexhub.com"
                     
-                    # Resize logo: height is 11% of background height
-                    new_h = int(bg_h * 0.11)
-                    logo_w, logo_h = logo.size
-                    new_w = int(logo_w * (new_h / logo_h))
-                    logo_resized = logo.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                    if website:
+                        if website.domain:
+                            domain = website.domain.strip().rstrip('/')
+                        if website.contact_email:
+                            email = website.contact_email
+                        else:
+                            email_domain = domain.replace('www.', '').split('/')[0]
+                            email = f"info@{email_domain}"
+                        if website.contact_phone:
+                            phone = website.contact_phone
+                        else:
+                            phone = ""
+
+                    footer_parts = []
+                    if email:
+                        footer_parts.append(email)
+                    if phone:
+                        footer_parts.append(phone)
+                    if domain:
+                        footer_parts.append(domain)
+                    footer_text = " | ".join(footer_parts)
+
+                    # Sample pixels in the footer area to determine luminance
+                    footer_crop_y0 = int(bg_h * 0.91)
+                    footer_crop_y1 = int(bg_h * 0.98)
+                    footer_pixels = bg.crop((int(bg_w * 0.1), footer_crop_y0, int(bg_w * 0.9), footer_crop_y1))
                     
-                    # Coordinates in top-left with margins
-                    margin_x = int(bg_w * 0.05)
-                    margin_y = int(bg_h * 0.05)
-                    paste_x = margin_x
-                    paste_y = margin_y
+                    # Get average color of the footer area
+                    avg_color_img = footer_pixels.resize((1, 1)).convert("RGB")
+                    avg_r, avg_g, avg_b = avg_color_img.getpixel((0, 0))
+                    luminance = 0.299 * avg_r + 0.587 * avg_g + 0.114 * avg_b
                     
-                    # Draw a white card behind the logo to ensure visibility
-                    draw = ImageDraw.Draw(bg)
-                    box_padding = 15
-                    box_x0 = paste_x - box_padding
-                    box_y0 = paste_y - box_padding
-                    box_x1 = paste_x + new_w + box_padding
-                    box_y1 = paste_y + new_h + box_padding
-                    draw.rounded_rectangle([box_x0, box_y0, box_x1, box_y1], radius=15, fill=(255, 255, 255, 255), outline=(203, 213, 225, 255), width=2)
+                    # Colors for the glassmorphism footer bar
+                    if luminance < 120:  # Dark background
+                        bar_fill = (255, 255, 255, 30)       # Glassmorphism light overlay (12% opacity)
+                        bar_outline = (255, 255, 255, 55)    # 22% opacity white border
+                        text_fill = (255, 255, 255, 235)     # 92% opacity white text
+                    else:  # Light background
+                        bar_fill = (15, 23, 42, 25)          # Glassmorphism dark overlay (10% opacity)
+                        bar_outline = (15, 23, 42, 50)       # 20% opacity dark border
+                        text_fill = (15, 23, 42, 225)        # 88% opacity dark text
+
+                    # Footer bar dimensions (rounded card at the bottom)
+                    bar_w = int(bg_w * 0.90) # 90% of image width
+                    bar_h = int(bg_h * 0.07) # 7% of image height
                     
-                    # Paste logo
-                    bg.alpha_composite(logo_resized, (paste_x, paste_y))
+                    bar_x0 = int((bg_w - bar_w) / 2)
+                    bar_x1 = bar_x0 + bar_w
                     
-                    # Save final composed image back
-                    bg.convert("RGB").save(temp_filepath, "PNG")
-                    logger.info("Successfully composited company logo onto PNG.")
-                except Exception as composite_err:
-                    logger.warning(f"Failed to composite logo using Pillow: {composite_err}")
+                    # Position it lower, right at the bottom area (91% height mark)
+                    bar_y0 = int(bg_h * 0.91)
+                    bar_y1 = bar_y0 + bar_h
+                    
+                    # Draw rounded bar on overlay
+                    overlay_draw.rounded_rectangle([bar_x0, bar_y0, bar_x1, bar_y1], radius=12, fill=bar_fill, outline=bar_outline, width=2)
+                    
+                    # Draw text on overlay in the middle
+                    from PIL import ImageFont
+                    font_size = int(bar_h * 0.40) # Font size is 40% of the bar's height
+                    try:
+                        font = ImageFont.truetype("arial.ttf", font_size)
+                    except Exception:
+                        try:
+                            font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+                        except Exception:
+                            try:
+                                font = ImageFont.load_default(size=font_size)
+                            except Exception:
+                                font = ImageFont.load_default()
+                            
+                    # Calculate text size and center it
+                    text_str = footer_text
+                    try:
+                        t_w = overlay_draw.textlength(text_str, font=font)
+                        t_h = font_size
+                    except Exception:
+                        t_w = len(text_str) * (font_size * 0.6)
+                        t_h = font_size
+                        
+                    text_x = int(bar_x0 + (bar_w - t_w) / 2)
+                    text_y = int(bar_y0 + (bar_h - t_h) / 2 - (font_size * 0.05))
+                    
+                    overlay_draw.text((text_x, text_y), text_str, fill=text_fill, font=font)
+                    logger.info("Successfully drew custom programmatic footer bar.")
+                except Exception as footer_err:
+                    logger.warning(f"Failed to draw custom footer bar: {footer_err}")
+
+                # Composite the single overlay onto the original image
+                bg = Image.alpha_composite(bg, overlay)
+                
+                # Save final composed image back as optimized JPEG (90% size reduction)
+                bg.convert("RGB").save(temp_filepath, "JPEG", quality=85, optimize=True)
+                logger.info("Successfully composited logo and footer onto JPEG.")
+            except Exception as composite_err:
+                logger.warning(f"Failed to composite using Pillow: {composite_err}")
 
             # Read back composed image
             with open(temp_filepath, 'rb') as f:
                 composed_bytes = f.read()
             b64_data = base64.b64encode(composed_bytes).decode('utf-8')
             
-            # Save final filename
-            final_filename = f"blog_cover_full_{uuid.uuid4().hex}.png"
+            # Save final filename as .jpg
+            final_filename = f"blog_cover_full_{uuid.uuid4().hex}.jpg"
             final_filepath = os.path.join(media_dir, final_filename)
             os.rename(temp_filepath, final_filepath)
-            logger.info(f"Successfully saved final composed PNG to: {final_filepath}")
+            logger.info(f"Successfully saved final composed JPEG to: {final_filepath}")
 
     except Exception as img_err:
         logger.warning(f"gpt-image-1 generation failed: {img_err}. Falling back to standard SVG template planning.")
@@ -2448,6 +2248,8 @@ Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
         )
 
         import json
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(website, 'visual_strategy', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         data = json.loads(response.choices[0].message.content.strip())
         svg_content = build_svg_from_data(data, website=website)
         if svg_content:
@@ -2508,11 +2310,19 @@ Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
     return "", None
 
 
-def generate_for_idea(idea_id: int):
+def generate_for_idea(idea_id: int, generate_image: bool = True):
     """Main entry point called by Celery task."""
     from .models import ContentIdea, ContentDraft
     
     idea = ContentIdea.objects.select_related('website').get(pk=idea_id)
+    
+    # Strip any starting numbers (e.g. "1. Topic") from the title
+    import re
+    cleaned_title = re.sub(r'^\d+\s*\.\s*', '', idea.title).strip()
+    if cleaned_title != idea.title:
+        idea.title = cleaned_title
+        idea.save()
+        
     website = idea.website
     
     try:
@@ -2526,36 +2336,37 @@ def generate_for_idea(idea_id: int):
             category_name = website.industry or 'Social Media'
             
         # Generate cover image using GPT (SVG vector art)
-        try:
-            from django.conf import settings
-            import os
-            import uuid
-            
-            logger.info(f"Generating GPT SVG cover image for {idea.platform}: {idea.title}")
-            svg_code, png_filename = generate_svg_cover_via_gpt(
-                idea.title, 
-                category_name, 
-                excerpt=content_data.get('excerpt', ''), 
-                website=website
-            )
-            
-            if png_filename:
-                cover_image_url = f"/static/media/{png_filename}"
-                logger.info(f"Successfully generated and saved GPT PNG cover image to: {cover_image_url}")
-            elif svg_code:
-                media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
-                os.makedirs(media_dir, exist_ok=True)
+        if generate_image:
+            try:
+                from django.conf import settings
+                import os
+                import uuid
                 
-                filename = f"cover_{uuid.uuid4().hex}.svg"
-                filepath = os.path.join(media_dir, filename)
+                logger.info(f"Generating GPT SVG cover image for {idea.platform}: {idea.title}")
+                svg_code, png_filename = generate_svg_cover_via_gpt(
+                    idea.title, 
+                    category_name, 
+                    excerpt=content_data.get('excerpt', ''), 
+                    website=website
+                )
                 
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(svg_code)
+                if png_filename:
+                    cover_image_url = f"/static/media/{png_filename}"
+                    logger.info(f"Successfully generated and saved GPT PNG cover image to: {cover_image_url}")
+                elif svg_code:
+                    media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+                    os.makedirs(media_dir, exist_ok=True)
                     
-                cover_image_url = f"/static/media/{filename}"
-                logger.info(f"Successfully generated and saved GPT SVG cover image to: {cover_image_url}")
-        except Exception as img_err:
-            logger.warning(f"Failed to generate GPT SVG cover image: {img_err}")
+                    filename = f"cover_{uuid.uuid4().hex}.svg"
+                    filepath = os.path.join(media_dir, filename)
+                    
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write(svg_code)
+                        
+                    cover_image_url = f"/static/media/{filename}"
+                    logger.info(f"Successfully generated and saved GPT SVG cover image to: {cover_image_url}")
+            except Exception as img_err:
+                logger.warning(f"Failed to generate GPT SVG cover image: {img_err}")
         
         draft = ContentDraft.objects.create(
             idea=idea,
@@ -2573,10 +2384,18 @@ def generate_for_idea(idea_id: int):
             category=category_name,
         )
         
+        # Inject internal links automatically
+        try:
+            from .utils import inject_internal_links
+            inject_internal_links(draft)
+        except Exception as link_err:
+            logger.warning(f"Failed to inject internal links on success: {link_err}")
+            
         idea.status = 'done'
         idea.save(update_fields=['status'])
         
         return draft.id
+
     
     except Exception as e:
         logger.warning(f"AI generation failed, falling back to local simulation: {e}")
@@ -2612,6 +2431,14 @@ def generate_for_idea(idea_id: int):
                 cover_image="",
                 category=category_name,
             )
+            
+            # Inject internal links automatically
+            try:
+                from .utils import inject_internal_links
+                inject_internal_links(draft)
+            except Exception as link_err:
+                logger.warning(f"Failed to inject internal links on fallback: {link_err}")
+                
             idea.status = 'done'
             idea.save(update_fields=['status'])
             return draft.id
@@ -2648,6 +2475,8 @@ Return ONLY a valid JSON object with these keys. Do NOT include markdown code bl
             response_format={"type": "json_object"},
         )
         import json
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(None, 'crawler_summary', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         return json.loads(response.choices[0].message.content)
     except Exception as e:
         logger.error(f"Failed to analyze website context with GPT: {e}")
@@ -2691,6 +2520,8 @@ Return ONLY valid JSON. No code blocks or markdown."""
             response_format={"type": "json_object"},
         )
         import json
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(website, 'idea_generation', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
         data = json.loads(response.choices[0].message.content)
         ideas = data.get("ideas", [])
         
@@ -2702,6 +2533,8 @@ Return ONLY valid JSON. No code blocks or markdown."""
             if platform not in ['blog', 'linkedin', 'instagram', 'facebook', 'youtube']:
                 platform = 'blog'
             if title:
+                import re
+                title = re.sub(r'^\d+\s*\.\s*', '', title).strip()
                 idea = ContentIdea.objects.create(
                     website=website,
                     title=title,

@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="workspace.css" />
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -41,7 +42,12 @@
 
         <div class="ap-layout">
           <!-- List Column -->
-          <div style="display:flex; flex-direction:column; gap:16px;">
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <!-- Status Tabs (Pending / Approved Unscheduled) -->
+            <div class="seg-pills" id="apStatusFilter" style="width: 100%; display: flex;">
+              <button class="active" data-status="pending" style="flex: 1; text-align: center;">Pending review (<span id="countPending">0</span>)</button>
+              <button data-status="approved" style="flex: 1; text-align: center;">Approved &amp; Unscheduled (<span id="countApproved">0</span>)</button>
+            </div>
             <div class="ap-list" id="apList"></div>
             <!-- Pagination Controls -->
             <div class="card__footer row-between" id="apPagination" style="padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-card); border-radius:var(--r-lg); border:1px solid var(--border);">
@@ -61,13 +67,141 @@
     </div>
   </div>
 
+  <!-- Edit draft modal (CMS-Style Rich Text Editor) -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal lg">
+      <div class="modal__head"><div class="mtxt"><h3>Edit draft</h3><div class="sub" id="editSub">Make changes before approving</div></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></div>
+      <div class="modal__body editor-modal-body" style="padding:0">
+        <div class="editor-layout">
+          <!-- Editor Main Area (Left) -->
+          <div class="editor-main">
+            <div class="field">
+              <label class="label">Title</label>
+              <input class="input editor-title-input" id="editTitle" placeholder="Enter post title..." />
+            </div>
+            
+            <div class="field" style="display:flex; flex-direction:column; flex:1; margin-bottom:0;">
+              <label class="label">Body Content</label>
+              <div class="rich-editor">
+                <div class="rich-toolbar" id="editorToolbar">
+                  <button type="button" class="tb-btn" data-cmd="bold" title="Bold"><i data-lucide="bold"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="italic" title="Italic"><i data-lucide="italic"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="underline" title="Underline"><i data-lucide="underline"></i></button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" data-block="h2" title="Heading 1" style="font-weight:bold; font-size:12px;">H1</button>
+                  <button type="button" class="tb-btn" data-block="h3" title="Heading 2" style="font-weight:bold; font-size:10px;">H2</button>
+                  <button type="button" class="tb-btn" data-block="p" title="Paragraph" style="font-size:11px;">P</button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" id="tb-forecolor-btn" title="Text Color" style="position:relative;">
+                    <i data-lucide="palette"></i>
+                    <input type="color" id="tb-forecolor" value="#111827" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer;" />
+                  </button>
+                  <button type="button" class="tb-btn" id="tb-backcolor-btn" title="Highlight Color" style="position:relative;">
+                    <i data-lucide="highlighter"></i>
+                    <input type="color" id="tb-backcolor" value="#ffffff" style="position:absolute; opacity:0; width:100%; height:100%; top:0; left:0; cursor:pointer;" />
+                  </button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet List"><i data-lucide="list"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered List"><i data-lucide="list-ordered"></i></button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" id="tb-link" title="Insert Link"><i data-lucide="link"></i></button>
+                  <button type="button" class="tb-btn" id="tb-image" title="Insert Inline Image"><i data-lucide="image"></i></button>
+                  <button type="button" class="tb-btn" data-cmd="unlink" title="Remove Link"><i data-lucide="link-2-off"></i></button>
+                  <span class="tb-sep"></span>
+                  <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear Formatting"><i data-lucide="remove-formatting"></i></button>
+                </div>
+                <div class="rich-content" contenteditable="true" id="editBodyRich" placeholder="Write your post here..."></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Editor Settings Panel (Right) -->
+          <div class="editor-sidebar">
+            <!-- Cover Image section -->
+            <div class="sidebar-card">
+              <h4 id="coverCardTitle">Cover Image</h4>
+              <div class="editor-cover-preview" id="editCoverPreview">
+                <i data-lucide="image" class="muted" style="width:32px;height:32px"></i>
+              </div>
+              <div class="field mt3">
+                <label class="label txs" id="coverUrlLabel">Image URL</label>
+                <input class="input input-sm" id="editCoverUrl" placeholder="https://example.com/image.jpg" />
+              </div>
+              <div class="row gap2 mt2">
+                <button type="button" class="btn btn-secondary btn-sm" id="uploadCoverBtn" style="flex:1">Upload</button>
+                <input type="file" id="editCoverFile" accept="image/*,video/*" style="display:none" />
+                <input type="file" id="inlineImageFile" accept="image/*" style="display:none" />
+                <button type="button" class="btn btn-ghost btn-sm text-danger" id="removeCoverBtn">Remove</button>
+              </div>
+            </div>
+            
+            <!-- Metadata Settings section -->
+            <div class="sidebar-card">
+              <h4>Post Metadata</h4>
+              <div class="field">
+                <label class="label txs">Author Name</label>
+                <input class="input input-sm" id="editAuthor" placeholder="e.g. Devex Hub" />
+              </div>
+              <div class="field mt2">
+                <label class="label txs">Publish Date</label>
+                <input class="input input-sm" id="editDate" placeholder="e.g. June 1, 2026" />
+              </div>
+              <div class="field mt2">
+                <label class="label txs">Category</label>
+                <input class="input input-sm" id="editCategory" placeholder="e.g. Marketing" />
+              </div>
+            </div>
+            
+            <!-- Tags & Style section -->
+            <div class="sidebar-card">
+              <h4>Tags &amp; Styling</h4>
+              <div class="tag-input-wrap">
+                <input class="input input-sm" id="newTagInput" placeholder="Add tag and press Enter..." />
+              </div>
+              <div id="tagsList" class="editor-tags-list mt3"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="saveEdit"><i data-lucide="check"></i> Save changes</button></div>
+    </div>
+  </div>
+
+  <!-- Schedule draft modal (Option A: Approve & Schedule) -->
+  <div class="modal-overlay" id="scheduleModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Schedule approved draft</h3>
+          <div class="sub">Set the publishing date and time.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body">
+        <input type="hidden" id="schedDraftId" />
+        <div class="field">
+          <label class="label">Date</label>
+          <input class="input" type="date" id="schedDate" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);" />
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">Time</label>
+          <input class="input" type="time" id="schedTime" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);" />
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-ghost" id="cancelScheduleBtn" data-close-modal>Skip scheduling</button>
+        <button class="btn btn-primary" id="confirmSchedule"><i data-lucide="calendar-plus"></i> Schedule post</button>
+      </div>
+    </div>
+  </div>
+
   <script src="mock-data.js"></script>
   <script src="app.js"></script>
   <script>
   (function () {
     const C = window.Cadence, M = window.MOCK, I = C.icon;
     let queue = M.approvals.map(a => ({ ...a }));
-    let platFilter = "all", selected = new Set(), activeId = queue[0]?.id;
+    let platFilter = "all", activeTab = "pending", selected = new Set(), activeId = queue[0]?.id;
     let currentPage = 1;
     const itemsPerPage = 5;
 
@@ -78,10 +212,16 @@
       Instagram: "Stale beans? Here's how to tell 👇 Flat aroma · no bloom · oily surface · dull color · sour finish.\n\n#specialtycoffee #pourover #freshroast",
     };
 
-    function visible(c) { return platFilter === "all" || c.platform === platFilter; }
+    function visible(c) {
+      const matchPlat = platFilter === "all" || c.platform === platFilter;
+      const matchStatus = activeTab === "pending" ? c.status === "Draft" : c.status === "Approved";
+      return matchPlat && matchStatus;
+    }
 
     function rowHTML(c) {
       const p = M.platMeta(c.platform);
+      const badgeClass = c.status === "Approved" ? "badge-success" : "badge-draft";
+      const statusLabel = c.status === "Approved" ? "Approved" : "Pending";
       return `<div class="ap-row ${c.id===activeId?'active':''}" data-id="${c.id}">
         <label class="check" onclick="event.stopPropagation()"><input type="checkbox" data-sel="${c.id}" ${selected.has(c.id)?'checked':''} /><span class="box"><i data-lucide="check"></i></span></label>
         <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
@@ -89,7 +229,7 @@
           <div class="ap-row-title">${c.title}</div>
           <div class="ap-row-sub"><span class="favicon" style="width:15px;height:15px;border-radius:4px;font-size:9px;background:${c.siteColor}">${c.siteShort}</span> ${c.siteName} · ${c.platform} · ${c.words}w</div>
         </div>
-        <span class="badge badge-draft">Pending</span>
+        <span class="badge ${badgeClass}">${statusLabel}</span>
       </div>`;
     }
 
@@ -246,39 +386,87 @@
       if (c.platform === "Blog") {
         const isHTML = body.trim().startsWith("<");
         const blogContent = isHTML ? body : body.split("\n\n").map(t=>`<p style="line-height:1.7;margin-bottom:12px">${t}</p>`).join("");
+        
+        let tagsHTML = "";
+        if (c.tags && c.tags.length > 0) {
+          tagsHTML = `<div class="editor-tags-list mt4" style="border-top:1px solid var(--border); padding-top:var(--s3); margin-top:var(--s4); display:flex; flex-wrap:wrap; gap:6px;">` +
+            c.tags.map(t => {
+              const parts = t.split(':');
+              const name = parts[0];
+              const style = parts[1] || 'neutral';
+              let styleClass = 'badge-neutral';
+              if (style === 'primary') styleClass = 'badge-primary';
+              else if (style === 'success') styleClass = 'badge-success';
+              else if (style === 'danger') styleClass = 'badge-error';
+              else if (style === 'warning') styleClass = 'badge-scheduled';
+              return `<span class="badge ${styleClass}" style="text-transform:uppercase;font-size:10px">${name}</span>`;
+            }).join(" ") + `</div>`;
+        }
+
+        const coverHTML = c.cover_image 
+          ? `<img class="bp-cover-img" src="${c.cover_image}" style="width:100%; height:auto; border-radius:var(--r-md); margin-bottom:var(--s4); display:block; border:none;" />` 
+          : `<div style="height:150px;border-radius:12px;background:linear-gradient(135deg, ${c.siteColor} 0%, #1e1b4b 100%);position:relative;overflow:hidden;margin-bottom:20px;display:flex;align-items:flex-end;padding:16px;">
+              <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.06);filter:blur(10px);"></div>
+              <div style="position:absolute;bottom:-30px;left:10%;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.04);filter:blur(15px);"></div>
+              <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);background-size:20px 20px;"></div>
+              <div style="position:relative;z-index:2;">
+                <span style="font-size:9px;text-transform:uppercase;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:1px;background:rgba(255,255,255,0.12);padding:3px 8px;border-radius:99px;backdrop-filter:blur(4px);">${c.platform} Preview</span>
+                <h4 style="color:#fff;margin:8px 0 0;font-size:16px;font-weight:600;line-height:1.3;text-shadow:0 2px 4px rgba(0,0,0,0.3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${c.title}</h4>
+              </div>
+            </div>`;
+
+        const dateObj = c.created_at ? new Date(c.created_at) : new Date();
+        const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const displayAuthor = c.author_name !== undefined ? c.author_name : c.siteName;
+        const displayDate = c.custom_date !== undefined ? c.custom_date : formattedDate;
+        const displayCategory = c.category !== undefined ? c.category : "Marketing";
+
+        let bylineItems = [];
+        if (displayAuthor) bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("user", "style='width:14px;height:14px;color:var(--text-muted)'")} By: ${displayAuthor}</span>`);
+        if (displayDate) bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("calendar", "style='width:14px;height:14px;color:var(--text-muted)'")} ${displayDate}</span>`);
+        if (displayCategory) bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("folder", "style='width:14px;height:14px;color:var(--text-muted)'")} ${displayCategory}</span>`);
+        bylineItems.push(`<span style="display: inline-flex; align-items: center; gap: 4px;">${I("message-square", "style='width:14px;height:14px;color:var(--text-muted)'")} 0 Comments</span>`);
+
+        const bylineHTML = `<div class="bp-byline" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin: var(--s2) 0 var(--s4) 0;">` +
+          bylineItems.join(`<span style="color: var(--border)">/</span>`) + `</div>`;
+
         return `<div class="bp preview-wrapper-${c.site}"><div class="bp-kicker" style="color:var(--primary);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">${c.siteName}</div>
           <h2 style="font-size:24px;margin:8px 0 12px;letter-spacing:-.02em">${c.title}</h2>
-          <div style="height:150px;border-radius:12px;background:linear-gradient(135deg, ${c.siteColor} 0%, #1e1b4b 100%);position:relative;overflow:hidden;margin-bottom:20px;display:flex;align-items:flex-end;padding:16px;">
-            <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.06);filter:blur(10px);"></div>
-            <div style="position:absolute;bottom:-30px;left:10%;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,0.04);filter:blur(15px);"></div>
-            <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);background-size:20px 20px;"></div>
-            <div style="position:relative;z-index:2;">
-              <span style="font-size:9px;text-transform:uppercase;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:1px;background:rgba(255,255,255,0.12);padding:3px 8px;border-radius:99px;backdrop-filter:blur(4px);">${c.platform} Preview</span>
-              <h4 style="color:#fff;margin:8px 0 0;font-size:16px;font-weight:600;line-height:1.3;text-shadow:0 2px 4px rgba(0,0,0,0.3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${c.title}</h4>
-            </div>
-          </div>
-          ${blogContent}</div>`;
+          ${bylineHTML}
+          ${coverHTML}
+          ${blogContent}
+          ${tagsHTML}</div>`;
       }
       if (c.platform === "Instagram") {
+        const imgStyle = c.cover_image 
+          ? `style="background-image: url('${c.cover_image}'); background-size: contain; background-repeat: no-repeat; background-position: center; background-color: var(--bg-subtle); aspect-ratio: 1;"`
+          : `style="aspect-ratio:1;background:linear-gradient(135deg,#ff7e5f, #feb47b, ${c.siteColor});position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;"`;
+        const imgContent = c.cover_image ? "" : `
+          <div style="position:absolute;inset:0;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent 60%);"></div>
+          <div style="z-index:2;text-align:center;color:#fff;padding:24px;">
+            <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,0.2);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;backdrop-filter:blur(5px);">${I("instagram","style='width:22px;height:22px'")}</div>
+            <div style="font-weight:700;font-size:15px;letter-spacing:-0.01em;text-shadow:0 2px 4px rgba(0,0,0,0.2);">${c.siteName}</div>
+            <div style="font-size:10px;opacity:0.8;margin-top:2px;">Instagram post draft</div>
+          </div>`;
         return `<div style="max-width:320px;margin:0 auto;border:1px solid var(--border);border-radius:13px;overflow:hidden;background:var(--bg-card)">
           <div style="display:flex;align-items:center;gap:9px;padding:10px 12px"><span class="favicon" style="background:${c.siteColor}">${c.siteShort}</span><b style="font-size:13px;color:var(--text)">${c.siteName}</b></div>
-          <div style="aspect-ratio:1;background:linear-gradient(135deg,#ff7e5f, #feb47b, ${c.siteColor});position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;">
-            <div style="position:absolute;inset:0;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent 60%);"></div>
-            <div style="z-index:2;text-align:center;color:#fff;padding:24px;">
-              <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,0.2);display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;backdrop-filter:blur(5px);">${I("instagram","style='width:22px;height:22px'")}</div>
-              <div style="font-weight:700;font-size:15px;letter-spacing:-0.01em;text-shadow:0 2px 4px rgba(0,0,0,0.2);">${c.siteName}</div>
-              <div style="font-size:10px;opacity:0.8;margin-top:2px;">Instagram post draft</div>
-            </div>
-          </div>
+          <div ${imgStyle}>${imgContent}</div>
           <div style="display:flex;gap:14px;padding:10px 12px;color:var(--text-secondary);">${I("heart")}${I("message-circle")}${I("send")}</div>
           <div style="padding:0 12px 12px;font-size:13px;line-height:1.5;color:var(--text)"><b>${c.siteName}</b> ${body}</div></div>`;
       }
       if (c.platform === "LinkedIn") {
+        const coverHTML = c.cover_image 
+          ? `<div class="li-cover" style="margin-top:12px; border-radius:var(--r-sm); overflow:hidden; border:1px solid var(--border);"><img src="${c.cover_image}" style="width:100%; height:auto; display:block;" /></div>` 
+          : "";
         return `<div style="max-width:460px;margin:0 auto;border:1px solid var(--border);border-radius:13px;padding:16px;background:var(--bg-card)">
           <div style="display:flex;gap:10px;margin-bottom:12px"><span class="avatar avatar-lg" style="background:${c.siteColor}">${c.siteShort}</span><div><div style="font-weight:650;color:var(--text)">${c.siteName}</div><div class="muted tsm">Just now</div></div></div>
-          <div style="white-space:pre-line;line-height:1.6;color:var(--text)">${body}</div></div>`;
+          <div style="white-space:pre-line;line-height:1.6;color:var(--text)">${body}</div>
+          ${coverHTML}</div>`;
       }
-      return `<div style="max-width:440px;margin:0 auto"><div style="aspect-ratio:16/9;border-radius:10px;background:linear-gradient(135deg,#ff0000 0%, #1f1f1f 100%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-md);">
+      const thumbStyle = c.cover_image 
+        ? `style="background-image: url('${c.cover_image}'); background-size: cover; background-position: center; aspect-ratio: 16/9; border-radius: 10px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;"`
+        : `style="aspect-ratio:16/9;border-radius:10px;background:linear-gradient(135deg,#ff0000 0%, #1f1f1f 100%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-md);"`;
+      return `<div style="max-width:440px;margin:0 auto"><div ${thumbStyle}>
         <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05), transparent 70%);"></div>
         <span style="width:54px;height:54px;border-radius:99px;background:rgba(0,0,0,0.6);display:grid;place-items:center;color:#fff;z-index:2;box-shadow:0 4px 12px rgba(0,0,0,0.3);">${I("play","style='width:24px;height:24px;fill:currentColor;margin-left:3px'")}</span>
         <div style="position:absolute;bottom:12px;left:12px;right:12px;z-index:2;text-align:left;">
@@ -289,75 +477,492 @@
       <p style="color:var(--text-secondary);line-height:1.6;margin-top:12px">${body}</p></div>`;
     }
 
+    let activeEditorTags = [];
+    let editingDraft = null;
+
+    function renderEditorTags() {
+      const wrap = document.getElementById("tagsList");
+      if (!wrap) return;
+      wrap.innerHTML = activeEditorTags.map(t => {
+        const parts = t.split(':');
+        const name = parts[0];
+        const style = parts[1] || 'neutral';
+        let styleClass = 'badge-neutral';
+        if (style === 'primary') styleClass = 'badge-primary';
+        else if (style === 'success') styleClass = 'badge-success';
+        else if (style === 'danger') styleClass = 'badge-error';
+        else if (style === 'warning') styleClass = 'badge-scheduled';
+        return `<span class="badge ${styleClass}" style="text-transform:uppercase;font-size:10.5px;padding:4px 8px;display:inline-flex;align-items:center;gap:6px;">
+          ${name} <i data-lucide="x" style="width:10px;height:10px;cursor:pointer;" onclick="window.removeEditorTag('${name}')"></i>
+        </span>`;
+      }).join(" ");
+      C.refreshIcons();
+    }
+
+    window.removeEditorTag = function(tagName) {
+      activeEditorTags = activeEditorTags.filter(t => t.split(':')[0] !== tagName);
+      renderEditorTags();
+    };
+
+    // Configure new tag input
+    const newTagInput = document.getElementById("newTagInput");
+    if (newTagInput) {
+      newTagInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const val = newTagInput.value.trim();
+          if (val) {
+            const exists = activeEditorTags.some(t => t.split(':')[0].toLowerCase() === val.toLowerCase());
+            if (!exists) {
+              activeEditorTags.push(`${val}:neutral`);
+              renderEditorTags();
+            }
+            newTagInput.value = "";
+          }
+        }
+      });
+    }
+
+    // Rich Text Editor Toolbar Listeners
+    const editorToolbar = document.getElementById("editorToolbar");
+    if (editorToolbar) {
+      editorToolbar.querySelectorAll("[data-cmd]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          const cmd = btn.dataset.cmd;
+          document.execCommand(cmd, false, null);
+          document.getElementById("editBodyRich").focus();
+        });
+      });
+
+      editorToolbar.querySelectorAll("[data-block]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          const block = btn.dataset.block;
+          document.execCommand("formatBlock", false, block);
+          document.getElementById("editBodyRich").focus();
+        });
+      });
+
+      let savedRange = null;
+      const saveSelection = () => {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          savedRange = selection.getRangeAt(0);
+        }
+      };
+      const restoreSelection = () => {
+        if (savedRange) {
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(savedRange);
+        }
+      };
+
+      const richBody = document.getElementById("editBodyRich");
+      if (richBody) {
+        richBody.addEventListener("mouseup", saveSelection);
+        richBody.addEventListener("keyup", saveSelection);
+      }
+
+      const foreColorInput = document.getElementById("tb-forecolor");
+      if (foreColorInput) {
+        foreColorInput.addEventListener("input", (e) => {
+          restoreSelection();
+          const color = e.target.value;
+          document.execCommand("foreColor", false, color);
+        });
+      }
+
+      const backColorInput = document.getElementById("tb-backcolor");
+      if (backColorInput) {
+        backColorInput.addEventListener("input", (e) => {
+          restoreSelection();
+          const color = e.target.value;
+          if (!document.execCommand("hiliteColor", false, color)) {
+            document.execCommand("backColor", false, color);
+          }
+        });
+      }
+      
+      const tbLink = document.getElementById("tb-link");
+      if (tbLink) {
+        tbLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          restoreSelection();
+          const sanitizeUrl = (u) => {
+            if (!u) return u;
+            const t = u.trim();
+            if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(t)) return t;
+            return "https://" + t;
+          };
+          const selection = window.getSelection();
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const selectedText = range.toString().trim();
+            
+            if (selectedText.length > 0) {
+              const url = prompt("Enter the link URL (e.g., https://google.com):");
+              if (url) {
+                restoreSelection();
+                document.execCommand("createLink", false, sanitizeUrl(url));
+              }
+            } else {
+              const linkText = prompt("Enter link text:");
+              if (linkText) {
+                const url = prompt("Enter the link URL (e.g., https://google.com):");
+                if (url) {
+                  restoreSelection();
+                  const a = document.createElement("a");
+                  a.href = sanitizeUrl(url);
+                  a.textContent = linkText;
+                  a.target = "_blank";
+                  range.insertNode(a);
+                  range.setStartAfter(a);
+                  range.setEndAfter(a);
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                }
+              }
+            }
+          }
+          document.getElementById("editBodyRich").focus();
+        });
+      }
+      
+      const tbImg = document.getElementById("tb-image");
+      if (tbImg) {
+        tbImg.addEventListener("click", (e) => {
+          e.preventDefault();
+          restoreSelection();
+          const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
+          if (url) {
+            restoreSelection();
+            document.execCommand("insertImage", false, url);
+            document.getElementById("editBodyRich").focus();
+          } else if (url === "") {
+            const inlineFileInput = document.getElementById("inlineImageFile");
+            if (inlineFileInput) inlineFileInput.click();
+          }
+        });
+      }
+
+      const inlineFileInput = document.getElementById("inlineImageFile");
+      if (inlineFileInput) {
+        inlineFileInput.addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              restoreSelection();
+              const base64 = event.target.result;
+              document.execCommand("insertImage", false, base64);
+              document.getElementById("editBodyRich").focus();
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+    }
+
+    // Wiring cover preview file selector
+    const editCoverFile = document.getElementById("editCoverFile");
+    const uploadCoverBtn = document.getElementById("uploadCoverBtn");
+    if (uploadCoverBtn && editCoverFile) {
+      uploadCoverBtn.addEventListener("click", () => editCoverFile.click());
+      editCoverFile.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const urlInput = document.getElementById("editCoverUrl");
+            if (urlInput) urlInput.value = ev.target.result;
+            const coverPreview = document.getElementById("editCoverPreview");
+            if (coverPreview) {
+              coverPreview.style.backgroundImage = `url('${ev.target.result}')`;
+              coverPreview.style.backgroundSize = "cover";
+              coverPreview.style.backgroundPosition = "center";
+              coverPreview.innerHTML = "";
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // Save Edit Modal
+    document.getElementById("saveEdit").addEventListener("click", async () => {
+      if (editingDraft) {
+        const title = document.getElementById("editTitle").value.trim();
+        const body = document.getElementById("editBodyRich").innerHTML;
+        const cover_image = document.getElementById("editCoverUrl").value.trim();
+        const tags = activeEditorTags;
+        const author_name = document.getElementById("editAuthor") ? document.getElementById("editAuthor").value.trim() : "";
+        const custom_date = document.getElementById("editDate") ? document.getElementById("editDate").value.trim() : "";
+        const category = document.getElementById("editCategory") ? document.getElementById("editCategory").value.trim() : "";
+        
+        try {
+          await CadenceAPI.updateDraft(editingDraft.id, { title, body, cover_image, tags, author_name, custom_date, category });
+          
+          // Sync local state
+          editingDraft.title = title;
+          editingDraft.body = body;
+          editingDraft.cover_image = cover_image;
+          editingDraft.tags = tags;
+          editingDraft.author_name = author_name;
+          editingDraft.custom_date = custom_date;
+          editingDraft.category = category;
+          editingDraft.excerpt = body.replace(/<[^>]*>/g, '').substring(0, 150) + "...";
+          
+          await M.syncMockData();
+          queue = M.approvals;
+          
+          renderList();
+          renderPreview();
+          C.toast({ type: "success", title: "Changes saved" });
+        } catch (err) {
+          C.toast({ type: "error", title: "Save failed", desc: err.message });
+        }
+      }
+      C.closeModal("editModal");
+    });
+
+    function updateCounts() {
+      const pendingCount = queue.filter(c => c.status === "Draft" && (platFilter === "all" || c.platform === platFilter)).length;
+      const approvedCount = queue.filter(c => c.status === "Approved" && (platFilter === "all" || c.platform === platFilter)).length;
+      const cp = document.getElementById("countPending");
+      const ca = document.getElementById("countApproved");
+      if (cp) cp.textContent = pendingCount;
+      if (ca) ca.textContent = approvedCount;
+    }
+
+    function renderList() {
+      updateCounts();
+      const list = queue.filter(visible);
+      const el = document.getElementById("apList");
+      const pagEl = document.getElementById("apPagination");
+      
+      if (!list.length) {
+        el.innerHTML = `<div class="empty card" style="padding:var(--s9)"><div class="empty-art">${I("check-check")}</div><h3>Queue is clear</h3><p>No drafts match this filter status. Approved drafts can be found in the Approved tab.</p></div>`;
+        document.getElementById("apPreview").innerHTML = "";
+        if (pagEl) pagEl.style.display = "none";
+        C.refreshIcons();
+        return;
+      }
+      
+      if (pagEl) pagEl.style.display = "flex";
+      const totalPages = Math.max(1, Math.ceil(list.length / itemsPerPage));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+      
+      document.getElementById("apPageIndicator").textContent = `Page ${currentPage} of ${totalPages}`;
+      document.getElementById("apPrevBtn").disabled = currentPage === 1;
+      document.getElementById("apNextBtn").disabled = currentPage === totalPages;
+      
+      const paginatedList = list.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+      
+      if (!paginatedList.find(c => c.id === activeId) && paginatedList.length > 0) {
+        activeId = paginatedList[0].id;
+      }
+      
+      el.innerHTML = paginatedList.map(rowHTML).join("");
+      C.refreshIcons();
+      el.querySelectorAll(".ap-row").forEach(r => r.addEventListener("click", () => { activeId = r.dataset.id; renderList(); renderPreview(); }));
+      el.querySelectorAll("[data-sel]").forEach(cb => cb.addEventListener("change", () => {
+        cb.checked ? selected.add(cb.dataset.sel) : selected.delete(cb.dataset.sel); updateBulk();
+      }));
+      updateBulk();
+    }
+
     function renderPreview() {
       const c = queue.find(x => x.id === activeId);
       const el = document.getElementById("apPreview");
       if (!c) { el.innerHTML = ""; return; }
       const p = M.platMeta(c.platform);
+      const isApproved = c.status === "Approved";
+
       el.innerHTML = `
-        <div class="card__header"><span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
-          <div style="flex:1;min-width:0"><h3 style="font-size:var(--fs-md)">${c.platform} draft</h3><div class="sub">${c.siteName} · scheduled ${c.day} ${c.time}</div></div>
-          <button class="icon-btn" id="editToggle" title="Inline edit">${I("pencil")}</button></div>
+        <div class="card__header">
+          <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+          <div style="flex:1;min-width:0">
+            <h3 style="font-size:var(--fs-md)">${c.platform} draft</h3>
+            <div class="sub">${c.siteName} · status: <b>${c.status}</b></div>
+          </div>
+        </div>
         <div class="card__body" id="prevBody" style="max-height:440px;overflow-y:auto">${platPreview(c)}</div>
-        <div class="card__footer" style="justify-content:space-between">
-          <button class="btn btn-ghost" id="rejectOne">${I("x")} Reject</button>
-          <div class="row gap2"><button class="btn btn-secondary" id="regenOne">${I("rotate-cw")} Regenerate</button>
-          <button class="btn btn-success" id="approveOne">${I("check")} Approve</button></div></div>`;
-      document.getElementById("approveOne").addEventListener("click", () => decide(c.id, "approve"));
-      document.getElementById("rejectOne").addEventListener("click", () => decide(c.id, "reject"));
-      document.getElementById("regenOne").addEventListener("click", async () => {
+        <div class="card__footer" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding: 12px var(--s5);">
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${!isApproved 
+              ? `<button class="btn btn-ghost btn-sm" id="rejectOne">${I("x")} Reject</button>
+                 <button class="btn btn-ghost btn-sm" id="regenContent">${I("file-text")} Regen Content</button>
+                 ${c.platform.toLowerCase() === 'blog' ? `<button class="btn btn-ghost btn-sm" id="regenImage">${I("image")} Regen Image</button>` : ''}`
+              : ''
+            }
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" id="editToggle">${I("pencil")} Edit</button>
+            ${isApproved 
+              ? `<button class="btn btn-primary btn-sm" id="scheduleOne">${I("calendar-plus")} Schedule</button>`
+              : `<button class="btn btn-success btn-sm" id="approveOne">${I("check")} Approve</button>`
+            }
+          </div>
+        </div>`;
+
+      if (document.getElementById("approveOne")) {
+        document.getElementById("approveOne").addEventListener("click", () => decide(c.id, "approve"));
+      }
+      if (document.getElementById("scheduleOne")) {
+        document.getElementById("scheduleOne").addEventListener("click", () => openScheduleModal(c.id, true));
+      }
+      if (document.getElementById("rejectOne")) {
+        document.getElementById("rejectOne").addEventListener("click", () => decide(c.id, "reject"));
+      }
+      
+      const triggerRegen = async (type) => {
         const b = document.getElementById("prevBody");
         b.style.opacity = ".4"; C.toast({ type: "info", title: "Regenerating…" });
         try {
-          await CadenceAPI.regenerateDraft(c.id);
+          const res = await CadenceAPI.regenerateDraft(c.id, type);
           await M.syncMockData();
           queue = M.approvals;
-          c = queue.find(x => x.id === c.id) || queue[0];
+          const nextId = (res && res.new_draft_id) ? String(res.new_draft_id) : c.id;
+          c = queue.find(x => x.id === nextId) || queue[0];
           b.style.opacity = "1";
           renderList(); renderPreview();
-          C.toast({ type: "success", title: "Fresh draft generated" });
+          const successMsg = type === 'image' ? "Fresh cover image generated" : type === 'content' ? "Fresh content generated" : "Fresh draft generated";
+          C.toast({ type: "success", title: successMsg });
         } catch (err) {
           b.style.opacity = "1";
           C.toast({ type: "error", title: "Regeneration failed", desc: err.message });
         }
-      });
+      };
+
+      if (document.getElementById("regenContent")) {
+        document.getElementById("regenContent").addEventListener("click", () => triggerRegen("content"));
+      }
+      if (document.getElementById("regenImage")) {
+        document.getElementById("regenImage").addEventListener("click", () => triggerRegen("image"));
+      }
+      
+      // Wire Edit button to open Rich Editor modal
       document.getElementById("editToggle").addEventListener("click", () => {
-        const body = document.getElementById("prevBody");
-        body.innerHTML = `<div class="field"><label class="label">Title</label><input class="input" value="${c.title.replace(/"/g,'&quot;')}" id="ieTitle"/></div>
-          <div class="field" style="margin-bottom:0"><label class="label">Content</label><textarea class="textarea" id="ieBody" style="min-height:240px">${c.body || c.excerpt}</textarea></div>
-          <div class="row gap2 mt4"><button class="btn btn-primary btn-sm" id="ieSave">${I("check")} Save</button><button class="btn btn-ghost btn-sm" id="ieCancel">Cancel</button></div>`;
-        C.refreshIcons();
-        document.getElementById("ieSave").addEventListener("click", async () => {
-          const newTitle = document.getElementById("ieTitle").value;
-          const newBody = document.getElementById("ieBody").value;
-          try {
-            await CadenceAPI.updateDraft(c.id, { title: newTitle, body: newBody });
-            c.title = newTitle;
-            c.body = newBody;
-            c.excerpt = newBody.substring(0, 150) + "...";
-            await M.syncMockData();
-            renderList(); renderPreview(); C.toast({type:"success",title:"Draft updated"});
-          } catch (err) {
-            C.toast({ type: "error", title: "Save failed", desc: err.message });
+        editingDraft = c;
+        
+        // Populate fields
+        document.getElementById("editTitle").value = c.title || "";
+        document.getElementById("editBodyRich").innerHTML = c.body || c.excerpt || "";
+        document.getElementById("editCoverUrl").value = c.cover_image || "";
+        
+        const coverPreview = document.getElementById("editCoverPreview");
+        if (coverPreview) {
+          if (c.cover_image) {
+            coverPreview.style.backgroundImage = `url('${c.cover_image}')`;
+            coverPreview.style.backgroundSize = "cover";
+            coverPreview.style.backgroundPosition = "center";
+            coverPreview.innerHTML = "";
+          } else {
+            coverPreview.style.backgroundImage = "none";
+            coverPreview.style.border = "1.5px dashed var(--border)";
+            coverPreview.innerHTML = `<i data-lucide="image" class="muted" style="width:32px;height:32px"></i>`;
           }
-        });
-        document.getElementById("ieCancel").addEventListener("click", renderPreview);
+        }
+        
+        activeEditorTags = Array.isArray(c.tags) ? [...c.tags] : [];
+        renderEditorTags();
+        
+        const editAuthor = document.getElementById("editAuthor");
+        if (editAuthor) editAuthor.value = c.author_name || c.siteName || "";
+        
+        const editDate = document.getElementById("editDate");
+        if (editDate) {
+          const dateObj = c.created_at ? new Date(c.created_at) : new Date();
+          editDate.value = c.custom_date || dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+        
+        const editCategory = document.getElementById("editCategory");
+        if (editCategory) editCategory.value = c.category || "Marketing";
+        
+        C.openModal("editModal");
       });
     }
+
+    function openScheduleModal(id, isFromApprovedTab = false) {
+      document.getElementById("schedDraftId").value = id;
+      const todayObj = new Date();
+      const yyyy = todayObj.getFullYear();
+      const mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(todayObj.getDate()).padStart(2, '0');
+      document.getElementById("schedDate").min = `${yyyy}-${mm}-${dd}`;
+      document.getElementById("schedDate").value = `${yyyy}-${mm}-${dd}`;
+      document.getElementById("schedTime").value = "09:00";
+      
+      const cancelBtn = document.getElementById("cancelScheduleBtn");
+      if (cancelBtn) {
+        cancelBtn.textContent = isFromApprovedTab ? "Cancel" : "Skip scheduling";
+      }
+      
+      C.openModal("scheduleModal");
+    }
+
+    // Schedule modal confirm click
+    document.getElementById("confirmSchedule").addEventListener("click", async () => {
+      const draftId = document.getElementById("schedDraftId").value;
+      const dateVal = document.getElementById("schedDate").value;
+      const timeVal = document.getElementById("schedTime").value || "09:00";
+      
+      if (!dateVal) {
+        C.toast({ type: "warning", title: "Date is required" });
+        return;
+      }
+      
+      const targetDate = new Date(`${dateVal}T${timeVal}:00`);
+      if (targetDate < new Date()) {
+        C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule in the past." });
+        return;
+      }
+      
+      try {
+        await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        C.closeModal("scheduleModal");
+        C.toast({ type: "success", title: "Post scheduled successfully" });
+        
+        // Remove scheduled item from queue view list
+        queue = queue.filter(c => c.id !== draftId);
+        selected.delete(draftId);
+        await M.syncMockData();
+        if (C.mountShell) C.mountShell();
+        renderList();
+        renderPreview();
+      } catch (err) {
+        C.toast({ type: "error", title: "Scheduling failed", desc: err.message });
+      }
+    });
 
     async function decide(id, action) {
       try {
         if (action === "approve") {
           await CadenceAPI.approveDraft(id);
+          const item = queue.find(c => c.id === id);
+          if (item) item.status = "Approved";
+          
+          await M.syncMockData();
+          if (C.mountShell) C.mountShell();
+          
+          C.toast({ type: "success", title: "Draft approved", desc: "Opening schedule option..." });
+          renderList();
+          renderPreview();
+          
+          // Option A: Prompt scheduling immediately!
+          openScheduleModal(id);
         } else {
           await CadenceAPI.rejectDraft(id, "Rejected via approvals queue");
+          queue = queue.filter(c => c.id !== id);
+          selected.delete(id);
+          C.toast({ type: "info", title: "Draft rejected" });
+          await M.syncMockData();
+          if (C.mountShell) C.mountShell();
+          renderList(); renderPreview();
         }
-        queue = queue.filter(c => c.id !== id);
-        selected.delete(id);
-        C.toast({ type: action === "approve" ? "success" : "info", title: action === "approve" ? "Draft approved" : "Draft rejected" });
-        await M.syncMockData();
-        if (C.mountShell) C.mountShell();
-        renderList(); renderPreview();
       } catch (err) {
         C.toast({ type: "error", title: "Operation failed", desc: err.message });
       }
@@ -383,12 +988,14 @@
       try {
         for (const id of ids) {
           await CadenceAPI.approveDraft(id);
-          queue = queue.filter(c => !ids.includes(c.id));
+          const item = queue.find(c => c.id === id);
+          if (item) item.status = "Approved";
         }
         selected.clear();
         await M.syncMockData();
         if (C.mountShell) C.mountShell();
-        renderList(); renderPreview(); C.toast({ type: "success", title: `${ids.length} drafts approved`, desc: "Ready to schedule" });
+        C.toast({ type: "success", title: `${ids.length} drafts approved`, desc: "They are now available to schedule" });
+        renderList(); renderPreview();
       } catch (err) {
         C.toast({ type: "error", title: "Bulk approval failed", desc: err.message });
       }
@@ -408,9 +1015,27 @@
         C.toast({ type: "error", title: "Bulk rejection failed", desc: err.message });
       }
     });
+    
+    // Wire Platform filter pills
     document.querySelectorAll("#apFilter button").forEach(b => b.addEventListener("click", () => {
-      document.querySelectorAll("#apFilter button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); platFilter = b.dataset.p; selected.clear(); currentPage = 1; renderList();
+      document.querySelectorAll("#apFilter button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); platFilter = b.dataset.p; selected.clear(); currentPage = 1; renderList(); renderPreview();
     }));
+
+    // Wire Status tabs filter pills (Option B)
+    const statusFilter = document.getElementById("apStatusFilter");
+    if (statusFilter) {
+      statusFilter.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          statusFilter.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          activeTab = btn.dataset.status;
+          selected.clear();
+          currentPage = 1;
+          renderList();
+          renderPreview();
+        });
+      });
+    }
 
     document.getElementById("apPrevBtn").addEventListener("click", () => {
       if (currentPage > 1) {
@@ -451,7 +1076,7 @@
     }
     .ap-layout {
       display: grid;
-      grid-template-columns: 1fr 1.15fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--s5);
       align-items: start;
     }

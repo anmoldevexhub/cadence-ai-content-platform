@@ -26,11 +26,11 @@
           <div class="ph-actions">
             <select class="select" id="aSite" style="min-width:180px"><option value="all">All websites</option></select>
             <div class="seg-pills" id="aRange"><button data-r="30">30d</button><button class="active" data-r="8w">8 weeks</button><button data-r="q">Quarter</button></div>
-            <button class="btn btn-secondary" onclick="Cadence.toast({type:'success',title:'Report exported (CSV)'})"><i data-lucide="download"></i> Export</button>
+            <button class="btn btn-secondary" id="exportBtn"><i data-lucide="download"></i> Export</button>
           </div>
         </div>
 
-        <div class="grid grid-4 mb6" id="kpis"></div>
+        <div class="grid grid-2 mb6" id="kpis"></div>
 
         <div class="grid mb6" style="grid-template-columns:1.6fr 1fr;align-items:start">
           <div class="card">
@@ -44,23 +44,14 @@
           </div>
         </div>
 
-        <div class="grid mb6" style="grid-template-columns:1fr 1fr;align-items:start">
+        <div class="mb6">
           <div class="card">
             <div class="card__header"><div><h3>Approval rate</h3><div class="sub">% of AI drafts approved without edits</div></div></div>
-            <div class="card__body"><div style="height:240px"><canvas id="apprChart"></canvas></div></div>
-          </div>
-          <div class="card">
-            <div class="card__header"><div><h3>Engagement rate</h3><div class="sub">Avg. engagement per post (%)</div></div></div>
-            <div class="card__body"><div style="height:240px"><canvas id="engChart"></canvas></div></div>
+            <div class="card__body"><div style="height:280px"><canvas id="apprChart"></canvas></div></div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card__header"><h3>Top performing content</h3><div class="spacer"></div><a class="tsm" style="color:var(--primary);font-weight:600" href="#">View all</a></div>
-          <div class="table-wrap" style="border:none;border-radius:0">
-            <table class="tbl"><thead><tr><th>Content</th><th>Website</th><th>Platform</th><th>Reach</th><th>Engagement</th><th>Published</th></tr></thead><tbody id="topBody"></tbody></table>
-          </div>
-        </div>
+        <!-- TOP PERFORMING SECTION REMOVED -->
 
       </main>
     </div>
@@ -69,11 +60,28 @@
   <script src="mock-data.js"></script>
   <script src="app.js"></script>
   <script>
-  (function () {
-    const C = window.Cadence, M = window.MOCK, I = C.icon;
+  (async function () {
+    const C = window.Cadence, API = window.CadenceAPI, M = window.MOCK, I = C.icon;
     const charts = {};
+    let liveWebsites = [];
+    let liveDrafts = [];
 
-    M.websites.forEach(w => { const o=document.createElement("option"); o.value=w.id; o.textContent=w.name; document.getElementById("aSite").appendChild(o); });
+    function mapPlatformName(plat) {
+      if (!plat) return 'Blog';
+      const low = plat.toLowerCase();
+      if (low === 'blog') return 'Blog';
+      if (low === 'linkedin') return 'LinkedIn';
+      if (low === 'youtube') return 'YouTube';
+      if (low === 'instagram') return 'Instagram';
+      if (low === 'facebook') return 'Facebook';
+      return plat;
+    }
+
+    function getSiteColor(siteId) {
+      const idx = parseInt(siteId) || 0;
+      const colors = ["#095075", "#0a66c2", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
+      return colors[idx % colors.length];
+    }
 
     function tc() { const cs=getComputedStyle(document.documentElement); return {
       primary:cs.getPropertyValue("--primary").trim(), text:cs.getPropertyValue("--text-muted").trim(),
@@ -90,83 +98,27 @@
       currentSiteId = siteId;
       currentRange = range;
 
-      const filteredContent = M.content.filter(c => siteId === "all" || c.site === siteId);
-      const publishedContent = filteredContent.filter(c => c.status === 'Published');
-
-      // KPIs calculation
+      const filteredContent = liveDrafts.filter(c => siteId === "all" || String(c.website) === String(siteId));
+      const publishedContent = filteredContent.filter(c => c.status.toLowerCase() === 'published');
       const pubCount = publishedContent.length;
-      
-      let sumEng = 0;
-      publishedContent.forEach(c => {
-        sumEng += 5.0 + (parseInt(c.id) % 7) * 1.1;
-      });
-      const avgEng = pubCount > 0 ? (sumEng / pubCount).toFixed(1) + "%" : "0.0%";
 
       const totalDrafts = filteredContent.length;
-      const approvedDrafts = filteredContent.filter(c => c.status === 'Approved' || c.status === 'Scheduled' || c.status === 'Published').length;
+      const approvedDrafts = filteredContent.filter(c => {
+        const s = c.status.toLowerCase();
+        return s === 'approved' || s === 'scheduled' || s === 'published';
+      }).length;
       const apprRate = totalDrafts > 0 ? Math.round((approvedDrafts / totalDrafts) * 100) : 100;
-
-      let sumReach = 0;
-      publishedContent.forEach(c => {
-        sumReach += (parseInt(c.id) || 1) * 12.3 + 5.1;
-      });
-      let reachStr = "0k";
-      if (sumReach >= 1000) {
-        reachStr = (sumReach / 1000).toFixed(1) + "M";
-      } else {
-        reachStr = sumReach.toFixed(1) + "k";
-      }
 
       // Renders KPIs cards
       document.getElementById("kpis").innerHTML = [
         { l:"Posts published", v:pubCount, d:"+22%", icon:"send", tile:"blog" },
-        { l:"Avg. engagement", v:avgEng, d:"+1.7pt", icon:"heart", tile:"linkedin" },
         { l:"Approval rate", v:apprRate + "%", d:"+13pt", icon:"check-check", tile:"youtube" },
-        { l:"Total reach", v:reachStr, d:"+34%", icon:"users", tile:"instagram" },
       ].map(s=>`<div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div>
         <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up">${I("trending-up")} ${s.d} <span class="muted">vs prev.</span></div></div>`).join("");
-
-      // Renders top content table
-      let top = publishedContent.length ? publishedContent.map(c => {
-        const siteObj = M.websites.find(w => w.id === c.site) || { name: 'General', color: '#095075' };
-        const idInt = parseInt(c.id) || 1;
-        const reachVal = (idInt * 12.3 + 5.1).toFixed(1);
-        const reach = `${reachVal}k`;
-        const engagement = `${(5.0 + (idInt % 7) * 1.1).toFixed(1)}%`;
-        const createdDate = new Date(c.created_at || Date.now());
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const dateStr = `${monthNames[createdDate.getMonth()]} ${createdDate.getDate()}`;
-        return [
-          c.title,
-          siteObj.name,
-          siteObj.color,
-          c.platform,
-          reach,
-          engagement,
-          dateStr
-        ];
-      }) : [];
-
-      if (publishedContent.length) {
-        top.sort((a, b) => parseFloat(b[5]) - parseFloat(a[5]));
-      }
-
-      const tableBody = document.getElementById("topBody");
-      if (top.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="cell-muted" style="text-align:center;padding:var(--s6)">No published posts found for this site.</td></tr>`;
-      } else {
-        tableBody.innerHTML = top.slice(0, 5).map(([t,s,col,p,r,e,d])=>{ const pm=M.platMeta(p);
-          return `<tr><td class="cell-strong" style="max-width:320px">${t}</td>
-            <td><span class="user-row"><span class="favicon" style="width:22px;height:22px;border-radius:5px;font-size:10px;background:${col}">${s[0]}</span><span class="tsm">${s}</span></span></td>
-            <td><span class="badge badge-neutral row gap2" style="display:inline-flex">${I(pm.icon,"style='width:13px;height:13px'")} ${p}</span></td>
-            <td class="mono">${r}</td><td class="mono" style="color:var(--success);font-weight:600">${e}</td><td class="cell-muted">${d}</td></tr>`;
-        }).join("");
-      }
 
       // Recalculate Weekly series data
       const nowObj = new Date();
       const publishedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
-      const engagementSeries = [0, 0, 0, 0, 0, 0, 0, 0];
       const approvalRateSeries = [0, 0, 0, 0, 0, 0, 0, 0];
       const totalSeries = [0, 0, 0, 0, 0, 0, 0, 0];
       const approvedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -179,22 +131,21 @@
         
         if (weekIndex >= 0 && weekIndex <= 7) {
           totalSeries[weekIndex]++;
-          if (c.status === 'Approved' || c.status === 'Scheduled' || c.status === 'Published') {
+          const s = c.status.toLowerCase();
+          if (s === 'approved' || s === 'scheduled' || s === 'published') {
             approvedSeries[weekIndex]++;
           }
-          if (c.status === 'Published') {
+          if (s === 'published') {
             publishedSeries[weekIndex]++;
-            engagementSeries[weekIndex] += 5.0 + (parseInt(c.id) % 7) * 1.1;
           }
         }
       });
 
       for (let i = 0; i < 8; i++) {
         if (publishedSeries[i] > 0) {
-          engagementSeries[i] = Number((engagementSeries[i] / publishedSeries[i]).toFixed(1));
+          // Keep array defined
         } else {
           publishedSeries[i] = 0;
-          engagementSeries[i] = 0;
         }
         if (totalSeries[i] > 0) {
           approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
@@ -203,10 +154,12 @@
         }
       }
 
-      const byPlatform = { Blog: 0, LinkedIn: 0, YouTube: 0, Instagram: 0 };
+      // Include YouTube in doughnut chart distribution
+      const byPlatform = { Blog: 0, LinkedIn: 0, Instagram: 0, YouTube: 0 };
       filteredContent.forEach(c => {
-        if (byPlatform[c.platform] !== undefined) {
-          byPlatform[c.platform]++;
+        const mapped = mapPlatformName(c.platform);
+        if (byPlatform[mapped] !== undefined) {
+          byPlatform[mapped]++;
         }
       });
       let totalPlatform = Object.values(byPlatform).reduce((a,b)=>a+b,0);
@@ -219,15 +172,37 @@
       const grad = vctx.getContext("2d").createLinearGradient(0,0,0,260); grad.addColorStop(0,t.primary+"4d"); grad.addColorStop(1,t.primary+"00");
       charts.vol = new Chart(vctx,{type:"line",data:{labels:M.weeks,datasets:[{data:publishedSeries,borderColor:t.primary,backgroundColor:grad,fill:true,tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:baseOpts(t)});
 
-      charts.plat = new Chart(document.getElementById("platChart"),{type:"doughnut",data:{labels:Object.keys(byPlatform),datasets:[{data:Object.values(byPlatform),backgroundColor:[t.blog,t.linkedin,t.youtube,t.instagram],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:"64%",plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}}}});
-      document.getElementById("platLegend").innerHTML=Object.entries(byPlatform).map(([k,v],i)=>`<div class="pl-row"><span class="lg-dot" style="background:${[t.blog,t.linkedin,t.youtube,t.instagram][i]}"></span><span class="pl-name">${k}</span><span class="pl-val mono">${totalPlatform > 0 ? Math.round(v/totalPlatform*100) : 0}%</span></div>`).join("");
+      charts.plat = new Chart(document.getElementById("platChart"),{type:"doughnut",data:{labels:Object.keys(byPlatform),datasets:[{data:Object.values(byPlatform),backgroundColor:[t.blog,t.linkedin,t.instagram],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:"64%",plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}}}});
+      document.getElementById("platLegend").innerHTML=Object.entries(byPlatform).map(([k,v],i)=>`<div class="pl-row"><span class="lg-dot" style="background:${[t.blog,t.linkedin,t.instagram][i]}"></span><span class="pl-name">${k}</span><span class="pl-val mono">${totalPlatform > 0 ? Math.round(v/totalPlatform*100) : 0}%</span></div>`).join("");
 
       charts.appr = new Chart(document.getElementById("apprChart"),{type:"line",data:{labels:M.weeks,datasets:[{data:approvalRateSeries,borderColor:t.success,backgroundColor:"transparent",tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:{...baseOpts(t),scales:{...baseOpts(t).scales,y:{...baseOpts(t).scales.y,min:50,max:100,ticks:{color:t.text,callback:v=>v+"%"}}}}});
 
-      charts.eng = new Chart(document.getElementById("engChart"),{type:"bar",data:{labels:M.weeks,datasets:[{data:engagementSeries,backgroundColor:t.primary,borderRadius:6,maxBarThickness:24}]},options:baseOpts(t)});
-
       setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()),90);
       C.refreshIcons();
+    }
+
+    // Initialize Page Data
+    try {
+      liveWebsites = await API.getWebsites();
+      
+      const siteSelect = document.getElementById("aSite");
+      siteSelect.innerHTML = '<option value="all">All websites</option>';
+      liveWebsites.forEach(w => {
+        const o = document.createElement("option");
+        o.value = w.id;
+        o.textContent = w.name;
+        siteSelect.appendChild(o);
+      });
+    } catch(err) {
+      console.error("Error loading websites:", err);
+      liveWebsites = M.websites;
+    }
+
+    try {
+      liveDrafts = await API.getDrafts();
+    } catch(err) {
+      console.error("Error loading drafts:", err);
+      liveDrafts = M.content;
     }
 
     updateAnalytics("all");
@@ -241,6 +216,31 @@
     document.getElementById("aSite").addEventListener("change", (e)=>{
       updateAnalytics(e.target.value);
       C.toast({type:"success",title:"Filtered analytics",desc:"Displaying data for " + e.target.options[e.target.selectedIndex].text});
+    });
+
+    // CSV Export handler
+    document.getElementById("exportBtn").addEventListener("click", () => {
+      const publishedContent = liveDrafts.filter(c => c.status.toLowerCase() === 'published' && (currentSiteId === "all" || String(c.website) === String(currentSiteId)));
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Title,Website,Platform,Published Date\n";
+      
+      publishedContent.forEach(c => {
+        const siteObj = liveWebsites.find(w => String(w.id) === String(c.website)) || { name: 'General' };
+        const createdDate = new Date(c.created_at || Date.now());
+        const dateStr = createdDate.toISOString().split('T')[0];
+        
+        const titleClean = c.title.replace(/"/g, '""');
+        csvContent += `"${titleClean}","${siteObj.name}","${mapPlatformName(c.platform)}","${dateStr}"\n`;
+      });
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `cadence_analytics_report_${currentSiteId}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      C.toast({ type: "success", title: "Report exported", desc: "Successfully generated and downloaded CSV report" });
     });
 
     C.refreshIcons();
