@@ -63,20 +63,65 @@ def inject_internal_links(new_draft):
     soup = BeautifulSoup(new_draft.body or '', 'html.parser')
     modified = False
     
+    used_anchors = set()
+    
     # 2. Match and link keywords
     for target in targets:
         title = target['title']
         tags = target['tags']
         post_url = target['url']
         
-        # Target keywords: exact title, title parts (split by colons/dashes), then tags of length >= 3
-        title_parts = [title] + [t.strip() for t in re.split(r'[:\-]', title) if t.strip() and t.strip() != title]
-        keywords = title_parts + [tag for tag in tags if tag and len(tag) >= 3]
+        # Target keywords: exact title, title parts, and tags
+        # Split by punctuation (excluding hyphens) and common transition words/prepositions to extract sub-phrases
+        delimiters = r'[:\?|,\.]|\b(?:help|achieve|for|in|on|with|by|and|to|is|are|the|how|why|about)\b'
+        parts = re.split(delimiters, title, flags=re.IGNORECASE)
+        
+        # Clean title parts and strip leading stop words
+        stop_words = {'how', 'why', 'the', 'a', 'an', 'what', 'is', 'are', 'about', 'to', 'for', 'in', 'on', 'with', 'by'}
+        extracted_parts = []
+        for p in parts:
+            p_clean = p.strip()
+            # Loop to strip leading stop words
+            while True:
+                words = p_clean.split()
+                if words and words[0].lower() in stop_words:
+                    words = words[1:]
+                    p_clean = " ".join(words)
+                else:
+                    break
+            if p_clean:
+                extracted_parts.append(p_clean)
+                
+        title_parts = [title] + extracted_parts
+        raw_keywords = title_parts + [tag for tag in tags if tag]
+        
+        # Filter keywords: must be multi-word phrases (>= 2 words) or specific terms (>= 6 chars and not generic)
+        common_generic = {
+            'differences', 'difference', 'digital', 'marketing', 'online', 'simple', 'steps', 
+            'immune', 'health', 'sleep', 'doctor', 'doctors', 'career', 'skills', 'balance', 
+            'tutors', 'teachers', 'nature', 'brief', 'guide', 'future', 'efficiency', 'innovation',
+            'support', 'impact', 'device', 'devices', 'unlocked', 'unleashed', 'diagnostics',
+            'complexity', 'businesses', 'automation', 'understanding', 'business', 'process'
+        }
+        keywords = []
+        for kw in raw_keywords:
+            kw_clean = kw.strip()
+            if not kw_clean:
+                continue
+            word_count = len(kw_clean.split())
+            if word_count >= 2:
+                keywords.append(kw_clean)
+            elif len(kw_clean) >= 6 and kw_clean.lower() not in common_generic:
+                keywords.append(kw_clean)
         
         linked = False
         for kw in keywords:
             if linked:
                 break
+                
+            # Prevent duplicate or overlapping links in the same article
+            if any(kw.lower() in anchor or anchor in kw.lower() for anchor in used_anchors):
+                continue
                 
             # Case-insensitive pattern matching whole words only
             pattern = re.compile(rf'\b({re.escape(kw)})\b', re.IGNORECASE)
@@ -89,8 +134,15 @@ def inject_internal_links(new_draft):
                 
                 match = pattern.search(text_node)
                 if match:
-                    matched_text = match.group(0)
                     start, end = match.span()
+                    
+                    # Prevent matching inside hyphenated compound words (e.g. Goal-based agents)
+                    has_leading_hyphen = start > 0 and text_node[start - 1] == '-'
+                    has_trailing_hyphen = end < len(text_node) and text_node[end] == '-'
+                    if has_leading_hyphen or has_trailing_hyphen:
+                        continue
+                        
+                    matched_text = match.group(0)
                     
                     # Split the text around the match
                     prev_text = text_node[:start]
@@ -109,6 +161,7 @@ def inject_internal_links(new_draft):
                     else:
                         text_node.extract()
                     
+                    used_anchors.add(matched_text.lower())
                     linked = True
                     modified = True
                     logger.info(f"Injected link to {post_url} for keyword '{kw}' in draft {new_draft.id}")

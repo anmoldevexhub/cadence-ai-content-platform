@@ -26,7 +26,6 @@
           <!-- Settings nav -->
           <nav class="set-nav" id="setNav">
             <button class="set-link active" data-s="profile"><i data-lucide="user"></i> Profile</button>
-
           </nav>
 
           <div class="set-content">
@@ -58,10 +57,6 @@
             </section>
 
 
-
-
-
-            <!-- CONNECTIONS PANEL REMOVED -->
 
             <div class="set-actions">
               <button class="btn btn-ghost" id="btnCancel">Cancel</button>
@@ -95,67 +90,80 @@
     };
 
     // Load initial profile data
-    document.getElementById("pName").value = localStorage.getItem("cadence.settings.name") || u.name || "";
-    document.getElementById("pEmail").value = localStorage.getItem("cadence.settings.email") || u.email || "";
-    document.getElementById("pJobTitle").value = localStorage.getItem("cadence.settings.jobTitle") || "Content Manager";
-    document.getElementById("pTimezone").value = localStorage.getItem("cadence.settings.timezone") || "(GMT+05:30) India (Kolkata)";
-    document.getElementById("pBio").value = localStorage.getItem("cadence.settings.bio") || "Managing content for specialty brands at Cadence.";
+    if (document.getElementById("pName")) document.getElementById("pName").value = localStorage.getItem("cadence.settings.name") || u.name || "";
+    if (document.getElementById("pEmail")) document.getElementById("pEmail").value = localStorage.getItem("cadence.settings.email") || u.email || "";
+    if (document.getElementById("pJobTitle")) document.getElementById("pJobTitle").value = localStorage.getItem("cadence.settings.jobTitle") || "Content Manager";
+    if (document.getElementById("pTimezone")) document.getElementById("pTimezone").value = localStorage.getItem("cadence.settings.timezone") || "(GMT+05:30) India (Kolkata)";
+    if (document.getElementById("pBio")) document.getElementById("pBio").value = localStorage.getItem("cadence.settings.bio") || "Managing content for specialty brands at Cadence.";
 
-    // Load scheduler data
-    document.getElementById("sRunDay").value = localStorage.getItem("cadence.settings.runDay") || "Monday";
-    document.getElementById("sRunTime").value = localStorage.getItem("cadence.settings.runTime") || "09:00";
-    document.getElementById("sAutoGenerate").checked = localStorage.getItem("cadence.settings.autoGenerate") !== "false";
-    document.getElementById("sAutoPublish").checked = localStorage.getItem("cadence.settings.autoPublish") !== "false";
+    // Load scheduler data (guarded)
+    const sRunDay = document.getElementById("sRunDay");
+    if (sRunDay) sRunDay.value = localStorage.getItem("cadence.settings.runDay") || "Monday";
+    const sRunTime = document.getElementById("sRunTime");
+    if (sRunTime) sRunTime.value = localStorage.getItem("cadence.settings.runTime") || "09:00";
+    const sAutoGenerate = document.getElementById("sAutoGenerate");
+    if (sAutoGenerate) sAutoGenerate.checked = localStorage.getItem("cadence.settings.autoGenerate") !== "false";
+    const sAutoPublish = document.getElementById("sAutoPublish");
+    if (sAutoPublish) sAutoPublish.checked = localStorage.getItem("cadence.settings.autoPublish") !== "false";
 
     function updateProfileAvatar() {
       const savedAv = localStorage.getItem("cadence.settings.avatar");
       const profAv = document.getElementById("profAv");
-      if (savedAv) {
-        profAv.innerHTML = `<img src="${savedAv}" alt="User Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:99px;">`;
-        profAv.style.background = "transparent";
-      } else {
-        profAv.textContent = u.initials;
-        profAv.style.background = u.color;
+      if (profAv) {
+        if (savedAv) {
+          profAv.innerHTML = `<img src="${savedAv}" alt="User Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:99px;">`;
+          profAv.style.background = "transparent";
+        } else {
+          profAv.textContent = u.initials;
+          profAv.style.background = u.color;
+        }
       }
     }
     updateProfileAvatar();
 
     // Wire avatar upload
-    document.getElementById("btnUploadPhoto").addEventListener("click", () => {
-      document.getElementById("avatarUpload").click();
-    });
-    document.getElementById("avatarUpload").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-          C.toast({ type: "error", title: "File too large", desc: "Max file size is 2MB" });
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = function (evt) {
-          const img = new Image();
-          img.onload = function () {
-            const canvas = document.createElement("canvas");
-            canvas.width = 150;
-            canvas.height = 150;
-            const ctx = canvas.getContext("2d");
-            
-            const size = Math.min(img.width, img.height);
-            const x = (img.width - size) / 2;
-            const y = (img.height - size) / 2;
-            ctx.drawImage(img, x, y, size, size, 0, 0, 150, 150);
-            
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-            localStorage.setItem("cadence.settings.avatar", dataUrl);
-            updateProfileAvatar();
-            C.mountShell(); // rebuilds the topbar and sidebar instantly
-            C.toast({ type: "success", title: "Photo uploaded successfully" });
+    const btnUploadPhoto = document.getElementById("btnUploadPhoto");
+    if (btnUploadPhoto) {
+      btnUploadPhoto.addEventListener("click", () => {
+        const avatarUpload = document.getElementById("avatarUpload");
+        if (avatarUpload) avatarUpload.click();
+      });
+    }
+    const avatarUpload = document.getElementById("avatarUpload");
+    if (avatarUpload) {
+      avatarUpload.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            C.toast({ type: "error", title: "File too large", desc: "Max file size is 2MB" });
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = function (evt) {
+            const img = new Image();
+            img.onload = function () {
+              const canvas = document.createElement("canvas");
+              canvas.width = 150;
+              canvas.height = 150;
+              const ctx = canvas.getContext("2d");
+              
+              const size = Math.min(img.width, img.height);
+              const x = (img.width - size) / 2;
+              const y = (img.height - size) / 2;
+              ctx.drawImage(img, x, y, size, size, 0, 0, 150, 150);
+              
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+              localStorage.setItem("cadence.settings.avatar", dataUrl);
+              updateProfileAvatar();
+              C.mountShell(); // rebuilds the topbar and sidebar instantly
+              C.toast({ type: "success", title: "Photo uploaded successfully" });
+            };
+            img.src = evt.target.result;
           };
-          img.src = evt.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
+          reader.readAsDataURL(file);
+        }
+      });
+    }
 
     function applyRole() { document.querySelectorAll(".super-only").forEach(e => e.classList.toggle("hide", C.store.role !== "super")); }
     applyRole();
@@ -215,15 +223,18 @@
       return [n, t, tm];
     });
 
-    document.getElementById("postTimes").innerHTML = times.map(([n,t,tm])=>`
-      <div class="chan-conn">
-        <span class="icon-tile tile-${t}">${I(getPlatIcon(n))}</span>
-        <div class="cc-meta">
-          <div class="cc-nm">${n}</div>
-          <div class="cc-st">Default daily posting time</div>
-        </div>
-        <input class="input post-time-input" data-platform="${t}" type="time" value="${tm}" style="width:130px"/>
-      </div>`).join("");
+    const postTimesEl = document.getElementById("postTimes");
+    if (postTimesEl) {
+      postTimesEl.innerHTML = times.map(([n,t,tm])=>`
+        <div class="chan-conn">
+          <span class="icon-tile tile-${t}">${I(getPlatIcon(n))}</span>
+          <div class="cc-meta">
+            <div class="cc-nm">${n}</div>
+            <div class="cc-st">Default daily posting time</div>
+          </div>
+          <input class="input post-time-input" data-platform="${t}" type="time" value="${tm}" style="width:130px"/>
+        </div>`).join("");
+    }
 
     // connections
     const defaultConns = [
@@ -240,8 +251,10 @@
       conns = defaultConns;
     }
 
+    const connListEl = document.getElementById("connList");
     function renderConnections() {
-      document.getElementById("connList").innerHTML = conns.map((c) => {
+      if (!connListEl) return;
+      connListEl.innerHTML = conns.map((c) => {
         const detailsHTML = c.connected && c.webhook_url
           ? `<div class="cc-st" style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); word-break:break-all; margin-top:2px;">Webhook: ${c.webhook_url}</div>`
           : `<div class="cc-st">${c.status}</div>`;
@@ -274,8 +287,10 @@
             renderConnections();
             C.toast({ type: "info", title: `${connItem.name} disconnected` });
           } else {
-            document.getElementById("connectModalPlatName").textContent = connItem.name;
-            document.getElementById("connectWebhookUrl").value = "";
+            const mPlatName = document.getElementById("connectModalPlatName");
+            if (mPlatName) mPlatName.textContent = connItem.name;
+            const mWebhookUrl = document.getElementById("connectWebhookUrl");
+            if (mWebhookUrl) mWebhookUrl.value = "";
             const saveBtn = document.getElementById("btnSaveSocialConn");
             if (saveBtn) saveBtn.dataset.key = key;
             C.openModal("connectSocialModal");
@@ -289,7 +304,8 @@
     if (btnSaveSocialConn) {
       btnSaveSocialConn.addEventListener("click", () => {
         const key = btnSaveSocialConn.dataset.key;
-        const url = document.getElementById("connectWebhookUrl").value.trim();
+        const mWebhookUrl = document.getElementById("connectWebhookUrl");
+        const url = mWebhookUrl ? mWebhookUrl.value.trim() : "";
         if (!url) {
           C.toast({ type: "error", title: "URL required", desc: "Please enter a valid webhook URL" });
           return;
@@ -308,106 +324,166 @@
     renderConnections();
 
     // theme buttons
-    document.getElementById("themeLight").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","light"); C.store.theme="light"; syncTheme(); window.dispatchEvent(new CustomEvent("themechange")); });
-    document.getElementById("themeDark").addEventListener("click", () => { document.documentElement.setAttribute("data-theme","dark"); C.store.theme="dark"; syncTheme(); window.dispatchEvent(new CustomEvent("themechange")); });
-    function syncTheme(){ const d=C.store.theme==="dark"; document.getElementById("themeDark").classList.toggle("active",d); document.getElementById("themeLight").classList.toggle("active",!d); }
+    const themeLightBtn = document.getElementById("themeLight");
+    const themeDarkBtn = document.getElementById("themeDark");
+    if (themeLightBtn) {
+      themeLightBtn.addEventListener("click", () => {
+        document.documentElement.setAttribute("data-theme","light");
+        C.store.theme="light";
+        syncTheme();
+        window.dispatchEvent(new CustomEvent("themechange"));
+      });
+    }
+    if (themeDarkBtn) {
+      themeDarkBtn.addEventListener("click", () => {
+        document.documentElement.setAttribute("data-theme","dark");
+        C.store.theme="dark";
+        syncTheme();
+        window.dispatchEvent(new CustomEvent("themechange"));
+      });
+    }
+    function syncTheme(){
+      const d = C.store.theme === "dark";
+      const tDark = document.getElementById("themeDark");
+      const tLight = document.getElementById("themeLight");
+      if (tDark) tDark.classList.toggle("active", d);
+      if (tLight) tLight.classList.toggle("active", !d);
+    }
     syncTheme();
     window.addEventListener("themechange", syncTheme);
 
     // cancel button
-    document.getElementById("btnCancel").addEventListener("click", () => {
-      location.href = "dashboard.html";
-    });
+    const btnCancel = document.getElementById("btnCancel");
+    if (btnCancel) {
+      btnCancel.addEventListener("click", () => {
+        location.href = "dashboard.html";
+      });
+    }
 
     // save changes
-    document.getElementById("saveSettings").addEventListener("click", async () => {
-      const name = document.getElementById("pName").value.trim();
-      const email = document.getElementById("pEmail").value.trim();
-      
-      const nameParts = name.split(/\s+/);
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      const jobTitle = document.getElementById("pJobTitle").value.trim();
-      const timezone = document.getElementById("pTimezone").value;
-      const bio = document.getElementById("pBio").value.trim();
-      const runDay = document.getElementById("sRunDay").value;
-      const runTime = document.getElementById("sRunTime").value;
-      const autoGen = document.getElementById("sAutoGenerate").checked;
-      const autoPub = document.getElementById("sAutoPublish").checked;
-      
-      // notification settings
-      const savedNotifs = [];
-      document.querySelectorAll(".notif-email").forEach(cb => {
-        const idx = cb.dataset.idx;
-        if (!savedNotifs[idx]) savedNotifs[idx] = {};
-        savedNotifs[idx].email = cb.checked;
-      });
-      document.querySelectorAll(".notif-inapp").forEach(cb => {
-        const idx = cb.dataset.idx;
-        if (!savedNotifs[idx]) savedNotifs[idx] = {};
-        savedNotifs[idx].inapp = cb.checked;
-      });
-
-      // posting times
-      const savedTimes = {};
-      document.querySelectorAll(".post-time-input").forEach(inp => {
-        const platform = inp.dataset.platform;
-        savedTimes[platform] = inp.value;
-      });
-      
-      // --- Always save to localStorage first (non-blocking) ---
-      localStorage.setItem("cadence.settings.name", name);
-      localStorage.setItem("cadence.settings.email", email);
-      localStorage.setItem("cadence.settings.jobTitle", jobTitle);
-      localStorage.setItem("cadence.settings.timezone", timezone);
-      localStorage.setItem("cadence.settings.bio", bio);
-      localStorage.setItem("cadence.settings.runDay", runDay);
-      localStorage.setItem("cadence.settings.runTime", runTime);
-      localStorage.setItem("cadence.settings.autoGenerate", autoGen);
-      localStorage.setItem("cadence.settings.autoPublish", autoPub);
-      localStorage.setItem("cadence.settings.notifications", JSON.stringify(savedNotifs));
-      localStorage.setItem("cadence.settings.postingTimes", JSON.stringify(savedTimes));
-
-      // Update name locally in mock data (so topbar & sidebar reflect new name immediately)
-      u.name = name || u.name;
-      const fi = firstName[0] || '';
-      const li = lastName[0] || '';
-      u.initials = (fi + li).toUpperCase() || u.initials;
-      u.email = email || u.email;
-      updateProfileAvatar();
-      C.mountShell();
-
-      // --- Try to persist profile to backend (soft failure) ---
-      try {
-        await CadenceAPI.request('/auth/me/', {
-          method: 'PATCH',
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            job_title: jobTitle,
-            timezone: timezone,
-            bio: bio
-          })
-        });
-        // Refresh local user cache from backend
-        await CadenceAPI.getMe();
-        await M.syncMockData();
-        const me = CadenceAPI.getUser();
-        if (me) {
-          u.name = (me.first_name + ' ' + me.last_name).trim() || u.name;
-          u.initials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || u.initials;
-          updateProfileAvatar();
-          C.mountShell();
+    const saveSettings = document.getElementById("saveSettings");
+    if (saveSettings) {
+      saveSettings.addEventListener("click", async () => {
+        const progressModal = document.getElementById("savingProgressModal");
+        const progressBar = document.getElementById("savingProgressBar");
+        const statusText = document.getElementById("savingStatusText");
+        
+        if (progressModal) {
+          if (progressBar) progressBar.style.width = "25%";
+          if (statusText) statusText.textContent = "Saving changes...";
+          C.openModal("savingProgressModal");
         }
-      } catch (apiErr) {
-        // Backend unavailable or token issue — settings are already saved locally
-        console.warn("Profile sync to backend failed (settings saved locally):", apiErr.message || apiErr);
-      }
+        
+        const pName = document.getElementById("pName");
+        const name = pName ? pName.value.trim() : "";
+        const pEmail = document.getElementById("pEmail");
+        const email = pEmail ? pEmail.value.trim() : "";
+        
+        const nameParts = name.split(/\s+/);
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        const pJobTitle = document.getElementById("pJobTitle");
+        const jobTitle = pJobTitle ? pJobTitle.value.trim() : "";
+        const pTimezone = document.getElementById("pTimezone");
+        const timezone = pTimezone ? pTimezone.value : "";
+        const pBio = document.getElementById("pBio");
+        const bio = pBio ? pBio.value.trim() : "";
+        
+        const sRunDay = document.getElementById("sRunDay");
+        const runDay = sRunDay ? sRunDay.value : "Monday";
+        const sRunTime = document.getElementById("sRunTime");
+        const runTime = sRunTime ? sRunTime.value : "09:00";
+        const sAutoGenerate = document.getElementById("sAutoGenerate");
+        const autoGen = sAutoGenerate ? sAutoGenerate.checked : true;
+        const sAutoPublish = document.getElementById("sAutoPublish");
+        const autoPub = sAutoPublish ? sAutoPublish.checked : true;
+        
+        // notification settings
+        const savedNotifs = [];
+        document.querySelectorAll(".notif-email").forEach(cb => {
+          const idx = cb.dataset.idx;
+          if (!savedNotifs[idx]) savedNotifs[idx] = {};
+          savedNotifs[idx].email = cb.checked;
+        });
+        document.querySelectorAll(".notif-inapp").forEach(cb => {
+          const idx = cb.dataset.idx;
+          if (!savedNotifs[idx]) savedNotifs[idx] = {};
+          savedNotifs[idx].inapp = cb.checked;
+        });
 
-      C.toast({ type:"success", title:"Settings saved successfully" });
-    });
+        // posting times
+        const savedTimes = {};
+        document.querySelectorAll(".post-time-input").forEach(inp => {
+          const platform = inp.dataset.platform;
+          savedTimes[platform] = inp.value;
+        });
+        
+        if (progressBar) progressBar.style.width = "60%";
+        
+        // --- Always save to localStorage first (non-blocking) ---
+        localStorage.setItem("cadence.settings.name", name);
+        localStorage.setItem("cadence.settings.email", email);
+        localStorage.setItem("cadence.settings.jobTitle", jobTitle);
+        localStorage.setItem("cadence.settings.timezone", timezone);
+        localStorage.setItem("cadence.settings.bio", bio);
+        localStorage.setItem("cadence.settings.runDay", runDay);
+        localStorage.setItem("cadence.settings.runTime", runTime);
+        localStorage.setItem("cadence.settings.autoGenerate", autoGen);
+        localStorage.setItem("cadence.settings.autoPublish", autoPub);
+        localStorage.setItem("cadence.settings.notifications", JSON.stringify(savedNotifs));
+        localStorage.setItem("cadence.settings.postingTimes", JSON.stringify(savedTimes));
+
+        // Update name locally in mock data (so topbar & sidebar reflect new name immediately)
+        u.name = name || u.name;
+        const fi = firstName[0] || '';
+        const li = lastName[0] || '';
+        u.initials = (fi + li).toUpperCase() || u.initials;
+        u.email = email || u.email;
+        updateProfileAvatar();
+        C.mountShell();
+
+        if (progressBar) progressBar.style.width = "85%";
+
+        // --- Try to persist profile to backend (soft failure) ---
+        try {
+          await CadenceAPI.request('/auth/me/', {
+            method: 'PATCH',
+            body: JSON.stringify({
+              first_name: firstName,
+              last_name: lastName,
+              email: email,
+              job_title: jobTitle,
+              timezone: timezone,
+              bio: bio
+            })
+          });
+          // Refresh local user cache from backend
+          await CadenceAPI.getMe();
+          await M.syncMockData();
+          const me = CadenceAPI.getUser();
+          if (me) {
+            u.name = (me.first_name + ' ' + me.last_name).trim() || u.name;
+            u.initials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || u.initials;
+            updateProfileAvatar();
+            C.mountShell();
+          }
+        } catch (apiErr) {
+          // Backend unavailable or token issue — settings are already saved locally
+          console.warn("Profile sync to backend failed (settings saved locally):", apiErr.message || apiErr);
+        }
+
+        if (progressBar) progressBar.style.width = "100%";
+        if (statusText) statusText.textContent = "Done!";
+
+        setTimeout(() => {
+          if (progressModal) {
+            C.closeModal("savingProgressModal");
+          }
+          C.toast({ type:"success", title:"Settings saved successfully" });
+        }, 150);
+      });
+    }
 
     C.refreshIcons();
   })();
@@ -435,6 +511,15 @@
     .notif-head .ctr { justify-self:center; }
     .notif-row .ctr { display:flex; justify-content:center; }
     .plan-banner { display:flex; align-items:center; justify-content:space-between; gap:var(--s4); padding:var(--s6); background:linear-gradient(120deg,var(--primary),#1e8fc6); flex-wrap:wrap; }
+    
+    /* Progress spinner animation */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .spin {
+      animation: spin 1.2s linear infinite;
+    }
   </style>
 
 
@@ -460,6 +545,20 @@
       <div class="modal__foot" style="display: flex; justify-content: flex-end; gap: var(--s2); padding: var(--s4) var(--s5); border-top: 1px solid var(--border);">
         <button class="btn btn-secondary" data-close-modal>Cancel</button>
         <button class="btn btn-primary" id="btnSaveSocialConn">Connect Channel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saving Progress Modal -->
+  <div class="modal-overlay" id="savingProgressModal">
+    <div class="modal" style="max-width: 380px; text-align: center; padding: var(--s7) var(--s6);">
+      <div style="margin-bottom: var(--s4); display: flex; justify-content: center;">
+        <i data-lucide="loader-2" class="spin" style="width: 42px; height: 42px; color: var(--primary);"></i>
+      </div>
+      <h3 style="margin-bottom: var(--s2); font-size: 18px; font-weight: 600;">Saving changes</h3>
+      <p class="muted tsm" id="savingStatusText" style="margin-bottom: var(--s5); font-size: 13px;">Updating settings...</p>
+      <div class="progress-bar-wrap" style="width: 100%; height: 6px; background: var(--bg-subtle); border-radius: var(--r-full); overflow: hidden;">
+        <div id="savingProgressBar" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; border-radius: var(--r-full);"></div>
       </div>
     </div>
   </div>

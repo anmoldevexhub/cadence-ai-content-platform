@@ -403,10 +403,10 @@
       });
     },
 
-    async submitIdea(websiteId, title, platform) {
+    async submitIdea(websiteId, title, platform, context = "") {
       return await request('/content/ideas/', {
         method: 'POST',
-        body: JSON.stringify({ website: websiteId, title, platform, status: 'pending' })
+        body: JSON.stringify({ website: websiteId, title, platform, context, status: 'pending' })
       });
     },
 
@@ -442,6 +442,12 @@
 
     async injectInternalLinks(id) {
       return await request(`/content/drafts/${id}/internal-links/`, {
+        method: 'POST'
+      });
+    },
+
+    async removeInternalLinks(id) {
+      return await request(`/content/drafts/${id}/remove-links/`, {
         method: 'POST'
       });
     },

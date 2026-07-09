@@ -68,7 +68,7 @@
   if (siteContent.length > 5) {
     pipelineHTML += `
       <div style="padding: var(--s3) 0 var(--s1); text-align: center; border-top: 1px solid var(--border); margin-top: var(--s2);">
-        <button class="btn btn-soft btn-sm" data-tab="generate" style="font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);">
+        <button class="btn btn-soft btn-sm" data-tab="drafts" style="font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);">
           View all ${siteContent.length} drafts
         </button>
       </div>`;
@@ -357,34 +357,7 @@
     });
   }
 
-  // Auto-schedule button
-  const wsAutoBtn = document.getElementById("wsAutoScheduleBtn");
-  if (wsAutoBtn) {
-    wsAutoBtn.addEventListener("click", async function() {
-      this.disabled = true;
-      this.innerHTML = `${I("loader-circle", "class='spin'")} Scheduling…`;
-      C.refreshIcons();
-      const approved = siteContent.filter(c => c.status === "Approved");
-      if (!approved.length) {
-        C.toast({ type: "info", title: "Nothing to schedule", desc: "No approved drafts available." });
-        this.disabled = false; this.innerHTML = `${I("wand-sparkles")} Auto-schedule`; C.refreshIcons();
-        return;
-      }
-      const now = new Date();
-      let scheduled = 0;
-      for (const draft of approved) {
-        const target = new Date();
-        target.setDate(target.getDate() + (scheduled % 5));
-        target.setHours(9 + scheduled, 0, 0, 0);
-        if (target <= now) { target.setDate(target.getDate() + 1); target.setHours(9, 0, 0, 0); }
-        try { await CadenceAPI.scheduleDraft(draft.id, target.toISOString()); scheduled++; } catch(e) { /* skip */ }
-      }
-      await M.syncMockData();
-      renderWorkspaceCalendar();
-      this.disabled = false; this.innerHTML = `${I("wand-sparkles")} Auto-schedule`; C.refreshIcons();
-      C.toast({ type: "success", title: `${scheduled} draft${scheduled !== 1 ? 's' : ''} scheduled` });
-    });
-  }
+
 
   // Edit-schedule modal save
   const wsEsSave = document.getElementById("esSave");
@@ -835,31 +808,42 @@
   async function checkCrawlStatus() {
     try {
       const res = await CadenceAPI.getCrawlStatus(site.id);
-      if (res.status === "done") {
+      if (res.status === "done" || res.status === "failed") {
         clearInterval(crawlInterval);
         crawlInterval = null;
         
-        // Refresh local mock data
-        await window.MOCK.syncMockData(site.id);
-        const updatedSite = window.MOCK.site(site.id);
-        if (updatedSite) {
-          site.style_guide = updatedSite.style_guide;
-          site.needs_crawl = updatedSite.needs_crawl;
-          site.scrape_status = updatedSite.scrape_status;
-          populateStyleGuideFields();
+        crawlBtn.disabled = false;
+        crawlBtn.innerHTML = `${I("refresh-cw")} Crawl website`;
+        C.refreshIcons();
+        C.closeModal("crawlProgressModal");
+        
+        if (res.status === "done") {
+          C.toast({ type: "success", title: "Crawl completed", desc: "Website style guide successfully extracted!" });
+        } else {
+          C.toast({ type: "error", title: "Crawl failed", desc: "Unable to parse website content." });
         }
         
-        crawlBtn.disabled = false;
-        crawlBtn.innerHTML = `${I("refresh-cw")} Crawl website`;
-        C.refreshIcons();
-        C.toast({ type: "success", title: "Crawl completed", desc: "Website style guide successfully extracted!" });
-      } else if (res.status === "failed") {
-        clearInterval(crawlInterval);
-        crawlInterval = null;
-        crawlBtn.disabled = false;
-        crawlBtn.innerHTML = `${I("refresh-cw")} Crawl website`;
-        C.refreshIcons();
-        C.toast({ type: "error", title: "Crawl failed", desc: "Unable to parse website content." });
+        // Refresh local mock data in background
+        try {
+          await window.MOCK.syncMockData(site.id);
+          const updatedSite = window.MOCK.site(site.id);
+          if (updatedSite) {
+            site.style_guide = updatedSite.style_guide;
+            site.needs_crawl = updatedSite.needs_crawl;
+            site.scrape_status = updatedSite.scrape_status;
+            populateStyleGuideFields();
+          }
+        } catch (syncErr) {
+          console.error("Failed to sync mock data in background:", syncErr);
+        }
+      } else {
+        const pBar = document.getElementById("crawlProgressBar");
+        if (pBar) {
+          let curWidth = parseFloat(pBar.style.width) || 25;
+          if (curWidth < 90) {
+            pBar.style.width = (curWidth + 15) + "%";
+          }
+        }
       }
     } catch (err) {
       console.error(err);
@@ -871,6 +855,11 @@
       crawlBtn.disabled = true;
       crawlBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Crawling...`;
       C.refreshIcons();
+      
+      const pBar = document.getElementById("crawlProgressBar");
+      if (pBar) pBar.style.width = "40%";
+      C.openModal("crawlProgressModal");
+      
       crawlInterval = setInterval(async () => {
         await checkCrawlStatus();
         if (site.scrape_status === "done") {
@@ -883,6 +872,11 @@
       crawlBtn.disabled = true;
       crawlBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Crawling...`;
       C.refreshIcons();
+      
+      const pBar = document.getElementById("crawlProgressBar");
+      if (pBar) pBar.style.width = "25%";
+      C.openModal("crawlProgressModal");
+      
       try {
         await CadenceAPI.triggerCrawl(site.id);
         C.toast({ type: "info", title: "Crawl started", desc: "Analyzing website style and page structure..." });
@@ -896,6 +890,7 @@
         crawlBtn.disabled = false;
         crawlBtn.innerHTML = `${I("refresh-cw")} Crawl website`;
         C.refreshIcons();
+        C.closeModal("crawlProgressModal");
         C.toast({ type: "error", title: "Failed to start crawl", desc: err.message });
       }
     });
@@ -1482,9 +1477,6 @@
         const saveBtn = document.getElementById("btnSaveSocialConn");
         if (saveBtn) saveBtn.dataset.plat = plat;
 
-        const testBtn = document.getElementById("btnTestSocialConn");
-        if (testBtn) testBtn.dataset.plat = plat;
-
         C.openModal("connectSocialModal");
       });
     });
@@ -1567,73 +1559,7 @@
     });
   }
 
-  // Bind Connect Social Modal Test Action
-  const btnTestSocialConn = document.getElementById("btnTestSocialConn");
-  if (btnTestSocialConn) {
-    btnTestSocialConn.addEventListener("click", async () => {
-      const plat = btnTestSocialConn.dataset.plat;
-      const url = document.getElementById("connectWebhookUrl").value.trim();
-      const statusEl = document.getElementById("connectModalTestStatus");
-      
-      if (!url) {
-        C.toast({ type: "error", title: "URL required", desc: "Please enter a valid URL to test" });
-        return;
-      }
 
-      statusEl.className = "";
-      statusEl.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:12px;height:12px;color:var(--text-muted)"></i> <span class="muted">Testing...</span>`;
-      C.refreshIcons();
-
-      let authType = 'none';
-      let authPayload = {};
-
-      if (plat === 'blog') {
-        authType = document.getElementById('connectAuthType').value;
-        if (authType === 'api_key') {
-          const api_key_name = document.getElementById('connect_api_key_name').value.trim();
-          const api_key_value = document.getElementById('connect_api_key_value').value.trim();
-          if (!api_key_name || !api_key_value) {
-            C.toast({ type: "error", title: "API Key required", desc: "Please fill in both key name and key value" });
-            statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Missing credentials</span>`;
-            C.refreshIcons();
-            return;
-          }
-          authPayload = { api_key_name, api_key_value };
-        } else if (authType === 'bearer_token') {
-          const token_value = document.getElementById('connect_bearer_token_value').value.trim();
-          if (!token_value) {
-            C.toast({ type: "error", title: "Token required", desc: "Please enter the bearer token" });
-            statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Missing credentials</span>`;
-            C.refreshIcons();
-            return;
-          }
-          authPayload = { token_value };
-        } else if (authType === 'basic_auth') {
-          const username = document.getElementById('connect_username').value.trim();
-          const password = document.getElementById('connect_password').value.trim();
-          if (!username || !password) {
-            C.toast({ type: "error", title: "Credentials required", desc: "Please enter both username and password" });
-            statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Missing credentials</span>`;
-            C.refreshIcons();
-            return;
-          }
-          authPayload = { username, password };
-        }
-      }
-
-      try {
-        const res = await CadenceAPI.testConnection(site.id, plat, url, authType, authPayload);
-        if (res && res.connected) {
-          statusEl.innerHTML = `<span style="color:var(--success); font-weight:500;"><i data-lucide="check-circle" style="width:14px;height:14px;color:var(--success);vertical-align:middle;"></i> Connected</span>`;
-        } else {
-          statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Failed</span>`;
-        }
-      } catch (err) {
-        statusEl.innerHTML = `<span style="color:var(--error); font-weight:500;"><i data-lucide="x-circle" style="width:14px;height:14px;color:var(--error);vertical-align:middle;"></i> Error</span>`;
-      }
-      C.refreshIcons();
-    });
-  }
 
   loadConnections();
 
@@ -2085,7 +2011,10 @@
       ? `<button class="btn btn-ghost btn-sm" data-act="reject" data-id="${d.id}">${I("x")} Reject</button>
          <button class="btn btn-ghost btn-sm" data-act="regen-content" data-id="${d.id}">${I("file-text")} Regen Content</button>
          ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("image")} Regen Image</button>` : ''}
-         ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>` : ''}
+         ${d.chan === "Blog" ? `
+            <button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>
+            <button class="btn btn-ghost btn-sm" data-act="remove-links" data-id="${d.id}">${I("link-2-off")} Remove Links</button>
+          ` : ''}
          <span class="spacer"></span>
          <button class="btn btn-secondary btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button>
          <button class="btn btn-success btn-sm" data-act="approve" data-id="${d.id}">${I("check")} Approve</button>`
@@ -2136,7 +2065,10 @@
              ? `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("video")} Regen Video</button>`
              : `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("image")} Regen Image</button>`
            }
-           ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>` : ''}
+           ${d.chan === "Blog" ? `
+            <button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>
+            <button class="btn btn-ghost btn-sm" data-act="remove-links" data-id="${d.id}">${I("link-2-off")} Remove Links</button>
+          ` : ''}
            <span class="spacer"></span>
            <button class="btn btn-secondary btn-sm" data-act="edit" data-id="${d.id}">${I("pencil")} Edit</button>
            <button class="btn btn-success btn-sm" data-act="approve" data-id="${d.id}">${I("check")} Approve</button>`
@@ -2176,7 +2108,10 @@
            ? `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("video")} Regen Video</button>`
            : `<button class="btn btn-ghost btn-sm" data-act="regen-image" data-id="${d.id}">${I("image")} Regen Image</button>`
          }
-         ${d.chan === "Blog" ? `<button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>` : ''}`
+         ${d.chan === "Blog" ? `
+            <button class="btn btn-ghost btn-sm" data-act="internal-links" data-id="${d.id}">${I("link")} Link References</button>
+            <button class="btn btn-ghost btn-sm" data-act="remove-links" data-id="${d.id}">${I("link-2-off")} Remove Links</button>
+          ` : ''}`
       : isScheduled
       ? `<button class="btn btn-ghost btn-sm" data-act="unschedule" data-id="${d.id}">${I("calendar-x")} Unschedule</button>`
       : '';
@@ -2420,6 +2355,28 @@
             C.refreshIcons();
           }
         }
+        else if (act === "remove-links") {
+          try {
+            b.disabled = true;
+            b.innerHTML = `${I("loader-circle", "class='spin' style='width:12px;height:12px'")} Removing...`;
+            C.refreshIcons();
+            const updated = await CadenceAPI.removeInternalLinks(d.id);
+            d.body = updated.body;
+            C.toast({ type: "success", title: "Links removed", desc: "Successfully removed all hyperlinks from the draft!" });
+            
+            // Update preview body directly
+            const bodyContainer = document.querySelector(".draft-preview-body");
+            if (bodyContainer) {
+              bodyContainer.innerHTML = previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+            }
+          } catch (err) {
+            C.toast({ type: "error", title: "Failed to remove links", desc: err.message });
+          } finally {
+            b.disabled = false;
+            b.innerHTML = `${I("link-2-off")} Remove Links`;
+            C.refreshIcons();
+          }
+        }
         else if (act === "edit" || act === "view") {
           openEdit(d);
         }
@@ -2486,7 +2443,7 @@
       widget.id = "globalTaskWidget";
       widget.style = `
         position: fixed;
-        bottom: 24px;
+        top: 76px;
         right: 24px;
         background: var(--surface);
         border: 1px solid var(--border-strong);
@@ -2746,6 +2703,9 @@
     const rawVal = document.getElementById("ideaTitle").value.trim();
     const titles = rawVal.split('\n').map(t => t.trim()).filter(t => t.length > 0);
     
+    const notesEl = document.getElementById("ideaNotes");
+    const notesVal = notesEl ? notesEl.value.trim() : "";
+    
     if (titles.length === 0) {
       titles.push(`New ${curChan} post about ${site.name}`);
     }
@@ -2760,7 +2720,7 @@
       const generatedIdeas = [];
       // Generate each title sequentially
       for (const title of titles) {
-        const idea = await CadenceAPI.submitIdea(site.id, title, curChan.toLowerCase());
+        const idea = await CadenceAPI.submitIdea(site.id, title, curChan.toLowerCase(), notesVal);
         await CadenceAPI.generateContent(idea.id);
         generatedIdeas.push({ id: idea.id, title: idea.title });
       }
@@ -2801,6 +2761,7 @@
       initGlobalTaskPoller();
 
       document.getElementById("ideaTitle").value = "";
+      if (document.getElementById("ideaNotes")) document.getElementById("ideaNotes").value = "";
     } catch (err) {
       console.error(err);
       C.toast({ type: "error", title: "Generation failed", desc: err.message });
@@ -3282,12 +3243,18 @@
     });
   }
 
-  /* ----- hero / tab buttons that jump to generate ----- */
-  document.querySelectorAll("[data-tab=generate]").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll(".ws-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "generate"));
-    document.querySelectorAll("#wsPanels .tab-panel").forEach(pp => pp.classList.toggle("active", pp.dataset.panel === "generate"));
-    document.getElementById("ideaTitle")?.focus();
-  }));
+  /* ----- hero / tab buttons that switch tabs ----- */
+  document.querySelectorAll("[data-tab]").forEach(b => {
+    if (b.classList.contains("tab")) return; // handled by app.js
+    b.addEventListener("click", () => {
+      const targetTab = b.dataset.tab;
+      document.querySelectorAll(".ws-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === targetTab));
+      document.querySelectorAll("#wsPanels .tab-panel").forEach(pp => pp.classList.toggle("active", pp.dataset.panel === targetTab));
+      if (targetTab === "generate") {
+        document.getElementById("ideaTitle")?.focus();
+      }
+    });
+  });
 
   function openImageLightbox(src) {
     let overlay = document.getElementById("imageLightboxOverlay");
@@ -3405,6 +3372,24 @@
       document.getElementById("usagePromptTokens").textContent = C.fmt(stats.prompt_tokens);
       document.getElementById("usageCompletionTokens").textContent = C.fmt(stats.completion_tokens);
       document.getElementById("usageTotalCost").textContent = `$${stats.total_cost.toFixed(2)}`;
+
+      // Update cost description dynamically based on actual models utilized
+      const costDesc = document.getElementById("usageCostDesc");
+      if (costDesc) {
+        const models = Object.keys(stats.model_breakdown || {});
+        if (models.length > 0) {
+          const names = models.map(m => {
+            if (m.toLowerCase().includes("gpt")) return "OpenAI";
+            if (m.toLowerCase().includes("gemini")) return "Gemini";
+            if (m.toLowerCase().includes("dall")) return "DALL-E";
+            return m;
+          });
+          const uniqueNames = [...new Set(names)];
+          costDesc.textContent = `Based on ${uniqueNames.join(" & ")} pricing`;
+        } else {
+          costDesc.textContent = "Based on model API pricing";
+        }
+      }
 
       // Weekly trend label
       const trendVal = document.getElementById("usageWeeklyTrend");

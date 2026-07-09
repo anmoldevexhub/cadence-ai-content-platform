@@ -120,6 +120,14 @@ body {
   text-rendering: optimizeLegibility;
 }
 a { color: inherit; text-decoration: none; }
+p a, .draft-body a, .content-editor a, .preview-body a {
+  color: var(--primary) !important;
+  text-decoration: none !important;
+  font-weight: 500;
+}
+p a:hover, .draft-body a:hover, .content-editor a:hover, .preview-body a:hover {
+  text-decoration: underline !important;
+}
 button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: none; }
 ul { list-style: none; }

@@ -401,7 +401,7 @@ window.MOCK = (function () {
       schedule,
       PLAT,
       platMeta: (p) => PLAT[p] || PLAT.Blog,
-      site: (id) => websites.find(w => w.id == id)
+      site: (id) => (window.MOCK && window.MOCK.websites ? window.MOCK.websites : websites).find(w => w.id == id)
     };
     document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return finalResult;

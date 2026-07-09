@@ -353,6 +353,33 @@ class InjectInternalLinksView(APIView):
         return Response(ContentDraftSerializer(draft).data)
 
 
+class RemoveInternalLinksView(APIView):
+    """
+    Strips all <a> tags from the draft blog post body, keeping the anchor text intact,
+    and saving the cleaned body back to the database.
+    """
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request, pk):
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Draft not found.'}, status=404)
+            
+        if draft.platform != 'blog':
+            return Response({'detail': 'Only blog drafts can have links removed.'}, status=400)
+            
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(draft.body or '', 'html.parser')
+        for a in soup.find_all('a'):
+            a.unwrap()
+        
+        draft.body = str(soup)
+        draft.save(update_fields=['body'])
+        
+        return Response(ContentDraftSerializer(draft).data)
+
+
 class TokenUsageStatsView(APIView):
     """
     Returns aggregated token and cost usage statistics for a specific website.

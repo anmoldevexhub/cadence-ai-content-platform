@@ -253,7 +253,6 @@
                   <button data-p="YouTube">YouTube</button>
                   <button data-p="Instagram">Instagram</button>
                 </div>
-                <button class="btn btn-primary btn-sm" id="wsAutoScheduleBtn"><i data-lucide="wand-sparkles"></i> Auto-schedule</button>
               </div>
             </div>
             <!-- Legend -->
@@ -295,7 +294,7 @@
                   <span class="tsm bold muted">Estimated Cost</span>
                 </div>
                 <div class="stat-card__val" id="usageTotalCost">$0.00</div>
-                <div class="stat-card__desc">Based on OpenAI & Gemini pricing</div>
+                <div class="stat-card__desc" id="usageCostDesc">Based on OpenAI & Gemini pricing</div>
               </div>
               <div class="stat-card">
                 <div class="stat-card__meta">
@@ -578,7 +577,6 @@
       </div>
       <div class="modal__foot" style="display: flex; justify-content: flex-end; gap: var(--s2); padding: var(--s4) var(--s5); border-top: 1px solid var(--border); align-items: center;">
         <span id="connectModalTestStatus" style="margin-right:auto; font-size:12px; display:flex; align-items:center; gap:6px;"></span>
-        <button class="btn btn-secondary" id="btnTestSocialConn">Test Connection</button>
         <button class="btn btn-primary" id="btnSaveSocialConn">Connect Channel</button>
       </div>
     </div>
@@ -762,6 +760,20 @@
       <div class="modal__foot">
         <button class="btn btn-ghost" data-close-modal>Cancel</button>
         <button class="btn btn-primary" id="esSave"><i data-lucide="calendar"></i> Update</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Crawl Progress Modal -->
+  <div class="modal-overlay" id="crawlProgressModal">
+    <div class="modal" style="max-width: 380px; text-align: center; padding: var(--s7) var(--s6);">
+      <div style="margin-bottom: var(--s4); display: flex; justify-content: center;">
+        <i data-lucide="loader-2" class="spin" style="width: 42px; height: 42px; color: var(--primary);"></i>
+      </div>
+      <h3 style="margin-bottom: var(--s2); font-size: 18px; font-weight: 600;">Crawling website</h3>
+      <p class="muted tsm" style="margin-bottom: var(--s5); font-size: 13px;">Analyzing website layout, styles, and extracting brand voice. This might take a few moments...</p>
+      <div class="progress-bar-wrap" style="width: 100%; height: 6px; background: var(--bg-subtle); border-radius: var(--r-full); overflow: hidden;">
+        <div id="crawlProgressBar" style="width: 25%; height: 100%; background: var(--primary); transition: width 0.5s ease; border-radius: var(--r-full);"></div>
       </div>
     </div>
   </div>

@@ -27,7 +27,6 @@
             <button class="btn btn-secondary" id="prevWeek"><i data-lucide="chevron-left"></i></button>
             <button class="btn btn-secondary" id="weekLabel" style="min-width:180px">Jun 9 – Jun 15, 2026</button>
             <button class="btn btn-secondary" id="nextWeek"><i data-lucide="chevron-right"></i></button>
-            <button class="btn btn-primary" id="autoBtn"><i data-lucide="wand-sparkles"></i> Auto-schedule week</button>
           </div>
         </div>
 
@@ -688,54 +687,7 @@
       }
     });
 
-    // auto-schedule: take approved drafts and distribute only on future/today dates of this week
-    document.getElementById("autoBtn").addEventListener("click", async function () {
-      this.disabled = true; this.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Scheduling…'; lucide.createIcons();
-      const approved = M.content.filter(c => c.status === "Approved" && userSiteIds.includes(String(c.site)));
-      
-      if (!approved.length) {
-        C.toast({ type: "info", title: "Nothing to schedule", desc: "No approved drafts are available for auto-scheduling." });
-        this.disabled = false; this.innerHTML = '<i data-lucide="wand-sparkles"></i> Auto-schedule week'; lucide.createIcons();
-        return;
-      }
 
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const availableDates = weekDates.filter(d => {
-        const checkDate = new Date(d);
-        checkDate.setHours(0, 0, 0, 0);
-        return checkDate >= todayStart;
-      });
-
-      if (!availableDates.length) {
-        C.toast({ type: "warning", title: "Auto-schedule blocked", desc: "All days in this week have already passed." });
-        this.disabled = false; this.innerHTML = '<i data-lucide="wand-sparkles"></i> Auto-schedule week'; lucide.createIcons();
-        return;
-      }
-
-      try {
-        for (let i = 0; i < approved.length; i++) {
-          const card = approved[i];
-          const targetDate = new Date(availableDates[i % availableDates.length]);
-          const round = Math.floor(i / availableDates.length);
-          const hour = 9 + (round * 4); // 9, 13, 17, 21...
-          targetDate.setHours(hour, 0, 0, 0);
-
-          await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
-        }
-        
-        await M.syncMockData();
-        loadCards();
-        render();
-        C.toast({ type: "success", title: "Week auto-scheduled", desc: `${approved.length} approved drafts distributed on remaining days` });
-      } catch (err) {
-        console.error(err);
-        C.toast({ type: "error", title: "Auto-scheduling failed", desc: err.message });
-      } finally {
-        this.disabled = false; this.innerHTML = '<i data-lucide="wand-sparkles"></i> Auto-schedule week'; lucide.createIcons();
-      }
-    });
 
     document.getElementById("prevWeek").addEventListener("click", () => {
       currentWeekOffset--;

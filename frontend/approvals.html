@@ -195,6 +195,25 @@
     </div>
   </div>
 
+  <!-- Large preview modal -->
+  <div class="modal-overlay" id="largePreviewModal">
+    <div class="modal lg" style="max-width: 960px; width: 95vw;">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3 id="largePreviewTitle">Preview Draft</h3>
+          <div class="sub" id="largePreviewSub">Full screen view</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding:var(--s6); overflow-y:auto; max-height:75vh;">
+        <div id="largePreviewBody"></div>
+      </div>
+      <div class="modal__foot" id="largePreviewFoot">
+        <button class="btn btn-primary" data-close-modal>Close preview</button>
+      </div>
+    </div>
+  </div>
+
   <script src="mock-data.js"></script>
   <script src="app.js"></script>
   <script>
@@ -782,25 +801,23 @@
       const isApproved = c.status === "Approved";
 
       el.innerHTML = `
-        <div class="card__header">
+        <div class="card__header" style="display:flex; align-items:center; justify-content:space-between; padding: 12px var(--s5);">
           <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
-          <div style="flex:1;min-width:0">
-            <h3 style="font-size:var(--fs-md)">${c.platform} draft</h3>
+          <div style="flex:1;min-width:0;margin-left:10px;">
+            <h3 style="font-size:var(--fs-md);margin-bottom:2px;">${c.platform} draft</h3>
             <div class="sub">${c.siteName} · status: <b>${c.status}</b></div>
           </div>
+          <button class="icon-btn btn-sm" id="maximizeApDraft" title="Full screen view" style="margin-right:4px;">${I("maximize-2")}</button>
         </div>
         <div class="card__body" id="prevBody" style="max-height:440px;overflow-y:auto">${platPreview(c)}</div>
         <div class="card__footer" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding: 12px var(--s5);">
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             ${!isApproved 
-              ? `<button class="btn btn-ghost btn-sm" id="rejectOne">${I("x")} Reject</button>
-                 <button class="btn btn-ghost btn-sm" id="regenContent">${I("file-text")} Regen Content</button>
-                 ${c.platform.toLowerCase() === 'blog' ? `<button class="btn btn-ghost btn-sm" id="regenImage">${I("image")} Regen Image</button>` : ''}`
+              ? `<button class="btn btn-ghost btn-sm" id="rejectOne">${I("x")} Reject</button>`
               : ''
             }
           </div>
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" id="editToggle">${I("pencil")} Edit</button>
             ${isApproved 
               ? `<button class="btn btn-primary btn-sm" id="scheduleOne">${I("calendar-plus")} Schedule</button>`
               : `<button class="btn btn-success btn-sm" id="approveOne">${I("check")} Approve</button>`
@@ -808,6 +825,9 @@
           </div>
         </div>`;
 
+      if (document.getElementById("maximizeApDraft")) {
+        document.getElementById("maximizeApDraft").addEventListener("click", () => openBigPreview(c));
+      }
       if (document.getElementById("approveOne")) {
         document.getElementById("approveOne").addEventListener("click", () => decide(c.id, "approve"));
       }
@@ -845,7 +865,8 @@
       }
       
       // Wire Edit button to open Rich Editor modal
-      document.getElementById("editToggle").addEventListener("click", () => {
+      if (document.getElementById("editToggle")) {
+        document.getElementById("editToggle").addEventListener("click", () => {
         editingDraft = c;
         
         // Populate fields
@@ -885,6 +906,7 @@
         C.openModal("editModal");
       });
     }
+  }
 
     function openScheduleModal(id, isFromApprovedTab = false) {
       document.getElementById("schedDraftId").value = id;
@@ -1052,6 +1074,48 @@
         renderList();
       }
     });
+
+    function openBigPreview(d) {
+      document.getElementById("largePreviewTitle").textContent = d.title;
+      document.getElementById("largePreviewSub").textContent = `${d.platform} · AI draft preview`;
+      
+      const bodyContainer = document.getElementById("largePreviewBody");
+      if (bodyContainer) {
+        bodyContainer.innerHTML = platPreview(d);
+      }
+      
+      const footContainer = document.getElementById("largePreviewFoot");
+      if (footContainer) {
+        const isApproved = d.status === "Approved";
+        const actions = !isApproved
+          ? `<button class="btn btn-ghost btn-sm" id="modalRejectOne">${I("x")} Reject</button>
+             <span class="spacer"></span>
+             <button class="btn btn-success btn-sm" id="modalApproveOne">${I("check")} Approve</button>`
+          : `<span class="spacer"></span><button class="btn btn-primary btn-sm" id="modalScheduleOne">${I("calendar-plus")} Schedule</button>`;
+        footContainer.innerHTML = actions;
+        
+        if (document.getElementById("modalApproveOne")) {
+          document.getElementById("modalApproveOne").addEventListener("click", () => {
+            decide(d.id, "approve");
+            C.closeModal("largePreviewModal");
+          });
+        }
+        if (document.getElementById("modalRejectOne")) {
+          document.getElementById("modalRejectOne").addEventListener("click", () => {
+            decide(d.id, "reject");
+            C.closeModal("largePreviewModal");
+          });
+        }
+        if (document.getElementById("modalScheduleOne")) {
+          document.getElementById("modalScheduleOne").addEventListener("click", () => {
+            openScheduleModal(d.id, true);
+            C.closeModal("largePreviewModal");
+          });
+        }
+      }
+      C.openModal("largePreviewModal");
+      C.refreshIcons();
+    }
 
     renderList(); renderPreview();
     C.refreshIcons();

@@ -29,7 +29,11 @@ def decrypt_value(encrypted_str: str) -> str:
     return f.decrypt(encrypted_str.encode('utf-8')).decode('utf-8')
 
 def test_connection_helper(platform, url, auth_type, auth_payload):
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+    }
     params = {}
     auth_credentials = None
 
@@ -84,8 +88,13 @@ def test_connection_helper(platform, url, auth_type, auth_payload):
             logger.warning(f"Connection test failed for URL {url} (auth_type: {auth_type}): HTTP {resp.status_code}")
             return False
             
-        # 200, 405 (Method Not Allowed), or 400 mean the endpoint is live and credentials did not reject us
-        return resp.status_code < 500
+        # 200 OK with HTML content type is likely a generic landing page/website rather than a publishing API
+        if resp.status_code == 200 and 'text/html' in resp.headers.get('Content-Type', '').lower():
+            logger.warning(f"Connection test failed: URL {url} returned a standard HTML webpage instead of an API/webhook response.")
+            return False
+            
+        # 200, 405 (Method Not Allowed), or 400 mean the endpoint is live and credentials did not reject us (excluding 404)
+        return resp.status_code in [200, 201, 202, 204, 400, 405]
 
     except Exception as e:
         logger.error(f"Error testing connection to URL {url} (auth_type: {auth_type}): {e}")

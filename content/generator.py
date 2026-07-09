@@ -12,7 +12,84 @@ from .models import ContentIdea, ContentDraft
 logger = logging.getLogger(__name__)
 client = OpenAI(api_key=config('OPENAI_API_KEY'), timeout=90.0, max_retries=5)
 
-MODEL = 'gpt-4o-mini'   # cheapest OpenAI model, ~$0.15/1M input tokens
+MODEL = config('AI_MODEL', default='gpt-4o-mini')
+
+def call_llm(prompt, system_prompt=None, max_tokens=600, temperature=0.7, json_mode=False, website=None, section='general'):
+    """Routes LLM request to OpenAI or Gemini depending on the configured model."""
+    model_name = config('AI_MODEL', default='gpt-4o-mini')
+    
+    if 'gemini' in model_name.lower():
+        import requests
+        import json
+        
+        api_key = config('GEMINI_API_KEY', default=config('GOOGLE_API_KEY', default=None))
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is not configured.")
+            
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        headers = {'Content-Type': 'application/json'}
+        
+        combined_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+        
+        payload = {
+            "contents": [{"parts": [{"text": combined_prompt}]}],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": temperature
+            }
+        }
+        
+        if json_mode:
+            payload["generationConfig"]["responseMimeType"] = "application/json"
+            
+        response = requests.post(url, headers=headers, json=payload, timeout=90)
+        response.raise_for_status()
+        result = response.json()
+        
+        # log token usage
+        usage = result.get('usageMetadata', {})
+        prompt_tokens = usage.get('promptTokenCount', 0)
+        completion_tokens = usage.get('candidatesTokenCount', 0)
+        if prompt_tokens or completion_tokens:
+            log_token_usage(website, section, model_name, prompt_tokens, completion_tokens)
+            
+        text = result['candidates'][0]['content']['parts'][0]['text']
+        if json_mode:
+            try:
+                return json.loads(text.strip())
+            except Exception:
+                # try cleaning markdown code block formatting
+                cleaned = text.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("\n", 1)[1].rsplit("\n", 1)[0].strip()
+                return json.loads(cleaned)
+        return text
+    else:
+        # OpenAI
+        messages = []
+        if system_prompt:
+            messages.append({'role': 'system', 'content': system_prompt})
+        messages.append({'role': 'user', 'content': prompt})
+        
+        args = {
+            'model': model_name,
+            'messages': messages,
+            'max_tokens': max_tokens,
+            'temperature': temperature,
+        }
+        if json_mode:
+            args['response_format'] = {"type": "json_object"}
+            
+        response = client.chat.completions.create(**args)
+        
+        if hasattr(response, 'usage') and response.usage:
+            log_token_usage(website, section, model_name, response.usage.prompt_tokens, response.usage.completion_tokens)
+            
+        text = response.choices[0].message.content.strip()
+        if json_mode:
+            import json
+            return json.loads(text)
+        return text
 
 
 def log_token_usage(website, section, model_name, prompt_tokens, completion_tokens):
@@ -62,15 +139,7 @@ Return a concise style guide (under 400 words) that an AI writer should follow
 when creating content for this website. Be specific and actionable."""
     
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{'role': 'user', 'content': prompt}],
-            max_tokens=600,
-            temperature=0.3,
-        )
-        if hasattr(response, 'usage') and response.usage:
-            log_token_usage(None, 'crawler_summary', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
-        return response.choices[0].message.content
+        return call_llm(prompt, max_tokens=600, temperature=0.3, section='crawler_summary')
     except Exception as e:
         logger.error(f"Failed to summarize website style: {e}")
         return (
@@ -1062,20 +1131,17 @@ Return ONLY valid JSON in the following format:
 # """
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt}
-            ],
+        content = call_llm(
+            user_prompt,
+            system_prompt=system_prompt,
+            max_tokens=4000,
             temperature=0.7,
-            response_format={"type": "json_object"}
+            json_mode=True,
+            website=website,
+            section='blog_generation'
         )
-        if hasattr(response, 'usage') and response.usage:
-            log_token_usage(website, 'blog_generation', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
-        content = json.loads(response.choices[0].message.content.strip())
         content['generation_prompt'] = user_prompt
-        content['ai_model'] = MODEL
+        content['ai_model'] = config('AI_MODEL', default='gpt-4o-mini')
         return content
     except Exception as e:
         logger.error(f"Failed to generate blog post with single prompt: {e}")
@@ -1137,23 +1203,17 @@ def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> 
  """
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt},
-            ],
+        content = call_llm(
+            user_prompt,
+            system_prompt=system_prompt,
             max_tokens=600,
             temperature=0.8,
-            response_format={"type": "json_object"},
+            json_mode=True,
+            website=website,
+            section='social_generation'
         )
-        
-        import json
-        if hasattr(response, 'usage') and response.usage:
-            log_token_usage(website, 'social_generation', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
-        content = json.loads(response.choices[0].message.content)
         content['generation_prompt'] = user_prompt
-        content['ai_model'] = MODEL
+        content['ai_model'] = config('AI_MODEL', default='gpt-4o-mini')
         return content
     except Exception as e:
         logger.warning(f"AI social post generation failed: {e}. Falling back to basic template.")
@@ -2467,17 +2527,13 @@ Extract the following details as a JSON object:
 Return ONLY a valid JSON object with these keys. Do NOT include markdown code blocks."""
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{'role': 'user', 'content': prompt}],
+        return call_llm(
+            prompt,
             max_tokens=600,
             temperature=0.3,
-            response_format={"type": "json_object"},
+            json_mode=True,
+            section='crawler_summary'
         )
-        import json
-        if hasattr(response, 'usage') and response.usage:
-            log_token_usage(None, 'crawler_summary', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
-        return json.loads(response.choices[0].message.content)
     except Exception as e:
         logger.error(f"Failed to analyze website context with GPT: {e}")
         return {
@@ -2512,17 +2568,14 @@ Return EXACTLY a JSON object with a single key "ideas" containing a list of 4 ob
 Return ONLY valid JSON. No code blocks or markdown."""
 
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{'role': 'user', 'content': prompt}],
+        data = call_llm(
+            prompt,
             max_tokens=500,
             temperature=0.7,
-            response_format={"type": "json_object"},
+            json_mode=True,
+            website=website,
+            section='idea_generation'
         )
-        import json
-        if hasattr(response, 'usage') and response.usage:
-            log_token_usage(website, 'idea_generation', MODEL, response.usage.prompt_tokens, response.usage.completion_tokens)
-        data = json.loads(response.choices[0].message.content)
         ideas = data.get("ideas", [])
         
         from content.models import ContentIdea
