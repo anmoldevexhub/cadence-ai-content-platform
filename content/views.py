@@ -220,6 +220,15 @@ class RegenerateDraftView(APIView):
         return Response({'status': 'regenerating', 'draft_id': pk, 'new_draft_id': new_draft_id})
 
 
+class RepublishDraftView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request, pk):
+        from .tasks import republish_published_post_task
+        republish_published_post_task.delay(pk)
+        return Response({'status': 'republishing', 'draft_id': pk})
+
+
 class ScheduleDraftView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
 

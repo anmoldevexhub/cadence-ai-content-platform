@@ -765,6 +765,7 @@ def generate_via_gemini(system_prompt: str, user_prompt: str) -> dict:
                 "type": "OBJECT",
                 "properties": {
                     "title": {"type": "STRING"},
+                    "meta_title": {"type": "STRING"},
                     "meta_description": {"type": "STRING"},
                     "category": {"type": "STRING"},
                     "tags": {
@@ -774,7 +775,7 @@ def generate_via_gemini(system_prompt: str, user_prompt: str) -> dict:
                     "excerpt": {"type": "STRING"},
                     "body": {"type": "STRING"}
                 },
-                "required": ["title", "meta_description", "category", "tags", "excerpt", "body"]
+                "required": ["title", "meta_title", "meta_description", "category", "tags", "excerpt", "body"]
             }
         }
     }
@@ -858,6 +859,184 @@ def generate_social_via_gemini(system_prompt: str, user_prompt: str) -> dict:
         raise ValueError("Invalid response format from Gemini")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BLOG VISUAL ELEMENTS INJECTOR
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _upload_bytes_to_imgbb(image_bytes: bytes, name: str) -> str:
+    """Uploads raw image bytes to imgbb and returns the permanent public URL."""
+    import base64, requests as _req
+    from decouple import config as _cfg
+    imgbb_key = _cfg('IMGBB_API_KEY', default='')
+    if not imgbb_key:
+        logger.warning("IMGBB_API_KEY not set — cannot upload infographic.")
+        return ""
+    try:
+        b64 = base64.b64encode(image_bytes).decode('utf-8')
+        resp = _req.post(
+            'https://api.imgbb.com/1/upload',
+            data={'key': imgbb_key, 'image': b64, 'name': name},
+            timeout=30
+        )
+        if resp.status_code == 200:
+            url = resp.json().get('data', {}).get('url', '')
+            if url:
+                logger.info(f"Infographic uploaded to imgbb: {url}")
+                return url
+    except Exception as e:
+        logger.warning(f"imgbb upload error: {e}")
+    return ""
+
+
+def _generate_infographic_image(description: str, topic: str) -> str:
+    """
+    Generates an infographic image via gpt-image-1-mini and uploads to imgbb.
+    Returns the permanent public URL or empty string on failure.
+    """
+    import uuid, requests as _req, base64
+    prompt = (
+        f"Create a clean, professional, modern infographic for a B2B blog article. "
+        f"Topic: '{topic}'. Visual focus: {description}. "
+        f"Style: flat design, corporate color palette (deep blue, white, orange accents), "
+        f"icon-based layout, clear typography, no stock photo backgrounds, no people. "
+        f"Include a minimal diagram, icons, or labeled boxes that visually summarize the key concepts. "
+        f"Make it look like a premium SaaS blog infographic. 16:9 widescreen layout."
+    )
+    try:
+        logger.info(f"Generating infographic image: {description[:80]}")
+        response = client.images.generate(
+            model="gpt-image-1-mini",
+            prompt=prompt,
+            n=1,
+            size="1536x1024"
+        )
+        img_bytes = None
+        b64_data = getattr(response.data[0], 'b64_json', None)
+        generated_url = response.data[0].url if response.data else None
+        if b64_data:
+            img_bytes = base64.b64decode(b64_data)
+        elif generated_url:
+            r = _req.get(generated_url, timeout=20)
+            if r.status_code == 200:
+                img_bytes = r.content
+        if img_bytes:
+            name = f"cadence_infographic_{uuid.uuid4().hex[:8]}"
+            return _upload_bytes_to_imgbb(img_bytes, name)
+    except Exception as e:
+        logger.warning(f"Infographic image generation failed: {e}")
+    return ""
+
+
+def _render_cta_banner(website) -> str:
+    """Returns a fully styled HTML CTA banner block linking to website's contact page."""
+    contact_url = f"{(website.url or '').rstrip('/')}/contact/"
+    site_name = website.name or "Us"
+    industry = website.industry or "business"
+    cta_text = f"Ready to see how {site_name} can help your {industry}?"
+    return f"""
+<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
+            border-radius:14px;padding:36px 44px;margin:44px 0;
+            display:flex;align-items:center;justify-content:space-between;
+            flex-wrap:wrap;gap:20px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+  <div>
+    <p style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;line-height:1.3;">
+      {cta_text}
+    </p>
+    <p style="color:#94a3b8;margin:0;font-size:15px;">
+      Talk to our team — no commitment needed.
+    </p>
+  </div>
+  <a href="{contact_url}" target="_blank"
+     style="background:#f97316;color:#ffffff;padding:14px 28px;border-radius:8px;
+            font-weight:700;text-decoration:none;white-space:nowrap;
+            display:inline-block;font-size:15px;letter-spacing:0.3px;">
+    Contact Us →
+  </a>
+</div>"""
+
+
+def _render_step_diagram(steps_raw: str) -> str:
+    """Converts 'Step1|Step2|Step3' pipe-separated string to styled HTML step flow."""
+    steps = [s.strip() for s in steps_raw.split('|') if s.strip()]
+    accent_colors = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4']
+    items_html = ""
+    for i, step in enumerate(steps):
+        color = accent_colors[i % len(accent_colors)]
+        items_html += f"""
+  <div style="background:#ffffff;border-radius:12px;padding:22px 16px;
+              flex:1;min-width:130px;max-width:200px;text-align:center;
+              border-top:4px solid {color};
+              box-shadow:0 2px 10px rgba(0,0,0,0.07);">
+    <div style="font-size:28px;font-weight:900;color:{color};line-height:1;">{str(i+1).zfill(2)}.</div>
+    <div style="font-weight:700;margin-top:10px;font-size:14px;color:#1e293b;line-height:1.4;">{step}</div>
+  </div>"""
+    return f"""
+<div style="display:flex;gap:12px;margin:36px 0;flex-wrap:wrap;justify-content:center;
+            align-items:stretch;">
+{items_html}
+</div>"""
+
+
+def _render_infographic_block(img_url: str, caption: str) -> str:
+    """Returns an HTML figure block embedding the infographic."""
+    return f"""
+<figure style="margin:40px 0;text-align:center;">
+  <img src="{img_url}" alt="{caption}"
+       style="max-width:100%;border-radius:14px;
+              box-shadow:0 6px 24px rgba(0,0,0,0.12);display:block;margin:0 auto;" />
+  <figcaption style="color:#64748b;font-size:13px;margin-top:10px;font-style:italic;">
+    {caption}
+  </figcaption>
+</figure>"""
+
+
+def inject_visual_elements(body: str, website, topic: str) -> str:
+    """
+    Post-processes a generated blog HTML body and replaces special markers with
+    rich visual elements:
+      - <!-- CADENCE_CTA --> → styled promotional CTA banner
+      - <!-- CADENCE_STEPS: Step1|Step2|Step3 --> → numbered step flow diagram
+      - <!-- CADENCE_INFOGRAPHIC: description --> → AI-generated image from gpt-image-1-mini
+    """
+    import re
+
+    # 1. Replace CTA markers
+    body = re.sub(
+        r'<!--\s*CADENCE_CTA\s*-->',
+        _render_cta_banner(website),
+        body,
+        flags=re.IGNORECASE
+    )
+
+    # 2. Replace step diagram markers
+    def _replace_steps(m):
+        return _render_step_diagram(m.group(1))
+    body = re.sub(
+        r'<!--\s*CADENCE_STEPS:\s*([^>]+?)\s*-->',
+        _replace_steps,
+        body,
+        flags=re.IGNORECASE
+    )
+
+    # 3. Replace infographic markers (generate image per marker)
+    def _replace_infographic(m):
+        description = m.group(1).strip()
+        img_url = _generate_infographic_image(description, topic)
+        if img_url:
+            return _render_infographic_block(img_url, description)
+        # Fallback: remove the marker silently if image gen fails
+        logger.warning(f"Infographic generation failed for: {description[:60]}")
+        return ""
+
+    body = re.sub(
+        r'<!--\s*CADENCE_INFOGRAPHIC:\s*([^>]+?)\s*-->',
+        _replace_infographic,
+        body,
+        flags=re.IGNORECASE
+    )
+
+    return body
+
 
 def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
     """Generates a full blog post using a single prompt approach."""
@@ -923,11 +1102,12 @@ OUTPUT
 Return ONLY valid JSON in the following format:
 {{
     "title": "A practitioner-level, engaging title matching the style guide",
+    "meta_title": "An SEO-friendly meta title under 60 characters, e.g. Title | Brand",
     "meta_description": "An engaging, natural SEO description under 160 characters",
     "category": "A relevant single-word or short phrase category (e.g., Marketing, Engineering)",
     "tags": ["tag1", "tag2"],
     "excerpt": "A brief 2-3 sentence overview of the article",
-    "body": "Your full, deep-dive article content formatted in clean HTML (containing only h2, h3, p, ul, ol, li, strong, a, and blockquote tags. No markdown formatting inside HTML)"
+    "body": "Your full, deep-dive article content formatted in clean HTML. CRITICAL WORD COUNT: The body MUST be 900–1200 words minimum — count every word carefully before finishing. Use 5–6 detailed H2 sections with multiple paragraphs each. Allowed tags: h2, h3, p, ul, ol, li, strong, a, blockquote, figure, figcaption, div. VISUAL MARKERS — embed these HTML comments naturally inside the body at appropriate positions (do NOT place them all at the end): (1) Place exactly one '<!-- CADENCE_CTA -->' somewhere mid-article between two sections where a call-to-action fits naturally (e.g. after explaining a problem or benefit). (2) If the article describes a process, workflow, or sequential steps, place '<!-- CADENCE_STEPS: Step One Title|Step Two Title|Step Three Title|Step Four Title -->' immediately after the paragraph that introduces the steps — use 3 to 6 pipe-separated step labels. (3) Place exactly one '<!-- CADENCE_INFOGRAPHIC: brief description of what the infographic should visually show -->' after the second or third H2 section where a diagram or visual overview would benefit the reader most. Each marker must appear only once. Keep all markers on their own line between HTML elements."
 }}
 """
 
@@ -1142,6 +1322,17 @@ Return ONLY valid JSON in the following format:
         )
         content['generation_prompt'] = user_prompt
         content['ai_model'] = config('AI_MODEL', default='gpt-4o-mini')
+
+        # Post-process: inject visual elements (CTA, step diagrams, infographics)
+        raw_body = content.get('body', '')
+        if raw_body:
+            try:
+                logger.info(f"Injecting visual elements for: {idea.title}")
+                content['body'] = inject_visual_elements(raw_body, website, idea.title)
+                logger.info('Visual element injection complete.')
+            except Exception as viz_err:
+                logger.warning(f"Visual injection failed (using raw body): {viz_err}")
+
         return content
     except Exception as e:
         logger.error(f"Failed to generate blog post with single prompt: {e}")
@@ -1748,9 +1939,27 @@ def build_svg_from_data(data: dict, website=None) -> str:
     return svg
 
 
+def choose_cta_text(title: str, category: str) -> str:
+    t_lower = title.lower() if title else ""
+    c_lower = category.lower() if category else ""
+    
+    if any(k in t_lower or k in c_lower for k in ["guide", "how to", "tutorial", "learn", "course", "what is"]):
+        return "LEARN MORE"
+    elif any(k in t_lower or k in c_lower for k in ["product", "feature", "pricing", "store", "buy", "order"]):
+        return "GET DETAILS"
+    elif any(k in t_lower or k in c_lower for k in ["analytics", "growth", "seo", "marketing", "business"]):
+        return "EXPLORE MORE"
+    elif any(k in t_lower or k in c_lower for k in ["about", "contact", "support", "help", "team"]):
+        return "MORE INFO"
+    else:
+        ctas = ["READ MORE", "LEARN MORE", "EXPLORE MORE", "GET DETAILS", "MORE INFO"]
+        idx = (len(title) + len(category or "")) % len(ctas)
+        return ctas[idx]
+
+
 def generate_dalle_prompt_via_gpt(title: str, category: str, excerpt: str, website=None, is_dark_logo=True) -> str:
     """Uses GPT-4o to write a highly creative, custom DALL-E 3 image generation prompt for the blog post."""
-    # Universal modern color defaults
+    cta_text = choose_cta_text(title, category)
     primary_color = "#0f172a"  # Slate/Dark Blue
     secondary_color = "#3b82f6"  # Royal Blue
     email = "info@devexhub.com"
@@ -1859,7 +2068,7 @@ CRITICAL BRANDING & COLOR DETAILS:
 - Brand Colors to use: {colors_desc}
   * IMPORTANT: You MUST strictly design the entire visual using these website colors so it integrates seamlessly with the website's brand identity. The primary brand color '{primary_color}' (or deep slate/charcoal if primary is neutral) MUST be the dominant, primary background color of the entire banner, extending 100% all the way to the absolute edges of the image canvas. The secondary brand color '{secondary_color}' (and other accents) MUST be used ONLY as an accent color for smaller detail highlights (like the text highlights, the button color, or small lighting glows in the illustration). Under NO circumstances should the secondary brand color '{secondary_color}' be used as an outer border, frame, margin, or padding surrounding the main content. This avoids creating a harsh or high-contrast border frame and ensures the layout is premium and elegant.
 - Contact Info: Do NOT write any contact details (email, phone, or website URL) on the banner. Leave the bottom area completely blank and clear.
-- Call-To-Action (CTA) Text: "Read More"
+- Call-To-Action (CTA) Text: "{cta_text}"
 
 DALL-E 3 PROMPT GENERATION INSTRUCTIONS:
 Generate a DALL-E 3 prompt describing a banner with the following layout, content, and quality requirements:
@@ -1881,7 +2090,7 @@ Generate a DALL-E 3 prompt describing a banner with the following layout, conten
 - Subtitle: Generate a short, compelling subtitle (maximum 8-10 words) that highlights the core value or benefit. Render it clearly under the headline.
 - **BODY DESCRIPTION / PARAGRAPH TEXT**: Beneath the subtitle, include a detailed, informative, and clean block of body text/paragraph (about 25-30 words, or 2-3 lines based on the blog excerpt: "{excerpt}") to give premium context. Ensure this text has excellent readability and spacing, making it look like a high-end corporate editorial magazine layout.
 - Typography should be high contrast, crisp, and easy to read, with excellent hierarchy and spacing.
-- CTA Section: Include a modern, rounded pill-shaped button at the bottom of the text panel that says "Read More" with a small arrow/chevron icon (->), styled in the accent color.
+- CTA Section: Include a modern, rounded pill-shaped button at the bottom of the text panel that says "{cta_text}" with a small arrow/chevron icon (->), styled in the accent color.
 
 3. BRAND INTEGRATION & EMPTY SPACES:
 - **STRICT LOGO SAFETY ZONE**: The entire top-left area of the banner (specifically from the top-left corner down to 20% of the height and extending to 25% of the width) MUST be completely empty, blank, and contain only the flat background color. {contrast_instruction} The headline/title text must begin strictly below this 20% height line, ensuring it never overlaps the company logo.
@@ -2352,7 +2561,7 @@ Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
             "theme": theme,
             "title_lines": title_lines,
             "subtext": f"A detailed guide to {title}.",
-            "cta_text": "READ MORE",
+            "cta_text": choose_cta_text(title, category),
             "laptop_screen": {
                 "title": "DEVEX",
                 "subtitle": "Knowledge Base"
@@ -2436,6 +2645,7 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
             body=content_data.get('body', ''),
             excerpt=content_data.get('excerpt', ''),
             meta_description=content_data.get('meta_description', ''),
+            meta_title=content_data.get('meta_title', content_data.get('title', idea.title)),
             tags=content_data.get('tags', []),
             ai_model=content_data.get('ai_model', MODEL),
             generation_prompt=content_data.get('generation_prompt', ''),
@@ -2484,6 +2694,7 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
                 body=body,
                 excerpt=excerpt,
                 meta_description=meta_desc,
+                meta_title=title_val,
                 tags=tags,
                 ai_model='local-fallback',
                 generation_prompt='Simulated Prompt (OpenAI Fallback)',

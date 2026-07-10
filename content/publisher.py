@@ -221,6 +221,7 @@ def send_to_make(scheduled_post: ScheduledPost) -> dict:
         'body': draft.body,
         'excerpt': draft.excerpt,
         'meta_description': draft.meta_description,
+        'meta_title': draft.meta_title or draft.title,
         'tags': draft.tags,
         'word_count': draft.word_count,
         'cover_image_url': public_image_url,   # permanent imgbb URL (no localhost)
@@ -271,7 +272,206 @@ def send_to_make(scheduled_post: ScheduledPost) -> dict:
     }
 
 
+def republish_to_custom_blog(draft, conn) -> dict:
+    """
+    Tries to update an existing live blog post for the given draft.
+
+    Flow:
+    1. Look up the external post ID from the ScheduledPost history.
+    2. Check if the connection has a separate update_webhook_url set.
+       - If yes → try to PUT/POST to that URL with the external ID appended.
+    3. If no update URL → try appending /<external_id>/ to the create URL and PUT.
+    4. If the update request fails with 404 / 405 (endpoint not found / method not allowed)
+       → fallback: POST to the original create URL to publish as a new post.
+    """
+    import json
+    from websites.utils import decrypt_value
+    from django.conf import settings
+
+    create_url = conn.make_webhook_url
+    auth_type = conn.auth_type
+
+    auth_payload = {}
+    if conn.auth_payload:
+        try:
+            auth_payload = json.loads(decrypt_value(conn.auth_payload))
+        except Exception as e:
+            logger.error(f"Failed to decrypt auth_payload for connection {conn.id}: {e}")
+
+    # Build auth header
+    headers = {}
+    params = {}
+    auth_credentials = None
+
+    if auth_type == 'api_key':
+        key_name = auth_payload.get('api_key_name', 'X-API-Key')
+        key_value = auth_payload.get('api_key_value', '')
+        headers[key_name] = key_value
+    elif auth_type == 'api_key_query':
+        key_name = auth_payload.get('api_key_name', 'api_key')
+        key_value = auth_payload.get('api_key_value', '')
+        params[key_name] = key_value
+    elif auth_type == 'bearer_token':
+        token = auth_payload.get('token_value', '')
+        headers['Authorization'] = f"Bearer {token}"
+    elif auth_type == 'basic_auth':
+        username = auth_payload.get('username', '')
+        password = auth_payload.get('password', '')
+        from requests.auth import HTTPBasicAuth
+        auth_credentials = HTTPBasicAuth(username, password)
+
+    is_form_data = auth_payload.get('payload_format') == 'form_data' or 'vidhyacore.com' in create_url.lower()
+
+    # ── Resolve external ID from previous publish history ───────────────────
+    from .models import ScheduledPost
+    external_id = None
+    try:
+        prev_sp = ScheduledPost.objects.filter(draft=draft, is_published=True).first()
+        if prev_sp and prev_sp.make_response:
+            blog_resp = prev_sp.make_response.get('blog', {})
+            if blog_resp:
+                raw_res = blog_resp.get('response', {})
+                if isinstance(raw_res, dict):
+                    if 'data' in raw_res and isinstance(raw_res['data'], dict):
+                        external_id = raw_res['data'].get('id')
+                    if not external_id:
+                        external_id = raw_res.get('id')
+                if not external_id:
+                    saved_id = blog_resp.get('id')
+                    if saved_id and str(saved_id) != str(draft.id):
+                        external_id = saved_id
+    except Exception as sp_err:
+        logger.warning(f"Could not retrieve previous ScheduledPost external ID: {sp_err}")
+
+    logger.info(f"Republish → draft={draft.id}, external_id={external_id}, create_url={create_url}")
+
+    # ── Build payload (shared for update + fallback) ─────────────────────────
+    def _make_form_payload(include_id=True):
+        tags_str = ", ".join(draft.tags) if isinstance(draft.tags, list) else (draft.tags or "")
+        email_val = conn.website.contact_email or (conn.website.owner.email if conn.website.owner else "")
+        meta_title = draft.meta_title or draft.title
+        if len(meta_title) > 60:
+            meta_title = meta_title[:57] + "..."
+        meta_desc = draft.meta_description or ""
+        if len(meta_desc) > 160:
+            meta_desc = meta_desc[:157] + "..."
+        payload = {
+            "title": draft.title,
+            "content": draft.body,
+            "description": draft.excerpt or draft.meta_description or draft.title,
+            "tags": tags_str,
+            "status": "PUBLISHED",
+            "metaTitle": meta_title,
+            "metaDescription": meta_desc,
+            "metaKeywords": tags_str,
+            "alt": draft.title,
+            "canonical": conn.website.url,
+            "email": email_val,
+        }
+        if include_id and external_id:
+            payload["id"] = str(external_id)
+            payload["draft_id"] = str(draft.id)
+            payload["external_id"] = str(external_id)
+        return payload
+
+    def _make_json_payload(include_id=True):
+        cover_image_url = upload_cover_image_to_imgbb(draft) or ""
+        word_count = draft.word_count or len(draft.body.split())
+        read_time_display = f"{max(1, round(word_count / 200))} min read"
+        payload = {
+            "title": draft.title,
+            "content": draft.body,
+            "excerpt": draft.excerpt or "",
+            "meta_description": draft.meta_description or "",
+            "meta_title": draft.meta_title or draft.title,
+            "category": draft.category or "Technology",
+            "read_time": read_time_display,
+            "author_name": draft.author_name or "Cadence Publisher",
+            "cover_image_url": cover_image_url,
+            "tags": draft.tags or [],
+            "flow": "all",
+        }
+        if include_id and external_id:
+            payload["id"] = external_id
+            payload["draft_id"] = draft.id
+            payload["external_id"] = external_id
+        return payload
+
+    def _do_request(method, req_url, use_form, include_id=True):
+        if use_form:
+            data_payload = _make_form_payload(include_id=include_id)
+            img_filepath = ""
+            if draft.cover_image:
+                rel = draft.cover_image.replace('/static/media/', '').replace('/static/', '')
+                if 'covers/' in draft.cover_image:
+                    img_filepath = os.path.join(settings.BASE_DIR, 'frontend', 'media', 'covers', os.path.basename(rel))
+                else:
+                    img_filepath = os.path.join(settings.BASE_DIR, 'frontend', 'media', os.path.basename(rel))
+            if img_filepath and os.path.exists(img_filepath):
+                import mimetypes
+                mime_type, _ = mimetypes.guess_type(img_filepath)
+                if not mime_type:
+                    mime_type = 'image/jpeg' if img_filepath.endswith(('.jpg', '.jpeg')) else 'image/png'
+                with open(img_filepath, 'rb') as f:
+                    files = {'image': (os.path.basename(img_filepath), f, mime_type)}
+                    return requests.request(method, req_url, data=data_payload, files=files,
+                                            headers=headers, params=params,
+                                            auth=auth_credentials if auth_type == 'basic_auth' else None,
+                                            timeout=60)
+            return requests.request(method, req_url, data=data_payload,
+                                    headers=headers, params=params,
+                                    auth=auth_credentials if auth_type == 'basic_auth' else None,
+                                    timeout=60)
+        else:
+            h = {**headers, "Content-Type": "application/json"}
+            return requests.request(method, req_url, json=_make_json_payload(include_id=include_id),
+                                    headers=h, params=params,
+                                    auth=auth_credentials if auth_type == 'basic_auth' else None,
+                                    timeout=30)
+
+    # ── Step 1: Try a dedicated update URL if configured ────────────────────
+    update_url = auth_payload.get('update_webhook_url', '').strip()
+    if update_url and external_id:
+        target = f"{update_url.rstrip('/')}/{external_id}/"
+        logger.info(f"Trying dedicated update URL: PUT {target}")
+        try:
+            resp = _do_request("PUT", target, is_form_data)
+            if resp.status_code < 400:
+                logger.info(f"Update via dedicated URL succeeded ({resp.status_code})")
+                result = resp.json() if resp.content else {}
+                return {"status_code": resp.status_code, "response": result, "url": target, "method": "PUT (update URL)"}
+            logger.warning(f"Dedicated update URL returned {resp.status_code}, will try fallback.")
+        except Exception as e:
+            logger.warning(f"Dedicated update URL request failed: {e}, will try fallback.")
+
+    # ── Step 2: Try appending external_id to the create URL (REST-style) ────
+    if external_id:
+        target = f"{create_url.rstrip('/')}/{external_id}/"
+        logger.info(f"Trying REST-style update: PUT {target}")
+        try:
+            resp = _do_request("PUT", target, is_form_data)
+            if resp.status_code < 400:
+                logger.info(f"REST-style update succeeded ({resp.status_code})")
+                result = resp.json() if resp.content else {}
+                return {"status_code": resp.status_code, "response": result, "url": target, "method": "PUT (id appended)"}
+            logger.warning(f"REST-style update returned {resp.status_code} — falling back to create.")
+        except Exception as e:
+            logger.warning(f"REST-style update request failed: {e} — falling back to create.")
+
+    # ── Step 3: Fallback → POST to create URL as a brand-new post (no ID) ───
+    # IMPORTANT: Send WITHOUT any ID fields so the target treats this as a fresh creation
+    logger.info(f"Fallback: POSTing to create URL WITHOUT ID fields: {create_url}")
+    resp = _do_request("POST", create_url, is_form_data, include_id=False)
+    if resp.status_code >= 400:
+        logger.error(f"Fallback create also failed ({resp.status_code}): {resp.text}")
+        resp.raise_for_status()
+    result = resp.json() if resp.content else {}
+    logger.info(f"Fallback create succeeded for draft {draft.id} (published as new post)")
+    return {"status_code": resp.status_code, "response": result, "url": create_url, "method": "POST (fallback create — new post)"}
+
+
 def publish_to_custom_blog(draft, conn) -> dict:
+
     """
     Publishes blog draft directly to the website's configured custom blog endpoint.
     Decrypts the auth_payload credentials and sends the request.
@@ -320,6 +520,30 @@ def publish_to_custom_blog(draft, conn) -> dict:
     is_form_data = auth_payload.get('payload_format') == 'form_data' or 'vidhyacore.com' in url.lower()
     clean_url = url
 
+    # Look up if this draft has a previously successful ScheduledPost response ID
+    from .models import ScheduledPost
+    external_id = None
+    try:
+        prev_sp = ScheduledPost.objects.filter(draft=draft, is_published=True).first()
+        if prev_sp and prev_sp.make_response:
+            blog_resp = prev_sp.make_response.get('blog', {})
+            if blog_resp:
+                raw_res = blog_resp.get('response', {})
+                if isinstance(raw_res, dict):
+                    if 'data' in raw_res and isinstance(raw_res['data'], dict):
+                        external_id = raw_res['data'].get('id')
+                    if not external_id:
+                        external_id = raw_res.get('id')
+                if not external_id:
+                    saved_id = blog_resp.get('id')
+                    if saved_id and str(saved_id) != str(draft.id):
+                        external_id = saved_id
+    except Exception as sp_err:
+        logger.warning(f"Could not retrieve previous ScheduledPost external ID: {sp_err}")
+
+    method = "POST"
+    clean_url = url
+
     if is_form_data:
         logger.info(f"Form-data target detected. Publishing via multipart/form-data to: {clean_url}")
         
@@ -337,7 +561,7 @@ def publish_to_custom_blog(draft, conn) -> dict:
         email_val = conn.website.contact_email or (conn.website.owner.email if conn.website.owner else "")
         
         # Safe truncation for meta SEO fields to avoid target DB constraints (usually VARCHAR(60) or VARCHAR(160))
-        meta_title = draft.title
+        meta_title = draft.meta_title or draft.title
         if len(meta_title) > 60:
             meta_title = meta_title[:57] + "..."
             
@@ -346,6 +570,9 @@ def publish_to_custom_blog(draft, conn) -> dict:
             meta_desc = meta_desc[:157] + "..."
 
         data_payload = {
+            "id": str(external_id or draft.id),
+            "draft_id": str(draft.id),
+            "external_id": str(external_id) if external_id else "",
             "title": draft.title,
             "content": draft.body,
             "description": draft.excerpt or draft.meta_description or draft.title,
@@ -368,7 +595,8 @@ def publish_to_custom_blog(draft, conn) -> dict:
                     if not mime_type:
                         mime_type = 'image/jpeg' if img_filepath.endswith(('.jpg', '.jpeg')) else 'image/png'
                     files = {'image': (os.path.basename(img_filepath), f, mime_type)}
-                    response = requests.post(
+                    response = requests.request(
+                        method,
                         clean_url,
                         data=data_payload,
                         files=files,
@@ -381,7 +609,8 @@ def publish_to_custom_blog(draft, conn) -> dict:
                 logger.error(f"Failed to post to Vidhya Core with file: {e}")
                 raise e
         else:
-            response = requests.post(
+            response = requests.request(
+                method,
                 clean_url,
                 data=data_payload,
                 headers=headers,
@@ -404,10 +633,14 @@ def publish_to_custom_blog(draft, conn) -> dict:
         read_time_display = f"{read_time_minutes} min read"
 
         json_payload = {
+            "id": external_id or draft.id,
+            "draft_id": draft.id,
+            "external_id": external_id or "",
             "title": draft.title,
             "content": draft.body,
             "excerpt": draft.excerpt or "",
             "meta_description": draft.meta_description or "",
+            "meta_title": draft.meta_title or draft.title,
             "category": draft.category or "Technology",
             "read_time": read_time_display,
             "author_name": draft.author_name or "Cadence Publisher",
@@ -417,8 +650,9 @@ def publish_to_custom_blog(draft, conn) -> dict:
         }
 
         logger.info(f"Dispatching standard custom blog post to {url}...")
-        response = requests.post(
-            url,
+        response = requests.request(
+            method,
+            clean_url,
             json=json_payload,
             headers=headers,
             params=params,
@@ -437,9 +671,20 @@ def publish_to_custom_blog(draft, conn) -> dict:
 
     logger.info(f"Custom blog post completed successfully for draft {draft.id}")
 
+    ext_id = None
+    if isinstance(result, dict):
+        if 'data' in result and isinstance(result['data'], dict):
+            ext_id = result['data'].get('id')
+        if not ext_id:
+            ext_id = result.get('id')
+        if not ext_id:
+            resp_sub = result.get('response')
+            if isinstance(resp_sub, dict):
+                ext_id = resp_sub.get('id')
+
     return {
         'status_code': response.status_code,
         'response': result,
         'url': result.get('url', url) if isinstance(result, dict) else url,
-        'id': result.get('id', str(draft.id)) if isinstance(result, dict) else str(draft.id),
+        'id': str(ext_id) if ext_id else str(draft.id),
     }

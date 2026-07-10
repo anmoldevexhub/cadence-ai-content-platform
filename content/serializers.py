@@ -29,7 +29,7 @@ class ContentDraftSerializer(serializers.ModelSerializer):
         model = ContentDraft
         fields = [
             'id', 'idea', 'website', 'website_name', 'platform', 'platform_display',
-            'title', 'body', 'excerpt', 'meta_description', 'tags', 'word_count',
+            'title', 'body', 'excerpt', 'meta_description', 'meta_title', 'tags', 'word_count',
             'status', 'status_display', 'reviewed_by', 'reviewed_by_name',
             'reviewed_at', 'rejection_reason', 'ai_model', 'generation_prompt',
             'cover_image', 'category', 'is_deleted', 'created_at', 'updated_at',

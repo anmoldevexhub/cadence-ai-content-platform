@@ -18,6 +18,7 @@ urlpatterns = [
     path('drafts/<int:pk>/regenerate/', views.RegenerateDraftView.as_view()),
     path('drafts/<int:pk>/schedule/', views.ScheduleDraftView.as_view()),
     path('drafts/<int:pk>/unschedule/', views.UnscheduleDraftView.as_view()),
+    path('drafts/<int:pk>/republish/', views.RepublishDraftView.as_view()),
     path('drafts/<int:pk>/internal-links/', views.InjectInternalLinksView.as_view()),
     path('drafts/<int:pk>/remove-links/', views.RemoveInternalLinksView.as_view()),
 

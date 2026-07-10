@@ -470,6 +470,35 @@
         item.custom_date
       );
     }
+    const footContainer = document.getElementById("largePreviewFoot");
+    if (footContainer) {
+      footContainer.innerHTML = `
+        <button class="btn btn-secondary btn-sm" id="editPublishedPostBtn">${I("edit-3")} Edit Published Post</button>
+        ${item.platform === "Blog" ? `<button class="btn btn-success btn-sm" id="republishPostBtn">${I("rotate-cw")} Republish</button>` : ''}
+        <span class="spacer"></span>
+        <button class="btn btn-primary btn-sm" data-close-modal>Close preview</button>
+      `;
+      C.refreshIcons();
+      document.getElementById("editPublishedPostBtn").addEventListener("click", () => {
+        C.closeModal("largePreviewModal");
+        openEdit(item);
+      });
+      const repubBtn = document.getElementById("republishPostBtn");
+      if (repubBtn) {
+        repubBtn.addEventListener("click", async () => {
+          try {
+            repubBtn.disabled = true;
+            C.toast({ type: "info", title: "Updating Live Post", desc: "Pushing changes to the website..." });
+            await CadenceAPI.republishDraft(item.id);
+            C.toast({ type: "success", title: "Republish Succeeded", desc: "Your live blog has been updated!" });
+            C.closeModal("largePreviewModal");
+          } catch(err) {
+            repubBtn.disabled = false;
+            C.toast({ type: "error", title: "Republish Failed", desc: err.message });
+          }
+        });
+      }
+    }
     C.openModal("largePreviewModal");
   };
 
@@ -2956,161 +2985,520 @@
     });
   }
 
-  // Rich Text Editor Toolbar Listeners
-  const editorToolbar = document.getElementById("editorToolbar");
-  if (editorToolbar) {
-    editorToolbar.querySelectorAll("[data-cmd]").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        const cmd = btn.dataset.cmd;
-        document.execCommand(cmd, false, null);
-        document.getElementById("editBodyRich").focus();
+  function initPremiumEditor() {
+    const editModal = document.getElementById("editModal");
+    if (!editModal) return;
+
+    // 1. Sidebar Tab Switcher
+    const btnSettings = document.getElementById("tabBtnSettings");
+    const btnAI = document.getElementById("tabBtnAI");
+    const contentSettings = document.getElementById("tabContentSettings");
+    const contentAI = document.getElementById("tabContentAI");
+
+    if (btnSettings && btnAI) {
+      btnSettings.addEventListener("click", () => {
+        btnSettings.classList.add("active");
+        btnAI.classList.remove("active");
+        contentSettings.style.display = "flex";
+        contentAI.style.display = "none";
       });
-    });
-
-    editorToolbar.querySelectorAll("[data-block]").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        const block = btn.dataset.block;
-        document.execCommand("formatBlock", false, block);
-        document.getElementById("editBodyRich").focus();
-      });
-    });
-
-    let savedRange = null;
-    const saveSelection = () => {
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        savedRange = selection.getRangeAt(0);
-      }
-    };
-    const restoreSelection = () => {
-      if (savedRange) {
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(savedRange);
-      }
-    };
-
-    const richBody = document.getElementById("editBodyRich");
-    if (richBody) {
-      richBody.addEventListener("mouseup", saveSelection);
-      richBody.addEventListener("keyup", saveSelection);
-    }
-
-    const foreColorInput = document.getElementById("tb-forecolor");
-    if (foreColorInput) {
-      foreColorInput.addEventListener("input", (e) => {
-        restoreSelection();
-        const color = e.target.value;
-        document.execCommand("foreColor", false, color);
+      btnAI.addEventListener("click", () => {
+        btnAI.classList.add("active");
+        btnSettings.classList.remove("active");
+        contentAI.style.display = "flex";
+        contentSettings.style.display = "none";
       });
     }
 
-    const backColorInput = document.getElementById("tb-backcolor");
-    if (backColorInput) {
-      backColorInput.addEventListener("input", (e) => {
-        restoreSelection();
-        const color = e.target.value;
-        if (!document.execCommand("hiliteColor", false, color)) {
-          document.execCommand("backColor", false, color);
+    // 2. Drag & Drop Cover Image
+    const coverPreview = document.getElementById("editCoverPreview");
+    const coverUrlInput = document.getElementById("editCoverUrl");
+    const coverFileInput = document.getElementById("editCoverFile");
+
+    if (coverPreview) {
+      coverPreview.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        coverPreview.classList.add("dragover");
+      });
+      coverPreview.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        coverPreview.classList.add("dragover");
+      });
+      coverPreview.addEventListener("dragleave", () => {
+        coverPreview.classList.remove("dragover");
+      });
+      coverPreview.addEventListener("drop", (e) => {
+        e.preventDefault();
+        coverPreview.classList.remove("dragover");
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+          const file = files[0];
+          if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const dataUrl = event.target.result;
+              coverUrlInput.value = dataUrl;
+              coverPreview.style.backgroundImage = `url("${dataUrl}")`;
+              coverPreview.innerHTML = "";
+              C.toast({ type: "success", title: "Cover uploaded", desc: "Drag & drop cover loaded successfully." });
+              updateStats();
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      });
+
+      coverPreview.addEventListener("click", (e) => {
+        if (e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT") {
+          coverFileInput.click();
         }
       });
     }
-    
-    const tbLink = document.getElementById("tb-link");
-    if (tbLink) {
-      tbLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        restoreSelection();
-        const sanitizeUrl = (u) => {
-          if (!u) return u;
-          const t = u.trim();
-          if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(t)) return t;
-          return "https://" + t;
-        };
+
+    // 3. Stats & SEO Engine
+    const editTitle = document.getElementById("editTitle");
+    const editBody = document.getElementById("editBodyRich");
+    const metaDesc = document.getElementById("editMetaDescription");
+
+    function getCleanText(html) {
+      const temp = document.createElement("div");
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || "";
+    }
+
+    function updateStats() {
+      const titleText = editTitle ? editTitle.value.trim() : "";
+      const bodyHTML = editBody ? editBody.innerHTML : "";
+      const bodyText = getCleanText(bodyHTML).trim();
+      
+      const words = bodyText ? bodyText.split(/\s+/).filter(w => w.length > 0).length : 0;
+      const chars = bodyText.length;
+      const readTime = Math.max(1, Math.ceil(words / 200));
+
+      const wordCountEl = document.getElementById("wordCount");
+      const charCountEl = document.getElementById("charCount");
+      const readTimeEl = document.getElementById("readTime");
+      
+      if (wordCountEl) wordCountEl.textContent = words;
+      if (charCountEl) charCountEl.textContent = chars;
+      if (readTimeEl) readTimeEl.textContent = readTime;
+
+      let score = 0;
+      if (titleText.length >= 30 && titleText.length <= 70) score += 25;
+      else if (titleText.length > 0) score += 10;
+
+      if (words > 300) score += 25;
+      else if (words > 100) score += 15;
+      else if (words > 0) score += 5;
+
+      const metaText = metaDesc ? metaDesc.value.trim() : "";
+      if (metaText.length >= 100 && metaText.length <= 160) score += 25;
+      else if (metaText.length > 0) score += 10;
+
+      if (bodyHTML.includes("<h2") || bodyHTML.includes("<h3")) score += 15;
+
+      const coverUrl = coverUrlInput ? coverUrlInput.value.trim() : "";
+      if (coverUrl) score += 10;
+
+      const seoScoreEl = document.getElementById("seoScore");
+      const seoBadgeEl = document.getElementById("seoScoreBadge");
+      if (seoScoreEl) seoScoreEl.textContent = `${score}/100`;
+      
+      if (seoBadgeEl) {
+        seoBadgeEl.className = "seo-badge";
+        if (score >= 80) seoBadgeEl.classList.add("good");
+        else if (score >= 50) seoBadgeEl.classList.add("average");
+        else seoBadgeEl.classList.add("poor");
+      }
+    }
+
+    if (editTitle) editTitle.addEventListener("input", updateStats);
+    if (editBody) {
+      editBody.addEventListener("input", updateStats);
+      editBody.addEventListener("keyup", updateStats);
+      editBody.addEventListener("click", (e) => {
+        const link = e.target.closest("a");
+        if (link) {
+          e.preventDefault();
+          window.open(link.href, "_blank");
+        }
+      });
+    }
+    if (metaDesc) metaDesc.addEventListener("input", updateStats);
+
+    window.updatePremiumEditorStats = updateStats;
+
+    // Rich Text Editor Toolbar Listeners
+    const editorToolbar = document.getElementById("editorToolbar");
+    if (editorToolbar) {
+      editorToolbar.querySelectorAll("[data-cmd]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          const cmd = btn.dataset.cmd;
+          document.execCommand(cmd, false, null);
+          editBody.focus();
+          updateStats();
+        });
+      });
+
+      editorToolbar.querySelectorAll("[data-block]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          const block = btn.dataset.block;
+          document.execCommand("formatBlock", false, block);
+          editBody.focus();
+          updateStats();
+        });
+      });
+
+      let savedRange = null;
+      const saveSelection = () => {
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          const selectedText = range.toString().trim();
-          
-          if (selectedText.length > 0) {
-            const url = prompt("Enter the link URL (e.g., https://google.com):");
-            if (url) {
-              restoreSelection();
-              document.execCommand("createLink", false, sanitizeUrl(url));
-            }
-          } else {
-            const linkText = prompt("Enter link text:");
-            if (linkText) {
+          savedRange = selection.getRangeAt(0);
+        }
+      };
+      const restoreSelection = () => {
+        if (savedRange) {
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(savedRange);
+        }
+      };
+
+      if (editBody) {
+        editBody.addEventListener("mouseup", saveSelection);
+        editBody.addEventListener("keyup", saveSelection);
+      }
+
+      const foreColorInput = document.getElementById("tb-forecolor");
+      if (foreColorInput) {
+        foreColorInput.addEventListener("input", (e) => {
+          restoreSelection();
+          const color = e.target.value;
+          document.execCommand("foreColor", false, color);
+          updateStats();
+        });
+      }
+
+      const backColorInput = document.getElementById("tb-backcolor");
+      if (backColorInput) {
+        backColorInput.addEventListener("input", (e) => {
+          restoreSelection();
+          const color = e.target.value;
+          if (!document.execCommand("hiliteColor", false, color)) {
+            document.execCommand("backColor", false, color);
+          }
+          updateStats();
+        });
+      }
+      
+      const tbLink = document.getElementById("tb-link");
+      if (tbLink) {
+        tbLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          restoreSelection();
+          const sanitizeUrl = (u) => {
+            if (!u) return u;
+            const t = u.trim();
+            if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(t)) return t;
+            return "https://" + t;
+          };
+          const selection = window.getSelection();
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const selectedText = range.toString().trim();
+            
+            if (selectedText.length > 0) {
               const url = prompt("Enter the link URL (e.g., https://google.com):");
               if (url) {
                 restoreSelection();
-                const a = document.createElement("a");
-                a.href = sanitizeUrl(url);
-                a.textContent = linkText;
-                a.target = "_blank";
-                range.insertNode(a);
-                // Move cursor after the inserted link
-                range.setStartAfter(a);
-                range.setEndAfter(a);
-                selection.removeAllRanges();
-                selection.addRange(range);
+                document.execCommand("createLink", false, sanitizeUrl(url));
+              }
+            } else {
+              const linkText = prompt("Enter link text:");
+              if (linkText) {
+                const url = prompt("Enter the link URL (e.g., https://google.com):");
+                if (url) {
+                  restoreSelection();
+                  const a = document.createElement("a");
+                  a.href = sanitizeUrl(url);
+                  a.textContent = linkText;
+                  a.target = "_blank";
+                  range.insertNode(a);
+                  range.setStartAfter(a);
+                  range.setEndAfter(a);
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                }
               }
             }
           }
-        }
-        document.getElementById("editBodyRich").focus();
-      });
-    }
-    
-    const tbImg = document.getElementById("tb-image");
-    if (tbImg) {
-      tbImg.addEventListener("click", (e) => {
-        e.preventDefault();
-        restoreSelection();
-        const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
-        if (url) {
+          editBody.focus();
+          updateStats();
+        });
+      }
+      
+      const tbImg = document.getElementById("tb-image");
+      if (tbImg) {
+        tbImg.addEventListener("click", (e) => {
+          e.preventDefault();
           restoreSelection();
-          document.execCommand("insertImage", false, url);
-          document.getElementById("editBodyRich").focus();
-        } else if (url === "") {
-          const inlineFileInput = document.getElementById("inlineImageFile");
-          if (inlineFileInput) inlineFileInput.click();
+          const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
+          if (url) {
+            restoreSelection();
+            document.execCommand("insertImage", false, url);
+            editBody.focus();
+            updateStats();
+          } else if (url === "") {
+            const inlineFileInput = document.getElementById("inlineImageFile");
+            if (inlineFileInput) inlineFileInput.click();
+          }
+        });
+      }
+
+      const inlineFileInput = document.getElementById("inlineImageFile");
+      if (inlineFileInput) {
+        inlineFileInput.addEventListener("change", (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              restoreSelection();
+              const base64 = event.target.result;
+              document.execCommand("insertImage", false, base64);
+              editBody.focus();
+              updateStats();
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+    }
+
+    // 4. Floating Selection Formatting Toolbar
+    let selectionToolbar = document.getElementById("floatingSelectionToolbar");
+    if (!selectionToolbar) {
+      selectionToolbar = document.createElement("div");
+      selectionToolbar.id = "floatingSelectionToolbar";
+      selectionToolbar.className = "floating-format-bar";
+      selectionToolbar.style.display = "none";
+      selectionToolbar.innerHTML = `
+        <button type="button" class="tb-btn" data-fcmd="bold" title="Bold"><i data-lucide="bold"></i></button>
+        <button type="button" class="tb-btn" data-fcmd="italic" title="Italic"><i data-lucide="italic"></i></button>
+        <button type="button" class="tb-btn" data-fcmd="underline" title="Underline"><i data-lucide="underline"></i></button>
+        <span class="tb-sep"></span>
+        <button type="button" class="tb-btn" id="floatingLinkBtn" title="Link"><i data-lucide="link"></i></button>
+      `;
+      document.body.appendChild(selectionToolbar);
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    selectionToolbar.querySelectorAll("[data-fcmd]").forEach(btn => {
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand(btn.dataset.fcmd, false, null);
+        updateStats();
+      });
+    });
+
+    const flLinkBtn = document.getElementById("floatingLinkBtn");
+    if (flLinkBtn) {
+      flLinkBtn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const url = prompt("Enter URL:");
+          if (url) {
+            document.execCommand("createLink", false, url);
+            updateStats();
+          }
         }
       });
     }
 
-    const inlineFileInput = document.getElementById("inlineImageFile");
-    if (inlineFileInput) {
-      inlineFileInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            restoreSelection();
-            const base64 = event.target.result;
-            document.execCommand("insertImage", false, base64);
-            document.getElementById("editBodyRich").focus();
-          };
-          reader.readAsDataURL(file);
+    if (editBody) {
+      document.addEventListener("selectionchange", () => {
+        const selection = window.getSelection();
+        if (!selection.isCollapsed && editBody.contains(selection.anchorNode)) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          
+          selectionToolbar.style.display = "flex";
+          selectionToolbar.style.top = `${window.scrollY + rect.top - 45}px`;
+          selectionToolbar.style.left = `${window.scrollX + rect.left + (rect.width/2) - (selectionToolbar.offsetWidth/2)}px`;
+        } else {
+          setTimeout(() => {
+            const activeSelection = window.getSelection();
+            if (activeSelection.isCollapsed || !editBody.contains(activeSelection.anchorNode)) {
+              selectionToolbar.style.display = "none";
+            }
+          }, 100);
         }
       });
     }
+
+    // 5. Slash Commands Menu
+    let slashMenu = document.getElementById("slashCommandsMenu");
+    if (!slashMenu) {
+      slashMenu = document.createElement("div");
+      slashMenu.id = "slashCommandsMenu";
+      slashMenu.className = "slash-commands-menu";
+      slashMenu.style.display = "none";
+      slashMenu.innerHTML = `
+        <div class="slash-category">Text Blocks</div>
+        <button type="button" class="slash-item" data-cmd="h2">
+          <i data-lucide="heading-1"></i>
+          <div>
+            <span class="slash-title">Heading 1</span>
+            <span class="slash-desc">Large section heading</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="h3">
+          <i data-lucide="heading-2"></i>
+          <div>
+            <span class="slash-title">Heading 2</span>
+            <span class="slash-desc">Medium subsection heading</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="p">
+          <i data-lucide="text"></i>
+          <div>
+            <span class="slash-title">Paragraph</span>
+            <span class="slash-desc">Plain body text</span>
+          </div>
+        </button>
+        <div class="slash-category">Lists &amp; Media</div>
+        <button type="button" class="slash-item" data-cmd="ul">
+          <i data-lucide="list"></i>
+          <div>
+            <span class="slash-title">Bulleted List</span>
+            <span class="slash-desc">Create a simple bulleted list</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="ol">
+          <i data-lucide="list-ordered"></i>
+          <div>
+            <span class="slash-title">Numbered List</span>
+            <span class="slash-desc">Create a numbered list</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="quote">
+          <i data-lucide="quote"></i>
+          <div>
+            <span class="slash-title">Blockquote</span>
+            <span class="slash-desc">Add styled quote block</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="img">
+          <i data-lucide="image"></i>
+          <div>
+            <span class="slash-title">Inline Image</span>
+            <span class="slash-desc">Insert image by URL</span>
+          </div>
+        </button>
+      `;
+      document.body.appendChild(slashMenu);
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    let selectedIndex = 0;
+    function updateMenuFocus() {
+      const items = slashMenu.querySelectorAll(".slash-item");
+      items.forEach((item, index) => {
+        item.classList.toggle("focused", index === selectedIndex);
+      });
+    }
+
+    if (editBody) {
+      editBody.addEventListener("keyup", (e) => {
+        if (e.key === "/") {
+          const selection = window.getSelection();
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            slashMenu.style.display = "flex";
+            slashMenu.style.top = `${window.scrollY + rect.bottom + 8}px`;
+            slashMenu.style.left = `${window.scrollX + rect.left}px`;
+            selectedIndex = 0;
+            updateMenuFocus();
+          }
+        } else if (slashMenu.style.display !== "none") {
+          if (e.key === "Escape") {
+            slashMenu.style.display = "none";
+          }
+        }
+      });
+
+      editBody.addEventListener("keydown", (e) => {
+        if (slashMenu.style.display !== "none") {
+          const items = slashMenu.querySelectorAll(".slash-item");
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            selectedIndex = (selectedIndex + 1) % items.length;
+            updateMenuFocus();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+            updateMenuFocus();
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const focusedItem = items[selectedIndex];
+            if (focusedItem) focusedItem.click();
+          }
+        }
+      });
+    }
+
+    slashMenu.querySelectorAll(".slash-item").forEach(item => {
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        const cmd = item.dataset.cmd;
+        
+        if (editBody) {
+          const text = editBody.innerHTML;
+          editBody.innerHTML = text.replace(/\/$/, "");
+        }
+
+        if (cmd === "h2" || cmd === "h3" || cmd === "p") {
+          document.execCommand("formatBlock", false, cmd);
+        } else if (cmd === "ul") {
+          document.execCommand("insertUnorderedList", false, null);
+        } else if (cmd === "ol") {
+          document.execCommand("insertOrderedList", false, null);
+        } else if (cmd === "quote") {
+          document.execCommand("formatBlock", false, "blockquote");
+        } else if (cmd === "img") {
+          const url = prompt("Enter Image URL:");
+          if (url) document.execCommand("insertImage", false, url);
+        }
+
+        slashMenu.style.display = "none";
+        if (editBody) editBody.focus();
+        updateStats();
+      });
+    });
+
+    document.addEventListener("mousedown", (e) => {
+      if (!slashMenu.contains(e.target) && editBody && !editBody.contains(e.target)) {
+        slashMenu.style.display = "none";
+      }
+    });
   }
+
+  // Run initPremiumEditor on load
+  initPremiumEditor();
 
   function openEdit(d) {
     editing = d;
     document.getElementById("editSub").textContent = `${d.chan} · ${d.title}`;
     document.getElementById("editTitle").value = d.title;
     
-    // Load body into rich editor
     const richBody = document.getElementById("editBodyRich");
     if (richBody) {
       richBody.innerHTML = d.body || "";
     }
     
-    // Customize cover image section for video if channel is YouTube
     const cardTitle = document.getElementById("coverCardTitle");
     const urlLabel = document.getElementById("coverUrlLabel");
     const isVideo = d.chan === "YouTube" || (d.cover_image && (d.cover_image.toLowerCase().endsWith(".mp4") || d.cover_image.toLowerCase().endsWith(".webm") || d.cover_image.startsWith("data:video/")));
@@ -3142,11 +3530,9 @@
       }
     }
     
-    // Load tags
     activeEditorTags = Array.isArray(d.tags) ? [...d.tags] : [];
     renderEditorTags();
 
-    // Load metadata settings
     const editAuthor = document.getElementById("editAuthor");
     if (editAuthor) {
       editAuthor.value = d.author_name || site.name || "";
@@ -3158,6 +3544,18 @@
     const editCategory = document.getElementById("editCategory");
     if (editCategory) {
       editCategory.value = d.category || site.industry || "Marketing";
+    }
+    const editMetaDesc = document.getElementById("editMetaDescription");
+    if (editMetaDesc) {
+      editMetaDesc.value = d.meta_description || "";
+    }
+    const editMetaTitle = document.getElementById("editMetaTitle");
+    if (editMetaTitle) {
+      editMetaTitle.value = d.meta_title || "";
+    }
+    
+    if (window.updatePremiumEditorStats) {
+      window.updatePremiumEditorStats();
     }
     
     C.openModal("editModal");
@@ -3172,9 +3570,11 @@
       const author_name = document.getElementById("editAuthor") ? document.getElementById("editAuthor").value.trim() : "";
       const custom_date = document.getElementById("editDate") ? document.getElementById("editDate").value.trim() : "";
       const category = document.getElementById("editCategory") ? document.getElementById("editCategory").value.trim() : "";
+      const meta_description = document.getElementById("editMetaDescription") ? document.getElementById("editMetaDescription").value.trim() : "";
+      const meta_title = document.getElementById("editMetaTitle") ? document.getElementById("editMetaTitle").value.trim() : "";
       
       try {
-        await CadenceAPI.updateDraft(editing.id, { title, body, cover_image, tags, author_name, custom_date, category });
+        await CadenceAPI.updateDraft(editing.id, { title, body, cover_image, tags, author_name, custom_date, category, meta_description, meta_title });
         editing.title = title;
         editing.body = body;
         editing.cover_image = cover_image;
@@ -3182,11 +3582,19 @@
         editing.author_name = author_name;
         editing.custom_date = custom_date;
         editing.category = category;
+        editing.meta_description = meta_description;
+        editing.meta_title = meta_title;
         
         await window.MOCK.syncMockData(site.id);
         drafts = window.MOCK.content.filter(x => x.site === site.id);
         renderDrafts();
-        C.toast({ type: "success", title: "Changes saved" });
+        if (window.renderPub) window.renderPub();
+        
+        if (editing.status === "Published" || editing.status === "published") {
+          C.toast({ type: "success", title: "Changes saved locally", desc: "Your edits are saved. Click 'Republish' on the post preview to push updates live!" });
+        } else {
+          C.toast({ type: "success", title: "Changes saved" });
+        }
       } catch (err) {
         C.toast({ type: "error", title: "Save failed", desc: err.message });
       }

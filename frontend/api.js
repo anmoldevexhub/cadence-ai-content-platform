@@ -440,6 +440,12 @@
       });
     },
 
+    async republishDraft(id) {
+      return await request(`/content/drafts/${id}/republish/`, {
+        method: 'POST'
+      });
+    },
+
     async injectInternalLinks(id) {
       return await request(`/content/drafts/${id}/internal-links/`, {
         method: 'POST'
@@ -625,6 +631,7 @@
             tags: d.tags || [],
             cover_image: d.cover_image,
             category: d.category,
+            meta_description: d.meta_description,
             author_name: d.author_name,
             custom_date: d.custom_date,
             created_at: d.created_at

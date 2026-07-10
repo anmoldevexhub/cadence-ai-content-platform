@@ -74,14 +74,10 @@
       <div class="modal__body editor-modal-body" style="padding:0">
         <div class="editor-layout">
           <!-- Editor Main Area (Left) -->
-          <div class="editor-main">
-            <div class="field">
-              <label class="label">Title</label>
-              <input class="input editor-title-input" id="editTitle" placeholder="Enter post title..." />
-            </div>
-            
-            <div class="field" style="display:flex; flex-direction:column; flex:1; margin-bottom:0;">
-              <label class="label">Body Content</label>
+          <div class="editor-main" id="editorMainArea">
+            <div class="editor-paper" id="editorPaper">
+              <input class="editor-title-input" id="editTitle" placeholder="Untitled Draft" />
+              
               <div class="rich-editor">
                 <div class="rich-toolbar" id="editorToolbar">
                   <button type="button" class="tb-btn" data-cmd="bold" title="Bold"><i data-lucide="bold"></i></button>
@@ -110,7 +106,15 @@
                   <span class="tb-sep"></span>
                   <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear Formatting"><i data-lucide="remove-formatting"></i></button>
                 </div>
-                <div class="rich-content" contenteditable="true" id="editBodyRich" placeholder="Write your post here..."></div>
+                <div class="rich-content" contenteditable="true" id="editBodyRich" placeholder="Start writing or type '/' for commands..."></div>
+              </div>
+
+              <!-- Live Status Bar -->
+              <div class="editor-status-bar">
+                <span>Words: <strong id="wordCount">0</strong></span>
+                <span>Chars: <strong id="charCount">0</strong></span>
+                <span>Reading time: <strong id="readTime">0</strong> min</span>
+                <span class="seo-badge" id="seoScoreBadge">SEO: <strong id="seoScore">0/100</strong></span>
               </div>
             </div>
           </div>
@@ -119,15 +123,16 @@
           <div class="editor-sidebar">
             <!-- Cover Image section -->
             <div class="sidebar-card">
-              <h4 id="coverCardTitle">Cover Image</h4>
+              <h4 id="coverCardTitle"><i data-lucide="image" style="width:16px;height:16px;"></i> Cover Image</h4>
               <div class="editor-cover-preview" id="editCoverPreview">
                 <i data-lucide="image" class="muted" style="width:32px;height:32px"></i>
+                <span class="txs muted mt2">Drag &amp; drop or click to upload</span>
               </div>
-              <div class="field mt3">
+              <div class="field mt2">
                 <label class="label txs" id="coverUrlLabel">Image URL</label>
                 <input class="input input-sm" id="editCoverUrl" placeholder="https://example.com/image.jpg" />
               </div>
-              <div class="row gap2 mt2">
+              <div class="row gap2 mt1">
                 <button type="button" class="btn btn-secondary btn-sm" id="uploadCoverBtn" style="flex:1">Upload</button>
                 <input type="file" id="editCoverFile" accept="image/*,video/*" style="display:none" />
                 <input type="file" id="inlineImageFile" accept="image/*" style="display:none" />
@@ -137,10 +142,10 @@
             
             <!-- Metadata Settings section -->
             <div class="sidebar-card">
-              <h4>Post Metadata</h4>
+              <h4><i data-lucide="file-text" style="width:16px;height:16px;"></i> Post Metadata</h4>
               <div class="field">
                 <label class="label txs">Author Name</label>
-                <input class="input input-sm" id="editAuthor" placeholder="e.g. Devex Hub" />
+                <input class="input input-sm" id="editAuthor" placeholder="e.g. e.g. Devex Hub" />
               </div>
               <div class="field mt2">
                 <label class="label txs">Publish Date</label>
@@ -150,11 +155,19 @@
                 <label class="label txs">Category</label>
                 <input class="input input-sm" id="editCategory" placeholder="e.g. Marketing" />
               </div>
+              <div class="field mt2">
+                <label class="label txs">Meta Title</label>
+                <input class="input input-sm" id="editMetaTitle" placeholder="SEO Meta Title" />
+              </div>
+              <div class="field mt2">
+                <label class="label txs">Meta Description</label>
+                <textarea class="textarea textarea-sm" id="editMetaDescription" placeholder="Enter SEO meta description..." style="height: 60px; font-size:12px; resize:vertical; padding:6px; line-height:1.4"></textarea>
+              </div>
             </div>
             
             <!-- Tags & Style section -->
             <div class="sidebar-card">
-              <h4>Tags &amp; Styling</h4>
+              <h4><i data-lucide="tag" style="width:16px;height:16px;"></i> Tags &amp; Styling</h4>
               <div class="tag-input-wrap">
                 <input class="input input-sm" id="newTagInput" placeholder="Add tag and press Enter..." />
               </div>
@@ -542,6 +555,149 @@
       });
     }
 
+  function initPremiumEditor() {
+    const editModal = document.getElementById("editModal");
+    if (!editModal) return;
+
+    // 1. Sidebar Tab Switcher
+    const btnSettings = document.getElementById("tabBtnSettings");
+    const btnAI = document.getElementById("tabBtnAI");
+    const contentSettings = document.getElementById("tabContentSettings");
+    const contentAI = document.getElementById("tabContentAI");
+
+    if (btnSettings && btnAI) {
+      btnSettings.addEventListener("click", () => {
+        btnSettings.classList.add("active");
+        btnAI.classList.remove("active");
+        contentSettings.style.display = "flex";
+        contentAI.style.display = "none";
+      });
+      btnAI.addEventListener("click", () => {
+        btnAI.classList.add("active");
+        btnSettings.classList.remove("active");
+        contentAI.style.display = "flex";
+        contentSettings.style.display = "none";
+      });
+    }
+
+    // 2. Drag & Drop Cover Image
+    const coverPreview = document.getElementById("editCoverPreview");
+    const coverUrlInput = document.getElementById("editCoverUrl");
+    const coverFileInput = document.getElementById("editCoverFile");
+
+    if (coverPreview) {
+      coverPreview.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        coverPreview.classList.add("dragover");
+      });
+      coverPreview.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        coverPreview.classList.add("dragover");
+      });
+      coverPreview.addEventListener("dragleave", () => {
+        coverPreview.classList.remove("dragover");
+      });
+      coverPreview.addEventListener("drop", (e) => {
+        e.preventDefault();
+        coverPreview.classList.remove("dragover");
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+          const file = files[0];
+          if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const dataUrl = event.target.result;
+              coverUrlInput.value = dataUrl;
+              coverPreview.style.backgroundImage = `url("${dataUrl}")`;
+              coverPreview.innerHTML = "";
+              C.toast({ type: "success", title: "Cover uploaded", desc: "Drag & drop cover loaded successfully." });
+              updateStats();
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      });
+
+      coverPreview.addEventListener("click", (e) => {
+        if (e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT") {
+          coverFileInput.click();
+        }
+      });
+    }
+
+    // 3. Stats & SEO Engine
+    const editTitle = document.getElementById("editTitle");
+    const editBody = document.getElementById("editBodyRich");
+    const metaDesc = document.getElementById("editMetaDescription");
+
+    function getCleanText(html) {
+      const temp = document.createElement("div");
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || "";
+    }
+
+    function updateStats() {
+      const titleText = editTitle ? editTitle.value.trim() : "";
+      const bodyHTML = editBody ? editBody.innerHTML : "";
+      const bodyText = getCleanText(bodyHTML).trim();
+      
+      const words = bodyText ? bodyText.split(/\s+/).filter(w => w.length > 0).length : 0;
+      const chars = bodyText.length;
+      const readTime = Math.max(1, Math.ceil(words / 200));
+
+      const wordCountEl = document.getElementById("wordCount");
+      const charCountEl = document.getElementById("charCount");
+      const readTimeEl = document.getElementById("readTime");
+      
+      if (wordCountEl) wordCountEl.textContent = words;
+      if (charCountEl) charCountEl.textContent = chars;
+      if (readTimeEl) readTimeEl.textContent = readTime;
+
+      let score = 0;
+      if (titleText.length >= 30 && titleText.length <= 70) score += 25;
+      else if (titleText.length > 0) score += 10;
+
+      if (words > 300) score += 25;
+      else if (words > 100) score += 15;
+      else if (words > 0) score += 5;
+
+      const metaText = metaDesc ? metaDesc.value.trim() : "";
+      if (metaText.length >= 100 && metaText.length <= 160) score += 25;
+      else if (metaText.length > 0) score += 10;
+
+      if (bodyHTML.includes("<h2") || bodyHTML.includes("<h3")) score += 15;
+
+      const coverUrl = coverUrlInput ? coverUrlInput.value.trim() : "";
+      if (coverUrl) score += 10;
+
+      const seoScoreEl = document.getElementById("seoScore");
+      const seoBadgeEl = document.getElementById("seoScoreBadge");
+      if (seoScoreEl) seoScoreEl.textContent = `${score}/100`;
+      
+      if (seoBadgeEl) {
+        seoBadgeEl.className = "seo-badge";
+        if (score >= 80) seoBadgeEl.classList.add("good");
+        else if (score >= 50) seoBadgeEl.classList.add("average");
+        else seoBadgeEl.classList.add("poor");
+      }
+    }
+
+    if (editTitle) editTitle.addEventListener("input", updateStats);
+    if (editBody) {
+      editBody.addEventListener("input", updateStats);
+      editBody.addEventListener("keyup", updateStats);
+      editBody.addEventListener("click", (e) => {
+        const link = e.target.closest("a");
+        if (link) {
+          e.preventDefault();
+          window.open(link.href, "_blank");
+        }
+      });
+    }
+    if (metaDesc) metaDesc.addEventListener("input", updateStats);
+
+    window.updatePremiumEditorStats = updateStats;
+
     // Rich Text Editor Toolbar Listeners
     const editorToolbar = document.getElementById("editorToolbar");
     if (editorToolbar) {
@@ -550,7 +706,8 @@
           e.preventDefault();
           const cmd = btn.dataset.cmd;
           document.execCommand(cmd, false, null);
-          document.getElementById("editBodyRich").focus();
+          editBody.focus();
+          updateStats();
         });
       });
 
@@ -559,7 +716,8 @@
           e.preventDefault();
           const block = btn.dataset.block;
           document.execCommand("formatBlock", false, block);
-          document.getElementById("editBodyRich").focus();
+          editBody.focus();
+          updateStats();
         });
       });
 
@@ -578,10 +736,9 @@
         }
       };
 
-      const richBody = document.getElementById("editBodyRich");
-      if (richBody) {
-        richBody.addEventListener("mouseup", saveSelection);
-        richBody.addEventListener("keyup", saveSelection);
+      if (editBody) {
+        editBody.addEventListener("mouseup", saveSelection);
+        editBody.addEventListener("keyup", saveSelection);
       }
 
       const foreColorInput = document.getElementById("tb-forecolor");
@@ -590,6 +747,7 @@
           restoreSelection();
           const color = e.target.value;
           document.execCommand("foreColor", false, color);
+          updateStats();
         });
       }
 
@@ -601,6 +759,7 @@
           if (!document.execCommand("hiliteColor", false, color)) {
             document.execCommand("backColor", false, color);
           }
+          updateStats();
         });
       }
       
@@ -645,7 +804,8 @@
               }
             }
           }
-          document.getElementById("editBodyRich").focus();
+          editBody.focus();
+          updateStats();
         });
       }
       
@@ -658,7 +818,8 @@
           if (url) {
             restoreSelection();
             document.execCommand("insertImage", false, url);
-            document.getElementById("editBodyRich").focus();
+            editBody.focus();
+            updateStats();
           } else if (url === "") {
             const inlineFileInput = document.getElementById("inlineImageFile");
             if (inlineFileInput) inlineFileInput.click();
@@ -676,7 +837,8 @@
               restoreSelection();
               const base64 = event.target.result;
               document.execCommand("insertImage", false, base64);
-              document.getElementById("editBodyRich").focus();
+              editBody.focus();
+              updateStats();
             };
             reader.readAsDataURL(file);
           }
@@ -684,32 +846,221 @@
       }
     }
 
-    // Wiring cover preview file selector
-    const editCoverFile = document.getElementById("editCoverFile");
-    const uploadCoverBtn = document.getElementById("uploadCoverBtn");
-    if (uploadCoverBtn && editCoverFile) {
-      uploadCoverBtn.addEventListener("click", () => editCoverFile.click());
-      editCoverFile.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const urlInput = document.getElementById("editCoverUrl");
-            if (urlInput) urlInput.value = ev.target.result;
-            const coverPreview = document.getElementById("editCoverPreview");
-            if (coverPreview) {
-              coverPreview.style.backgroundImage = `url('${ev.target.result}')`;
-              coverPreview.style.backgroundSize = "cover";
-              coverPreview.style.backgroundPosition = "center";
-              coverPreview.innerHTML = "";
-            }
-          };
-          reader.readAsDataURL(file);
+    // 4. Floating Selection Formatting Toolbar
+    let selectionToolbar = document.getElementById("floatingSelectionToolbar");
+    if (!selectionToolbar) {
+      selectionToolbar = document.createElement("div");
+      selectionToolbar.id = "floatingSelectionToolbar";
+      selectionToolbar.className = "floating-format-bar";
+      selectionToolbar.style.display = "none";
+      selectionToolbar.innerHTML = `
+        <button type="button" class="tb-btn" data-fcmd="bold" title="Bold"><i data-lucide="bold"></i></button>
+        <button type="button" class="tb-btn" data-fcmd="italic" title="Italic"><i data-lucide="italic"></i></button>
+        <button type="button" class="tb-btn" data-fcmd="underline" title="Underline"><i data-lucide="underline"></i></button>
+        <span class="tb-sep"></span>
+        <button type="button" class="tb-btn" id="floatingLinkBtn" title="Link"><i data-lucide="link"></i></button>
+      `;
+      document.body.appendChild(selectionToolbar);
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    selectionToolbar.querySelectorAll("[data-fcmd]").forEach(btn => {
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand(btn.dataset.fcmd, false, null);
+        updateStats();
+      });
+    });
+
+    const flLinkBtn = document.getElementById("floatingLinkBtn");
+    if (flLinkBtn) {
+      flLinkBtn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const url = prompt("Enter URL:");
+          if (url) {
+            document.execCommand("createLink", false, url);
+            updateStats();
+          }
         }
       });
     }
 
-    // Save Edit Modal
+    if (editBody) {
+      document.addEventListener("selectionchange", () => {
+        const selection = window.getSelection();
+        if (!selection.isCollapsed && editBody.contains(selection.anchorNode)) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          
+          selectionToolbar.style.display = "flex";
+          selectionToolbar.style.top = `${window.scrollY + rect.top - 45}px`;
+          selectionToolbar.style.left = `${window.scrollX + rect.left + (rect.width/2) - (selectionToolbar.offsetWidth/2)}px`;
+        } else {
+          setTimeout(() => {
+            const activeSelection = window.getSelection();
+            if (activeSelection.isCollapsed || !editBody.contains(activeSelection.anchorNode)) {
+              selectionToolbar.style.display = "none";
+            }
+          }, 100);
+        }
+      });
+    }
+
+    // 5. Slash Commands Menu
+    let slashMenu = document.getElementById("slashCommandsMenu");
+    if (!slashMenu) {
+      slashMenu = document.createElement("div");
+      slashMenu.id = "slashCommandsMenu";
+      slashMenu.className = "slash-commands-menu";
+      slashMenu.style.display = "none";
+      slashMenu.innerHTML = `
+        <div class="slash-category">Text Blocks</div>
+        <button type="button" class="slash-item" data-cmd="h2">
+          <i data-lucide="heading-1"></i>
+          <div>
+            <span class="slash-title">Heading 1</span>
+            <span class="slash-desc">Large section heading</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="h3">
+          <i data-lucide="heading-2"></i>
+          <div>
+            <span class="slash-title">Heading 2</span>
+            <span class="slash-desc">Medium subsection heading</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="p">
+          <i data-lucide="text"></i>
+          <div>
+            <span class="slash-title">Paragraph</span>
+            <span class="slash-desc">Plain body text</span>
+          </div>
+        </button>
+        <div class="slash-category">Lists &amp; Media</div>
+        <button type="button" class="slash-item" data-cmd="ul">
+          <i data-lucide="list"></i>
+          <div>
+            <span class="slash-title">Bulleted List</span>
+            <span class="slash-desc">Create a simple bulleted list</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="ol">
+          <i data-lucide="list-ordered"></i>
+          <div>
+            <span class="slash-title">Numbered List</span>
+            <span class="slash-desc">Create a numbered list</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="quote">
+          <i data-lucide="quote"></i>
+          <div>
+            <span class="slash-title">Blockquote</span>
+            <span class="slash-desc">Add styled quote block</span>
+          </div>
+        </button>
+        <button type="button" class="slash-item" data-cmd="img">
+          <i data-lucide="image"></i>
+          <div>
+            <span class="slash-title">Inline Image</span>
+            <span class="slash-desc">Insert image by URL</span>
+          </div>
+        </button>
+      `;
+      document.body.appendChild(slashMenu);
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    let selectedIndex = 0;
+    function updateMenuFocus() {
+      const items = slashMenu.querySelectorAll(".slash-item");
+      items.forEach((item, index) => {
+        item.classList.toggle("focused", index === selectedIndex);
+      });
+    }
+
+    if (editBody) {
+      editBody.addEventListener("keyup", (e) => {
+        if (e.key === "/") {
+          const selection = window.getSelection();
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            slashMenu.style.display = "flex";
+            slashMenu.style.top = `${window.scrollY + rect.bottom + 8}px`;
+            slashMenu.style.left = `${window.scrollX + rect.left}px`;
+            selectedIndex = 0;
+            updateMenuFocus();
+          }
+        } else if (slashMenu.style.display !== "none") {
+          if (e.key === "Escape") {
+            slashMenu.style.display = "none";
+          }
+        }
+      });
+
+      editBody.addEventListener("keydown", (e) => {
+        if (slashMenu.style.display !== "none") {
+          const items = slashMenu.querySelectorAll(".slash-item");
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            selectedIndex = (selectedIndex + 1) % items.length;
+            updateMenuFocus();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+            updateMenuFocus();
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const focusedItem = items[selectedIndex];
+            if (focusedItem) focusedItem.click();
+          }
+        }
+      });
+    }
+
+    slashMenu.querySelectorAll(".slash-item").forEach(item => {
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        const cmd = item.dataset.cmd;
+        
+        if (editBody) {
+          const text = editBody.innerHTML;
+          editBody.innerHTML = text.replace(/\/$/, "");
+        }
+
+        if (cmd === "h2" || cmd === "h3" || cmd === "p") {
+          document.execCommand("formatBlock", false, cmd);
+        } else if (cmd === "ul") {
+          document.execCommand("insertUnorderedList", false, null);
+        } else if (cmd === "ol") {
+          document.execCommand("insertOrderedList", false, null);
+        } else if (cmd === "quote") {
+          document.execCommand("formatBlock", false, "blockquote");
+        } else if (cmd === "img") {
+          const url = prompt("Enter Image URL:");
+          if (url) document.execCommand("insertImage", false, url);
+        }
+
+        slashMenu.style.display = "none";
+        if (editBody) editBody.focus();
+        updateStats();
+      });
+    });
+
+    document.addEventListener("mousedown", (e) => {
+      if (!slashMenu.contains(e.target) && editBody && !editBody.contains(e.target)) {
+        slashMenu.style.display = "none";
+      }
+    });
+
+  }
+
+  // Initialize premium editor features on load
+  initPremiumEditor();
+
+  // Save Edit Modal
     document.getElementById("saveEdit").addEventListener("click", async () => {
       if (editingDraft) {
         const title = document.getElementById("editTitle").value.trim();
@@ -719,9 +1070,11 @@
         const author_name = document.getElementById("editAuthor") ? document.getElementById("editAuthor").value.trim() : "";
         const custom_date = document.getElementById("editDate") ? document.getElementById("editDate").value.trim() : "";
         const category = document.getElementById("editCategory") ? document.getElementById("editCategory").value.trim() : "";
+        const meta_title = document.getElementById("editMetaTitle") ? document.getElementById("editMetaTitle").value.trim() : "";
+        const meta_description = document.getElementById("editMetaDescription") ? document.getElementById("editMetaDescription").value.trim() : "";
         
         try {
-          await CadenceAPI.updateDraft(editingDraft.id, { title, body, cover_image, tags, author_name, custom_date, category });
+          await CadenceAPI.updateDraft(editingDraft.id, { title, body, cover_image, tags, author_name, custom_date, category, meta_title, meta_description });
           
           // Sync local state
           editingDraft.title = title;
@@ -731,6 +1084,8 @@
           editingDraft.author_name = author_name;
           editingDraft.custom_date = custom_date;
           editingDraft.category = category;
+          editingDraft.meta_title = meta_title;
+          editingDraft.meta_description = meta_description;
           editingDraft.excerpt = body.replace(/<[^>]*>/g, '').substring(0, 150) + "...";
           
           await M.syncMockData();
@@ -902,7 +1257,15 @@
         
         const editCategory = document.getElementById("editCategory");
         if (editCategory) editCategory.value = c.category || "Marketing";
-        
+
+        const editMetaTitle = document.getElementById("editMetaTitle");
+        if (editMetaTitle) editMetaTitle.value = c.meta_title || "";
+        const editMetaDesc = document.getElementById("editMetaDescription");
+        if (editMetaDesc) editMetaDesc.value = c.meta_description || "";
+
+        if (window.updatePremiumEditorStats) {
+          window.updatePremiumEditorStats();
+        }
         C.openModal("editModal");
       });
     }

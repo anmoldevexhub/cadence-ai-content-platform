@@ -589,14 +589,10 @@
       <div class="modal__body editor-modal-body" style="padding:0">
         <div class="editor-layout">
           <!-- Editor Main Area (Left) -->
-          <div class="editor-main">
-            <div class="field">
-              <label class="label">Title</label>
-              <input class="input editor-title-input" id="editTitle" placeholder="Enter post title..." />
-            </div>
-            
-            <div class="field" style="display:flex; flex-direction:column; flex:1; margin-bottom:0;">
-              <label class="label">Body Content</label>
+          <div class="editor-main" id="editorMainArea">
+            <div class="editor-paper" id="editorPaper">
+              <input class="editor-title-input" id="editTitle" placeholder="Untitled Draft" />
+              
               <div class="rich-editor">
                 <div class="rich-toolbar" id="editorToolbar">
                   <button type="button" class="tb-btn" data-cmd="bold" title="Bold"><i data-lucide="bold"></i></button>
@@ -625,7 +621,15 @@
                   <span class="tb-sep"></span>
                   <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear Formatting"><i data-lucide="remove-formatting"></i></button>
                 </div>
-                <div class="rich-content" contenteditable="true" id="editBodyRich" placeholder="Write your post here..."></div>
+                <div class="rich-content" contenteditable="true" id="editBodyRich" placeholder="Start writing or type '/' for commands..."></div>
+              </div>
+
+              <!-- Live Status Bar -->
+              <div class="editor-status-bar">
+                <span>Words: <strong id="wordCount">0</strong></span>
+                <span>Chars: <strong id="charCount">0</strong></span>
+                <span>Reading time: <strong id="readTime">0</strong> min</span>
+                <span class="seo-badge" id="seoScoreBadge">SEO: <strong id="seoScore">0/100</strong></span>
               </div>
             </div>
           </div>
@@ -634,15 +638,16 @@
           <div class="editor-sidebar">
             <!-- Cover Image section -->
             <div class="sidebar-card">
-              <h4 id="coverCardTitle">Cover Image</h4>
+              <h4 id="coverCardTitle"><i data-lucide="image" style="width:16px;height:16px;"></i> Cover Image</h4>
               <div class="editor-cover-preview" id="editCoverPreview">
                 <i data-lucide="image" class="muted" style="width:32px;height:32px"></i>
+                <span class="txs muted mt2">Drag &amp; drop or click to upload</span>
               </div>
-              <div class="field mt3">
+              <div class="field mt2">
                 <label class="label txs" id="coverUrlLabel">Image URL</label>
                 <input class="input input-sm" id="editCoverUrl" placeholder="https://example.com/image.jpg" />
               </div>
-              <div class="row gap2 mt2">
+              <div class="row gap2 mt1">
                 <button type="button" class="btn btn-secondary btn-sm" id="uploadCoverBtn" style="flex:1">Upload</button>
                 <input type="file" id="editCoverFile" accept="image/*,video/*" style="display:none" />
                 <input type="file" id="inlineImageFile" accept="image/*" style="display:none" />
@@ -652,7 +657,7 @@
             
             <!-- Metadata Settings section -->
             <div class="sidebar-card">
-              <h4>Post Metadata</h4>
+              <h4><i data-lucide="file-text" style="width:16px;height:16px;"></i> Post Metadata</h4>
               <div class="field">
                 <label class="label txs">Author Name</label>
                 <input class="input input-sm" id="editAuthor" placeholder="e.g. Devex Hub" />
@@ -665,11 +670,19 @@
                 <label class="label txs">Category</label>
                 <input class="input input-sm" id="editCategory" placeholder="e.g. Marketing" />
               </div>
+              <div class="field mt2">
+                <label class="label txs">Meta Title</label>
+                <input class="input input-sm" id="editMetaTitle" placeholder="SEO Meta Title" />
+              </div>
+              <div class="field mt2">
+                <label class="label txs">Meta Description</label>
+                <textarea class="textarea textarea-sm" id="editMetaDescription" placeholder="Enter SEO meta description..." style="height: 60px; font-size:12px; resize:vertical; padding:6px; line-height:1.4"></textarea>
+              </div>
             </div>
             
             <!-- Tags & Style section -->
             <div class="sidebar-card">
-              <h4>Tags &amp; Styling</h4>
+              <h4><i data-lucide="tag" style="width:16px;height:16px;"></i> Tags &amp; Styling</h4>
               <div class="tag-input-wrap">
                 <input class="input input-sm" id="newTagInput" placeholder="Add tag and press Enter..." />
               </div>

@@ -234,6 +234,8 @@ window.MOCK = (function () {
         tags: d.tags || [],
         cover_image: d.cover_image,
         category: d.category,
+        meta_title: d.meta_title || "",
+        meta_description: d.meta_description || "",
         author_name: d.author_name,
         custom_date: d.custom_date,
         created_at: d.created_at

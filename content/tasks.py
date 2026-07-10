@@ -200,3 +200,48 @@ def publish_scheduled_posts():
             logger.info(f"Published: {sp.draft.title} (Blog: {blog_success}, make.com: {make_success})")
         else:
             logger.error(f"Publishing failed for {sp.draft.title}: {errors}")
+
+
+@shared_task
+def republish_published_post_task(draft_id: int):
+    """
+    Called when a draft that was already published is edited.
+    Triggers the custom blog or social publishing logic to perform an update on the live site.
+    """
+    from .models import ContentDraft
+    from websites.models import SocialConnection
+    from .publisher import publish_to_custom_blog
+    
+    try:
+        draft = ContentDraft.objects.get(pk=draft_id)
+    except ContentDraft.DoesNotExist:
+        logger.warning(f"Draft {draft_id} does not exist. Skipping republish.")
+        return False
+        
+    if draft.status != 'published':
+        logger.warning(f"Draft {draft_id} is not in published status. Skipping republish.")
+        return False
+        
+    logger.info(f"Republishing updated published post: {draft.title} (ID: {draft.id})")
+    
+    if draft.platform == 'blog':
+        try:
+            custom_conn = SocialConnection.objects.filter(
+                website=draft.website,
+                platform='blog',
+                is_active=True
+            ).first()
+            if custom_conn and custom_conn.make_webhook_url:
+                from .publisher import republish_to_custom_blog
+                result = republish_to_custom_blog(draft, custom_conn)
+                logger.info(
+                    f"Live blog republish complete for '{draft.title}' "
+                    f"via {result.get('method', 'unknown')} → {result.get('url', '')}"
+                )
+                return True
+            else:
+                logger.warning("No custom blog connection configured, skipping live republish.")
+        except Exception as e:
+            logger.error(f"Live blog update failed: {e}")
+            raise e
+    return False

@@ -74,6 +74,7 @@ class ContentDraft(models.Model):
     cover_image_public_url = models.URLField(max_length=1000, blank=True, default="",
         help_text="Permanent public URL of cover image uploaded to imgbb. Used for social/blog publishing.")
     category = models.CharField(max_length=100, blank=True)
+    meta_title = models.CharField(max_length=300, blank=True, default="")
     author_name = models.CharField(max_length=100, blank=True, default="")
     custom_date = models.CharField(max_length=50, blank=True, default="")
     is_deleted = models.BooleanField(default=False, help_text="Soft delete flag")
