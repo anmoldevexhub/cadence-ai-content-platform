@@ -2165,6 +2165,7 @@
           <div class="sub">${site.name} · status: <b>${d.status}</b></div>
         </div>
         <button class="icon-btn btn-sm" id="maximizeWsDraft" title="Full screen view" style="margin-right:4px;">${I("maximize-2")}</button>
+        <button class="icon-btn btn-sm" data-act="more" data-id="${d.id}" title="Move to trash">${I("more-vertical")}</button>
       </div>
       <div class="card__body" id="wsPrevBody" style="max-height:480px;overflow-y:auto;padding:var(--s5);">${previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date)}</div>
       <div class="card__footer" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding: 12px var(--s5);">
