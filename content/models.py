@@ -78,6 +78,8 @@ class ContentDraft(models.Model):
     author_name = models.CharField(max_length=100, blank=True, default="")
     custom_date = models.CharField(max_length=50, blank=True, default="")
     is_deleted = models.BooleanField(default=False, help_text="Soft delete flag")
+    include_infographics = models.BooleanField(default=True, help_text="Whether infographics were enabled for this draft")
+    include_cta = models.BooleanField(default=True, help_text="Whether Contact Us CTA was enabled for this draft")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

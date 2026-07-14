@@ -17,8 +17,8 @@ window.MOCK = (function () {
 
   const defaultMock = {
     users: {
-      admin: { name: "Maya Chen", email: "maya@cadence.io", initials: "MC", color: "#095075", role: "admin" },
-      super: { name: "Devon Park", email: "devon@cadence.io", initials: "DP", color: "#1e8fc6", role: "super" },
+      admin: { name: "Maya Chen", email: "maya@candence.io", initials: "MC", color: "#095075", role: "admin" },
+      super: { name: "Devon Park", email: "devon@candence.io", initials: "DP", color: "#1e8fc6", role: "super" },
     },
     websites: [],
     content: [],
@@ -42,7 +42,7 @@ window.MOCK = (function () {
   const path = window.location.pathname;
   const isAuth = ['login.html', 'signup.html', 'forgot-password.html', 'index.html'].some(p => path.includes(p)) || path === '/' || path === '/static/';
 
-  const access = localStorage.getItem('cadence.access_token');
+  const access = localStorage.getItem('candence.access_token');
   if (isAuth || !access) {
     document.write('<script src="api.js?v=' + Date.now() + '"></script>');
     return {
@@ -57,7 +57,7 @@ window.MOCK = (function () {
     const cleanUrl = method === 'GET' ? (url + (url.includes('?') ? '&' : '?') + '_=' + Date.now()) : url;
     xhr.open(method, '/api' + cleanUrl, false); // false makes it synchronous
     
-    const token = localStorage.getItem('cadence.access_token');
+    const token = localStorage.getItem('candence.access_token');
     if (token) {
       xhr.setRequestHeader('Authorization', 'Bearer ' + token);
     }
@@ -71,7 +71,7 @@ window.MOCK = (function () {
     
     if (xhr.status === 401) {
       // Attempt token refresh synchronously
-      const refresh = localStorage.getItem('cadence.refresh_token');
+      const refresh = localStorage.getItem('candence.refresh_token');
       if (refresh) {
         const rxhr = new XMLHttpRequest();
         rxhr.open('POST', '/api/auth/token/refresh/', false);
@@ -80,8 +80,8 @@ window.MOCK = (function () {
         
         if (rxhr.status === 200) {
           const data = JSON.parse(rxhr.responseText);
-          localStorage.setItem('cadence.access_token', data.access);
-          if (data.refresh) localStorage.setItem('cadence.refresh_token', data.refresh);
+          localStorage.setItem('candence.access_token', data.access);
+          if (data.refresh) localStorage.setItem('candence.refresh_token', data.refresh);
           
           // Retry
           const retryXhr = new XMLHttpRequest();
@@ -100,9 +100,9 @@ window.MOCK = (function () {
       }
       
       // Refresh failed, redirect
-      localStorage.removeItem('cadence.access_token');
-      localStorage.removeItem('cadence.refresh_token');
-      localStorage.removeItem('cadence.user');
+      localStorage.removeItem('candence.access_token');
+      localStorage.removeItem('candence.refresh_token');
+      localStorage.removeItem('candence.user');
       window.location.href = 'login.html';
       return null;
     }
@@ -120,23 +120,23 @@ window.MOCK = (function () {
 
     // Sync localStorage settings with the backend profile data
     if (me.first_name || me.last_name) {
-      localStorage.setItem("cadence.settings.name", ((me.first_name || '') + ' ' + (me.last_name || '')).trim());
+      localStorage.setItem("candence.settings.name", ((me.first_name || '') + ' ' + (me.last_name || '')).trim());
     }
     if (me.email) {
-      localStorage.setItem("cadence.settings.email", me.email);
+      localStorage.setItem("candence.settings.email", me.email);
     }
     if (me.job_title) {
-      localStorage.setItem("cadence.settings.jobTitle", me.job_title);
+      localStorage.setItem("candence.settings.jobTitle", me.job_title);
     }
     if (me.timezone) {
-      localStorage.setItem("cadence.settings.timezone", me.timezone);
+      localStorage.setItem("candence.settings.timezone", me.timezone);
     }
     if (me.bio) {
-      localStorage.setItem("cadence.settings.bio", me.bio);
+      localStorage.setItem("candence.settings.bio", me.bio);
     }
 
-    const meName = localStorage.getItem("cadence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
-    const meEmail = localStorage.getItem("cadence.settings.email") || me.email || '';
+    const meName = localStorage.getItem("candence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
+    const meEmail = localStorage.getItem("candence.settings.email") || me.email || '';
     const meInitials = (((me.first_name && me.first_name[0]) || '') + ((me.last_name && me.last_name[0]) || '')).toUpperCase() || (me.username ? me.username.substring(0, 2).toUpperCase() : 'U');
     const userObj = {
       name: meName,
@@ -301,7 +301,7 @@ window.MOCK = (function () {
     // 8. Notifications derived from pending approvals (respecting notification preferences)
     let notificationsPref;
     try {
-      notificationsPref = JSON.parse(localStorage.getItem("cadence.settings.notifications"));
+      notificationsPref = JSON.parse(localStorage.getItem("candence.settings.notifications"));
     } catch(e) {}
 
     const notifications = [];
@@ -410,8 +410,8 @@ window.MOCK = (function () {
 
   } catch (err) {
     console.error("Failed to load backend mock data proxy", err);
-    const savedName = localStorage.getItem("cadence.settings.name");
-    const savedEmail = localStorage.getItem("cadence.settings.email");
+    const savedName = localStorage.getItem("candence.settings.name");
+    const savedEmail = localStorage.getItem("candence.settings.email");
     const finalResult = {
       ...defaultMock,
       site: (id) => defaultMock.websites.find(w => w.id == id)

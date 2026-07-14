@@ -77,7 +77,14 @@ def crawl_website_task(self, website_id: int):
             website.industry = analysis.get('industry', website.industry or 'General')
             website.tone = analysis.get('tone', website.tone or 'Professional')
             website.topics = analysis.get('topics', website.topics)
-            website.brand_colors = analysis.get('brand_colors', website.brand_colors)
+            
+            # Prioritize real CSS colors from homepage, fall back to LLM suggestions
+            homepage_colors = result['pages'][0].get('brand_colors', []) if result.get('pages') else []
+            if homepage_colors:
+                website.brand_colors = homepage_colors
+            else:
+                website.brand_colors = analysis.get('brand_colors', website.brand_colors)
+                
             website.avg_read_time = analysis.get('avg_read_time', website.avg_read_time)
         except Exception as e:
             logger.error(f"Task context analysis error: {e}")

@@ -7,10 +7,10 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, max_retries=2)
-def generate_content_task(self, idea_id: int):
+def generate_content_task(self, idea_id: int, include_infographics: bool = True, include_cta: bool = True):
     try:
         from .generator import generate_for_idea
-        draft_id = generate_for_idea(idea_id)
+        draft_id = generate_for_idea(idea_id, include_infographics=include_infographics, include_cta=include_cta)
         ActivityLog.objects.create(
             actor=None, actor_name='AI Engine',
             action='content_generated',
@@ -65,7 +65,11 @@ def regenerate_draft_task(self, draft_id: int, regenerate_type: str = 'all'):
             new_draft_id = draft.id
         elif regenerate_type == 'content':
             if draft.idea:
-                new_draft_id = generate_for_idea(draft.idea_id, generate_image=False)
+                new_draft_id = generate_for_idea(
+                    draft.idea_id, generate_image=False,
+                    include_infographics=draft.include_infographics,
+                    include_cta=draft.include_cta
+                )
                 new_draft = ContentDraft.objects.get(pk=new_draft_id)
                 new_draft.cover_image = draft.cover_image
                 new_draft.cover_image_public_url = draft.cover_image_public_url
@@ -73,7 +77,11 @@ def regenerate_draft_task(self, draft_id: int, regenerate_type: str = 'all'):
                 draft.delete()
         else:
             if draft.idea:
-                new_draft_id = generate_for_idea(draft.idea_id)
+                new_draft_id = generate_for_idea(
+                    draft.idea_id,
+                    include_infographics=draft.include_infographics,
+                    include_cta=draft.include_cta
+                )
                 draft.delete()
                 
         return {'new_draft_id': new_draft_id}

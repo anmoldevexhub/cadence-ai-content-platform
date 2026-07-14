@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trash Bin · Cadence</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <title>Trash Bin · Candence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -50,7 +50,7 @@
   <script src="app.js"></script>
   <script>
     (async function () {
-      const C = window.Cadence, M = window.MOCK, I = C.icon;
+      const C = window.Candence, M = window.MOCK, I = C.icon;
       
       async function loadTrash() {
         await renderWebsites();
@@ -60,7 +60,7 @@
       async function renderWebsites() {
         const wrap = document.getElementById("deletedWebsitesList");
         try {
-          const websites = await CadenceAPI.getWebsites({ trash: true });
+          const websites = await CandenceAPI.getWebsites({ trash: true });
           if (!websites.length) {
             wrap.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art">${I("globe")}</div><h3>No deleted websites</h3><p>Websites you delete will appear here.</p></div>`;
             C.refreshIcons();
@@ -101,7 +101,7 @@
             const id = btn.dataset.id;
             btn.disabled = true;
             try {
-              await CadenceAPI.updateWebsite(id, { is_deleted: false });
+              await CandenceAPI.updateWebsite(id, { is_deleted: false });
               C.toast({ type: "success", title: "Website restored" });
               await M.syncMockData();
               if (C.mountShell) C.mountShell();
@@ -119,7 +119,7 @@
             if (!confirm("Are you sure you want to permanently delete this website? This will delete all content history and cannot be undone.")) return;
             btn.disabled = true;
             try {
-              await CadenceAPI.deleteWebsite(id, true);
+              await CandenceAPI.deleteWebsite(id, true);
               C.toast({ type: "success", title: "Website permanently deleted" });
               await M.syncMockData();
               if (C.mountShell) C.mountShell();
@@ -135,7 +135,7 @@
       async function renderDrafts() {
         const wrap = document.getElementById("deletedDraftsList");
         try {
-          const drafts = await CadenceAPI.getDrafts({ trash: true });
+          const drafts = await CandenceAPI.getDrafts({ trash: true });
           if (!drafts.length) {
             wrap.innerHTML = `<div class="empty card" style="grid-column:1/-1;padding:var(--s9)"><div class="empty-art">${I("file-text")}</div><h3>No deleted drafts</h3><p>Drafts you delete will appear here.</p></div>`;
             C.refreshIcons();
@@ -180,7 +180,7 @@
             const id = btn.dataset.id;
             btn.disabled = true;
             try {
-              await CadenceAPI.updateDraft(id, { is_deleted: false });
+              await CandenceAPI.updateDraft(id, { is_deleted: false });
               C.toast({ type: "success", title: "Draft restored" });
               await M.syncMockData();
               if (C.mountShell) C.mountShell();
@@ -198,7 +198,7 @@
             if (!confirm("Are you sure you want to permanently delete this draft? This cannot be undone.")) return;
             btn.disabled = true;
             try {
-              await CadenceAPI.deleteDraft(id, true);
+              await CandenceAPI.deleteDraft(id, true);
               C.toast({ type: "success", title: "Draft permanently deleted" });
               await M.syncMockData();
               if (C.mountShell) C.mountShell();

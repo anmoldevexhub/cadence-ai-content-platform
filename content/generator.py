@@ -888,19 +888,82 @@ def _upload_bytes_to_imgbb(image_bytes: bytes, name: str) -> str:
     return ""
 
 
-def _generate_infographic_image(description: str, topic: str) -> str:
+def _hex_to_rgb(hex_str: str):
+    hex_str = hex_str.lstrip('#')
+    if len(hex_str) == 3:
+        hex_str = ''.join([c*2 for c in hex_str])
+    if len(hex_str) == 6:
+        try:
+            return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+        except ValueError:
+            pass
+    return (0, 0, 0)
+
+
+def _get_luminance(hex_str: str) -> float:
+    r, g, b = _hex_to_rgb(hex_str)
+    return 0.299 * r + 0.587 * g + 0.114 * b
+
+
+def _get_brand_theme(website) -> dict:
+    """
+    Extracts brand styling details from a Website model.
+    Falls back to a professional high-contrast dark blue & orange SaaS theme if no brand colors exist.
+    """
+    primary = "#f97316" # default orange
+    secondary = "#3b82f6" # default blue
+    
+    if website:
+        brand_colors = getattr(website, 'brand_colors', []) or []
+        if isinstance(brand_colors, list) and len(brand_colors) > 0:
+            primary = brand_colors[0]
+            if len(brand_colors) > 1:
+                secondary = brand_colors[1]
+        elif getattr(website, 'color', ''):
+            primary = website.color
+            
+    # Determine best contrasting text color on primary background
+    lum = _get_luminance(primary)
+    text_on_primary = "#0f172a" if lum >= 150 else "#ffffff"
+    
+    # Derive dark gradient shades from brand primary/secondary colors
+    def _darken_hex(hex_str: str, factor: float = 0.45) -> str:
+        """Returns a darkened version of a hex color by blending with black."""
+        r, g, b = _hex_to_rgb(hex_str)
+        r2 = int(r * factor)
+        g2 = int(g * factor)
+        b2 = int(b * factor)
+        return f"#{r2:02x}{g2:02x}{b2:02x}"
+    
+    bg_start = _darken_hex(primary, 0.35)
+    bg_end = _darken_hex(secondary, 0.45)
+    
+    color_desc = f"brand color palette ({primary}, white, {secondary} accents)"
+    
+    return {
+        'primary': primary,
+        'text_on_primary': text_on_primary,
+        'secondary': secondary,
+        'bg_start': bg_start,
+        'bg_end': bg_end,
+        'color_desc': color_desc
+    }
+
+
+def _generate_infographic_image(description: str, topic: str, website=None) -> str:
     """
     Generates an infographic image via gpt-image-1-mini and uploads to imgbb.
     Returns the permanent public URL or empty string on failure.
     """
     import uuid, requests as _req, base64
+    theme = _get_brand_theme(website)
     prompt = (
         f"Create a clean, professional, modern infographic for a B2B blog article. "
         f"Topic: '{topic}'. Visual focus: {description}. "
-        f"Style: flat design, corporate color palette (deep blue, white, orange accents), "
+        f"Style: flat design, brand color palette (primary {theme['primary']}, white, accent {theme['secondary']}), "
         f"icon-based layout, clear typography, no stock photo backgrounds, no people. "
         f"Include a minimal diagram, icons, or labeled boxes that visually summarize the key concepts. "
-        f"Make it look like a premium SaaS blog infographic. 16:9 widescreen layout."
+        f"Make it look like a premium blog infographic. 16:9 widescreen layout."
     )
     try:
         logger.info(f"Generating infographic image: {description[:80]}")
@@ -929,68 +992,98 @@ def _generate_infographic_image(description: str, topic: str) -> str:
 
 def _render_cta_banner(website) -> str:
     """Returns a fully styled HTML CTA banner block linking to website's contact page."""
-    contact_url = f"{(website.url or '').rstrip('/')}/contact/"
+    # Try to find the real contact page URL from crawled data
+    contact_url = None
+    try:
+        from websites.models import ScrapeResult
+        crawled_pages = ScrapeResult.objects.filter(website=website)
+        for page in crawled_pages:
+            url_lower = (page.page_url or '').lower()
+            title_lower = (page.page_title or '').lower()
+            if 'contact' in url_lower or 'contact' in title_lower:
+                contact_url = page.page_url
+                break
+    except Exception:
+        pass
+    # Fallback to constructed URL if no crawled contact page found
+    if not contact_url:
+        contact_url = f"{(website.url or '').rstrip('/')}/contact/"
     site_name = website.name or "Us"
     industry = website.industry or "business"
     cta_text = f"Ready to see how {site_name} can help your {industry}?"
+    theme = _get_brand_theme(website)
     return f"""
-<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
+<div contenteditable="false" draggable="false" class="custom-block-wrapper"
+     style="background:linear-gradient(135deg,{theme['bg_start']} 0%,{theme['bg_end']} 100%);
             border-radius:14px;padding:36px 44px;margin:44px 0;
             display:flex;align-items:center;justify-content:space-between;
-            flex-wrap:wrap;gap:20px;box-shadow:0 8px 32px rgba(0,0,0,0.18);">
-  <div>
-    <p style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 6px;line-height:1.3;">
-      {cta_text}
+            flex-wrap:wrap;gap:20px;box-shadow:0 8px 32px rgba(0,0,0,0.18);position:relative;">
+  <!-- Drag Handle -->
+  <div class="block-drag-handle" contenteditable="false" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);cursor:grab;color:rgba(255,255,255,0.4);font-size:20px;font-weight:bold;user-select:none;padding:10px 5px;">⋮⋮</div>
+  
+  <div style="color:#ffffff !important;padding-left:15px;">
+    <p style="color:#ffffff !important;font-size:20px;font-weight:700;margin:0 0 6px;line-height:1.3;display:block;">
+      <span contenteditable="true" style="color:#ffffff !important;font-weight:700 !important;font-size:20px !important;outline:none;">{cta_text}</span>
     </p>
-    <p style="color:#94a3b8;margin:0;font-size:15px;">
-      Talk to our team — no commitment needed.
+    <p style="color:#e2e8f0 !important;margin:0;font-size:15px;display:block;">
+      <span contenteditable="true" style="color:#cbd5e1 !important;font-size:15px !important;outline:none;">Talk to our team — no commitment needed.</span>
     </p>
   </div>
-  <a href="{contact_url}" target="_blank"
-     style="background:#f97316;color:#ffffff;padding:14px 28px;border-radius:8px;
+  <a href="{contact_url}" target="_blank" contenteditable="false"
+     style="background:{theme['primary']} !important;color:{theme['text_on_primary']} !important;padding:14px 28px;border-radius:8px;
             font-weight:700;text-decoration:none;white-space:nowrap;
             display:inline-block;font-size:15px;letter-spacing:0.3px;">
-    Contact Us →
+    <span contenteditable="true" style="color:{theme['text_on_primary']} !important;font-weight:700 !important;outline:none;">Contact Us →</span>
   </a>
 </div>"""
 
 
-def _render_step_diagram(steps_raw: str) -> str:
+def _render_step_diagram(steps_raw: str, website=None) -> str:
     """Converts 'Step1|Step2|Step3' pipe-separated string to styled HTML step flow."""
     steps = [s.strip() for s in steps_raw.split('|') if s.strip()]
-    accent_colors = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4']
+    theme = _get_brand_theme(website)
+    accent_colors = [theme['primary'], theme['secondary'], '#10b981', '#8b5cf6', '#ef4444', '#06b6d4']
     items_html = ""
     for i, step in enumerate(steps):
         color = accent_colors[i % len(accent_colors)]
         items_html += f"""
-  <div style="background:#ffffff;border-radius:12px;padding:22px 16px;
+  <div style="background:#ffffff !important;border-radius:12px;padding:22px 16px;
               flex:1;min-width:130px;max-width:200px;text-align:center;
-              border-top:4px solid {color};
-              box-shadow:0 2px 10px rgba(0,0,0,0.07);">
-    <div style="font-size:28px;font-weight:900;color:{color};line-height:1;">{str(i+1).zfill(2)}.</div>
-    <div style="font-weight:700;margin-top:10px;font-size:14px;color:#1e293b;line-height:1.4;">{step}</div>
+              border-top:4px solid {color} !important;
+              box-shadow:0 2px 10px rgba(0,0,0,0.07) !important;">
+    <div style="font-size:28px;font-weight:900;color:{color} !important;line-height:1;">{str(i+1).zfill(2)}.</div>
+    <div contenteditable="true" style="font-weight:700 !important;margin-top:10px;font-size:14px;color:#1e293b !important;line-height:1.4;outline:none;">{step}</div>
   </div>"""
     return f"""
-<div style="display:flex;gap:12px;margin:36px 0;flex-wrap:wrap;justify-content:center;
-            align-items:stretch;">
-{items_html}
+<div contenteditable="false" draggable="false" class="custom-block-wrapper"
+     style="display:flex;flex-direction:column;gap:8px;margin:36px 0;position:relative;">
+  <!-- Drag Handle -->
+  <div class="block-drag-handle" contenteditable="false" style="position:absolute;left:50%;top:-22px;transform:translateX(-50%);cursor:grab;color:var(--text-muted);font-size:18px;font-weight:bold;user-select:none;">⠿</div>
+  
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:stretch;margin-top:12px;">
+    {items_html}
+  </div>
 </div>"""
 
 
 def _render_infographic_block(img_url: str, caption: str) -> str:
     """Returns an HTML figure block embedding the infographic."""
     return f"""
-<figure style="margin:40px 0;text-align:center;">
+<figure contenteditable="false" draggable="false" class="custom-block-wrapper"
+        style="margin:40px 0;text-align:center;position:relative;">
+  <!-- Drag Handle -->
+  <div class="block-drag-handle" contenteditable="false" style="position:absolute;left:50%;top:-22px;transform:translateX(-50%);cursor:grab;color:var(--text-muted);font-size:18px;font-weight:bold;user-select:none;">⠿</div>
+  
   <img src="{img_url}" alt="{caption}"
        style="max-width:100%;border-radius:14px;
-              box-shadow:0 6px 24px rgba(0,0,0,0.12);display:block;margin:0 auto;" />
-  <figcaption style="color:#64748b;font-size:13px;margin-top:10px;font-style:italic;">
+              box-shadow:0 6px 24px rgba(0,0,0,0.12);display:block;margin:12px auto 0;" />
+  <figcaption contenteditable="true" style="color:#64748b;font-size:13px;margin-top:10px;font-style:italic;outline:none;">
     {caption}
   </figcaption>
 </figure>"""
 
 
-def inject_visual_elements(body: str, website, topic: str) -> str:
+def inject_visual_elements(body: str, website, topic: str, include_infographics: bool = True, include_cta: bool = True) -> str:
     """
     Post-processes a generated blog HTML body and replaces special markers with
     rich visual elements:
@@ -1001,16 +1094,22 @@ def inject_visual_elements(body: str, website, topic: str) -> str:
     import re
 
     # 1. Replace CTA markers
+    def _replace_cta(m):
+        if not include_cta:
+            logger.info("CTA banner disabled by user. Removing marker silently.")
+            return ""
+        return _render_cta_banner(website)
+
     body = re.sub(
         r'<!--\s*CADENCE_CTA\s*-->',
-        _render_cta_banner(website),
+        _replace_cta,
         body,
         flags=re.IGNORECASE
     )
 
     # 2. Replace step diagram markers
     def _replace_steps(m):
-        return _render_step_diagram(m.group(1))
+        return _render_step_diagram(m.group(1), website=website)
     body = re.sub(
         r'<!--\s*CADENCE_STEPS:\s*([^>]+?)\s*-->',
         _replace_steps,
@@ -1020,8 +1119,11 @@ def inject_visual_elements(body: str, website, topic: str) -> str:
 
     # 3. Replace infographic markers (generate image per marker)
     def _replace_infographic(m):
+        if not include_infographics:
+            logger.info("Infographics disabled by user. Removing marker silently.")
+            return ""
         description = m.group(1).strip()
-        img_url = _generate_infographic_image(description, topic)
+        img_url = _generate_infographic_image(description, topic, website=website)
         if img_url:
             return _render_infographic_block(img_url, description)
         # Fallback: remove the marker silently if image gen fails
@@ -1038,7 +1140,7 @@ def inject_visual_elements(body: str, website, topic: str) -> str:
     return body
 
 
-def generate_blog_post(idea: ContentIdea, website: Website) -> dict:
+def generate_blog_post(idea: ContentIdea, website: Website, include_infographics: bool = True, include_cta: bool = True) -> dict:
     """Generates a full blog post using a single prompt approach."""
     # Get live search data
     logger.info(f"Performing live search for topic: {idea.title}")
@@ -1107,7 +1209,7 @@ Return ONLY valid JSON in the following format:
     "category": "A relevant single-word or short phrase category (e.g., Marketing, Engineering)",
     "tags": ["tag1", "tag2"],
     "excerpt": "A brief 2-3 sentence overview of the article",
-    "body": "Your full, deep-dive article content formatted in clean HTML. CRITICAL WORD COUNT: The body MUST be 900–1200 words minimum — count every word carefully before finishing. Use 5–6 detailed H2 sections with multiple paragraphs each. Allowed tags: h2, h3, p, ul, ol, li, strong, a, blockquote, figure, figcaption, div. VISUAL MARKERS — embed these HTML comments naturally inside the body at appropriate positions (do NOT place them all at the end): (1) Place exactly one '<!-- CADENCE_CTA -->' somewhere mid-article between two sections where a call-to-action fits naturally (e.g. after explaining a problem or benefit). (2) If the article describes a process, workflow, or sequential steps, place '<!-- CADENCE_STEPS: Step One Title|Step Two Title|Step Three Title|Step Four Title -->' immediately after the paragraph that introduces the steps — use 3 to 6 pipe-separated step labels. (3) Place exactly one '<!-- CADENCE_INFOGRAPHIC: brief description of what the infographic should visually show -->' after the second or third H2 section where a diagram or visual overview would benefit the reader most. Each marker must appear only once. Keep all markers on their own line between HTML elements."
+    "body": "Your full, deep-dive article content formatted in clean HTML. CRITICAL WORD COUNT: The body MUST be between 900 and 1200 words total. The content will be rejected if it is under 900 words. You MUST write at least 5-6 detailed H2 sections, and each H2 section MUST have at least 3-4 full paragraphs (4-5 sentences each) with thorough explanations. Do not use brief bullet points or quick summaries. Allowed tags: h2, h3, p, ul, ol, li, strong, a, blockquote, figure, figcaption, div. VISUAL MARKERS — embed these HTML comments naturally inside the body at appropriate positions (do NOT place them all at the end): (1) Place exactly one '<!-- CADENCE_CTA -->' somewhere mid-article between two sections where a call-to-action fits naturally (e.g. after explaining a problem or benefit). (2) If the article describes a process, workflow, or sequential steps, place '<!-- CADENCE_STEPS: Step One Title|Step Two Title|Step Three Title|Step Four Title -->' immediately after the paragraph that introduces the steps — use 3 to 6 pipe-separated step labels. (3) Place exactly one '<!-- CADENCE_INFOGRAPHIC: brief description of what the infographic should visually show -->' after the second or third H2 section where a diagram or visual overview would benefit the reader most. Each marker must appear only once. Keep all markers on their own line between HTML elements."
 }}
 """
 
@@ -1328,7 +1430,7 @@ Return ONLY valid JSON in the following format:
         if raw_body:
             try:
                 logger.info(f"Injecting visual elements for: {idea.title}")
-                content['body'] = inject_visual_elements(raw_body, website, idea.title)
+                content['body'] = inject_visual_elements(raw_body, website, idea.title, include_infographics=include_infographics, include_cta=include_cta)
                 logger.info('Visual element injection complete.')
             except Exception as viz_err:
                 logger.warning(f"Visual injection failed (using raw body): {viz_err}")
@@ -1410,8 +1512,8 @@ def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> 
         logger.warning(f"AI social post generation failed: {e}. Falling back to basic template.")
         content = {
             "title": idea.title,
-            "body": f"🚀 Exploring {idea.title}! Consistent content is key to building a strong digital presence. What are your thoughts on this? 👇 #cadence #contentmarketing #ai",
-            "excerpt": f"🚀 Exploring {idea.title}! Consistent content is key to building a strong digital presence. What are your thoughts on this? 👇 #cadence #contentmarketing #ai",
+            "body": f"🚀 Exploring {idea.title}! Consistent content is key to building a strong digital presence. What are your thoughts on this? 👇 #candence #contentmarketing #ai",
+            "excerpt": f"🚀 Exploring {idea.title}! Consistent content is key to building a strong digital presence. What are your thoughts on this? 👇 #candence #contentmarketing #ai",
             "tags": ["content", "ai"],
             "meta_description": "",
             "generation_prompt": user_prompt,
@@ -2579,7 +2681,7 @@ Do NOT include any markdown formatting. Return ONLY the raw JSON object."""
     return "", None
 
 
-def generate_for_idea(idea_id: int, generate_image: bool = True):
+def generate_for_idea(idea_id: int, generate_image: bool = True, include_infographics: bool = True, include_cta: bool = True):
     """Main entry point called by Celery task."""
     from .models import ContentIdea, ContentDraft
     
@@ -2598,7 +2700,7 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
         cover_image_url = ""
         category_name = ""
         if idea.platform == 'blog':
-            content_data = generate_blog_post(idea, website)
+            content_data = generate_blog_post(idea, website, include_infographics=include_infographics, include_cta=include_cta)
             category_name = content_data.get('category', 'General')
         else:
             content_data = generate_social_post(idea, website, idea.platform)
@@ -2620,20 +2722,25 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
                 )
                 
                 if png_filename:
-                    cover_image_url = f"/static/media/{png_filename}"
+                    # Upload the generated cover PNG/JPG to ImgBB for permanent public hosting
+                    media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
+                    filepath = os.path.join(media_dir, png_filename)
+                    public_url = ""
+                    try:
+                        with open(filepath, 'rb') as img_f:
+                            import base64
+                            public_url = _upload_bytes_to_imgbb(img_f.read(), png_filename)
+                    except Exception as upload_err:
+                        logger.warning(f"Failed to upload PNG cover to ImgBB: {upload_err}")
+                    
+                    cover_image_url = public_url if public_url else f"/static/media/{png_filename}"
                     logger.info(f"Successfully generated and saved GPT PNG cover image to: {cover_image_url}")
                 elif svg_code:
-                    media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
-                    os.makedirs(media_dir, exist_ok=True)
-                    
-                    filename = f"cover_{uuid.uuid4().hex}.svg"
-                    filepath = os.path.join(media_dir, filename)
-                    
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write(svg_code)
-                        
-                    cover_image_url = f"/static/media/{filename}"
-                    logger.info(f"Successfully generated and saved GPT SVG cover image to: {cover_image_url}")
+                    # Convert SVG directly to base64 Data URL so it loads instantly everywhere without server hosting dependency
+                    import base64
+                    svg_base64 = base64.b64encode(svg_code.encode('utf-8')).decode('utf-8')
+                    cover_image_url = f"data:image/svg+xml;base64,{svg_base64}"
+                    logger.info("Successfully converted GPT SVG cover to inline base64 Data URL.")
             except Exception as img_err:
                 logger.warning(f"Failed to generate GPT SVG cover image: {img_err}")
         
@@ -2652,14 +2759,11 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
             status='draft',
             cover_image=cover_image_url,
             category=category_name,
+            include_infographics=include_infographics,
+            include_cta=include_cta,
         )
         
-        # Inject internal links automatically
-        try:
-            from .utils import inject_internal_links
-            inject_internal_links(draft)
-        except Exception as link_err:
-            logger.warning(f"Failed to inject internal links on success: {link_err}")
+        # Internal links injection is now user-triggered manually via 'Link References' button
             
         idea.status = 'done'
         idea.save(update_fields=['status'])
@@ -2679,7 +2783,7 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
                 category_name = fallback_data['category']
                 title_val = fallback_data['title']
             else:
-                body = f"🚀 Exploring {idea.title}! Consistent content is key to building a strong digital presence. What are your thoughts on this? 👇 #cadence #contentmarketing #ai"
+                body = f"🚀 Exploring {idea.title}! Consistent content is key to building a strong digital presence. What are your thoughts on this? 👇 #candence #contentmarketing #ai"
                 excerpt = body
                 tags = ["content", "ai"]
                 meta_desc = ""
@@ -2701,14 +2805,11 @@ def generate_for_idea(idea_id: int, generate_image: bool = True):
                 status='draft',
                 cover_image="",
                 category=category_name,
+                include_infographics=include_infographics,
+                include_cta=include_cta,
             )
             
-            # Inject internal links automatically
-            try:
-                from .utils import inject_internal_links
-                inject_internal_links(draft)
-            except Exception as link_err:
-                logger.warning(f"Failed to inject internal links on fallback: {link_err}")
+            # Internal links injection is now user-triggered manually via 'Link References' button
                 
             idea.status = 'done'
             idea.save(update_fields=['status'])
@@ -2762,7 +2863,7 @@ def generate_suggested_ideas(website):
     based on the website's crawled topics, industry, and tone.
     """
     topics_str = ", ".join(website.topics) if website.topics else "General marketing, SEO, and business growth"
-    prompt = f"""You are a content strategy generator for Cadence.
+    prompt = f"""You are a content strategy generator for Candence.
 Analyze this website context:
 - Name: {website.name}
 - Industry: {website.industry or "Technology & Marketing"}

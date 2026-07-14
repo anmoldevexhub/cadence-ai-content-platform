@@ -30,7 +30,17 @@ STOPWORDS = {
     'doesn\'t', 'don\'t', 'didn\'t', 'won\'t', 'wouldn\'t', 'shan\'t', 'shouldn\'t',
     'can\'t', 'cannot', 'couldn\'t', 'mustn\'t', 'let\'s', 'that\'s', 'who\'s',
     'what\'s', 'here\'s', 'there\'s', 'when\'s', 'where\'s', 'why\'s', 'how\'s',
-    'a\'s', 'c\'s', 't\'s', 'us'
+    'a\'s', 'c\'s', 't\'s', 'us',
+    
+    # Lorem Ipsum template placeholders
+    'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit',
+    'interdum', 'donec', 'ultrices', 'mauris', 'eros', 'non', 'erat', 'nam',
+    'lectus', 'duis', 'tempus', 'iaculis', 'urna', 'pellentesque', 'eleifend',
+    'rutrum', 'tellus', 'praesent', 'vestibulum', 'sollicitudin', 'convallis',
+    'suspendisse', 'vulputate', 'aliquam', 'nullam', 'phasellus', 'porttitor',
+    'vehicula', 'feugiat', 'libero', 'curabitur', 'molestie', 'interdum velit',
+    'donec ultrices', 'mauris ultrices', 'non consectetur', 'erat nam', 'lectus urna',
+    'tempus iaculis', 'rutrum tellus'
 }
 
 CTA_KEYWORDS = {

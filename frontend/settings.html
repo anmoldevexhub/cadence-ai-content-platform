@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Settings · Cadence</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <title>Settings · Candence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -47,7 +47,7 @@
                   <div class="field"><label class="label">Job title</label><input class="input" id="pJobTitle" value="Content Manager"/></div>
                   <div class="field"><label class="label">Timezone</label><select class="select" id="pTimezone"><option>(GMT-08:00) Pacific Time</option><option>(GMT+00:00) London</option><option>(GMT+01:00) Berlin</option><option selected>(GMT+05:30) India (Kolkata)</option></select></div>
                 </div>
-                <div class="field" style="margin-bottom:0"><label class="label">Bio</label><textarea class="textarea" id="pBio">Managing content for specialty brands at Cadence.</textarea></div>
+                <div class="field" style="margin-bottom:0"><label class="label">Bio</label><textarea class="textarea" id="pBio">Managing content for specialty brands at Candence.</textarea></div>
               </div>
               <div class="card card-pad">
                 <h3 class="set-h">Appearance</h3>
@@ -73,11 +73,11 @@
   <script src="app.js"></script>
   <script>
   (function () {
-    if (!window.Cadence || !window.MOCK) {
-      console.error("[Settings] Cadence or MOCK not loaded. Buttons may not work.");
+    if (!window.Candence || !window.MOCK) {
+      console.error("[Settings] Candence or MOCK not loaded. Buttons may not work.");
       return;
     }
-    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    const C = window.Candence, M = window.MOCK, I = C.icon;
     const usersObj = M.users || {};
     const u = (C.store.role === "super" ? usersObj.super : usersObj.admin) || usersObj.admin || {};
 
@@ -90,24 +90,24 @@
     };
 
     // Load initial profile data
-    if (document.getElementById("pName")) document.getElementById("pName").value = localStorage.getItem("cadence.settings.name") || u.name || "";
-    if (document.getElementById("pEmail")) document.getElementById("pEmail").value = localStorage.getItem("cadence.settings.email") || u.email || "";
-    if (document.getElementById("pJobTitle")) document.getElementById("pJobTitle").value = localStorage.getItem("cadence.settings.jobTitle") || "Content Manager";
-    if (document.getElementById("pTimezone")) document.getElementById("pTimezone").value = localStorage.getItem("cadence.settings.timezone") || "(GMT+05:30) India (Kolkata)";
-    if (document.getElementById("pBio")) document.getElementById("pBio").value = localStorage.getItem("cadence.settings.bio") || "Managing content for specialty brands at Cadence.";
+    if (document.getElementById("pName")) document.getElementById("pName").value = localStorage.getItem("candence.settings.name") || u.name || "";
+    if (document.getElementById("pEmail")) document.getElementById("pEmail").value = localStorage.getItem("candence.settings.email") || u.email || "";
+    if (document.getElementById("pJobTitle")) document.getElementById("pJobTitle").value = localStorage.getItem("candence.settings.jobTitle") || "Content Manager";
+    if (document.getElementById("pTimezone")) document.getElementById("pTimezone").value = localStorage.getItem("candence.settings.timezone") || "(GMT+05:30) India (Kolkata)";
+    if (document.getElementById("pBio")) document.getElementById("pBio").value = localStorage.getItem("candence.settings.bio") || "Managing content for specialty brands at Candence.";
 
     // Load scheduler data (guarded)
     const sRunDay = document.getElementById("sRunDay");
-    if (sRunDay) sRunDay.value = localStorage.getItem("cadence.settings.runDay") || "Monday";
+    if (sRunDay) sRunDay.value = localStorage.getItem("candence.settings.runDay") || "Monday";
     const sRunTime = document.getElementById("sRunTime");
-    if (sRunTime) sRunTime.value = localStorage.getItem("cadence.settings.runTime") || "09:00";
+    if (sRunTime) sRunTime.value = localStorage.getItem("candence.settings.runTime") || "09:00";
     const sAutoGenerate = document.getElementById("sAutoGenerate");
-    if (sAutoGenerate) sAutoGenerate.checked = localStorage.getItem("cadence.settings.autoGenerate") !== "false";
+    if (sAutoGenerate) sAutoGenerate.checked = localStorage.getItem("candence.settings.autoGenerate") !== "false";
     const sAutoPublish = document.getElementById("sAutoPublish");
-    if (sAutoPublish) sAutoPublish.checked = localStorage.getItem("cadence.settings.autoPublish") !== "false";
+    if (sAutoPublish) sAutoPublish.checked = localStorage.getItem("candence.settings.autoPublish") !== "false";
 
     function updateProfileAvatar() {
-      const savedAv = localStorage.getItem("cadence.settings.avatar");
+      const savedAv = localStorage.getItem("candence.settings.avatar");
       const profAv = document.getElementById("profAv");
       if (profAv) {
         if (savedAv) {
@@ -153,7 +153,7 @@
               ctx.drawImage(img, x, y, size, size, 0, 0, 150, 150);
               
               const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-              localStorage.setItem("cadence.settings.avatar", dataUrl);
+              localStorage.setItem("candence.settings.avatar", dataUrl);
               updateProfileAvatar();
               C.mountShell(); // rebuilds the topbar and sidebar instantly
               C.toast({ type: "success", title: "Photo uploaded successfully" });
@@ -185,12 +185,12 @@
       ["Weekly run summary","A Monday recap of what was generated",true,true],
       ["Approval reminders","If drafts sit unreviewed for 24h",true,false],
       ["Mentions &amp; comments","When someone @mentions you",false,true],
-      ["Product updates","New features and tips from Cadence",false,true],
+      ["Product updates","New features and tips from Candence",false,true],
     ];
 
     let savedNotifs;
     try {
-      savedNotifs = JSON.parse(localStorage.getItem("cadence.settings.notifications"));
+      savedNotifs = JSON.parse(localStorage.getItem("candence.settings.notifications"));
     } catch(e) {}
 
     const notifs = defaultNotifs.map(([title, desc, emailVal, inappVal], idx) => {
@@ -213,7 +213,7 @@
     const defaultTimes = [["Blog","blog","08:00"],["LinkedIn","linkedin","08:30"],["YouTube","youtube","17:00"],["Instagram","instagram","12:30"]];
     let savedTimes;
     try {
-      savedTimes = JSON.parse(localStorage.getItem("cadence.settings.postingTimes"));
+      savedTimes = JSON.parse(localStorage.getItem("candence.settings.postingTimes"));
     } catch(e) {}
 
     const times = defaultTimes.map(([n,t,tm]) => {
@@ -246,7 +246,7 @@
 
     let conns;
     try {
-      conns = JSON.parse(localStorage.getItem("cadence.settings.connections")) || defaultConns;
+      conns = JSON.parse(localStorage.getItem("candence.settings.connections")) || defaultConns;
     } catch(e) {
       conns = defaultConns;
     }
@@ -283,7 +283,7 @@
             connItem.connected = false;
             connItem.status = "Not connected";
             connItem.webhook_url = "";
-            localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
+            localStorage.setItem("candence.settings.connections", JSON.stringify(conns));
             renderConnections();
             C.toast({ type: "info", title: `${connItem.name} disconnected` });
           } else {
@@ -314,7 +314,7 @@
         connItem.connected = true;
         connItem.status = "Connected with Webhook";
         connItem.webhook_url = url;
-        localStorage.setItem("cadence.settings.connections", JSON.stringify(conns));
+        localStorage.setItem("candence.settings.connections", JSON.stringify(conns));
         C.closeModal("connectSocialModal");
         renderConnections();
         C.toast({ type: "success", title: `${connItem.name} connected`, desc: "Webhook configured successfully!" });
@@ -422,17 +422,17 @@
         if (progressBar) progressBar.style.width = "60%";
         
         // --- Always save to localStorage first (non-blocking) ---
-        localStorage.setItem("cadence.settings.name", name);
-        localStorage.setItem("cadence.settings.email", email);
-        localStorage.setItem("cadence.settings.jobTitle", jobTitle);
-        localStorage.setItem("cadence.settings.timezone", timezone);
-        localStorage.setItem("cadence.settings.bio", bio);
-        localStorage.setItem("cadence.settings.runDay", runDay);
-        localStorage.setItem("cadence.settings.runTime", runTime);
-        localStorage.setItem("cadence.settings.autoGenerate", autoGen);
-        localStorage.setItem("cadence.settings.autoPublish", autoPub);
-        localStorage.setItem("cadence.settings.notifications", JSON.stringify(savedNotifs));
-        localStorage.setItem("cadence.settings.postingTimes", JSON.stringify(savedTimes));
+        localStorage.setItem("candence.settings.name", name);
+        localStorage.setItem("candence.settings.email", email);
+        localStorage.setItem("candence.settings.jobTitle", jobTitle);
+        localStorage.setItem("candence.settings.timezone", timezone);
+        localStorage.setItem("candence.settings.bio", bio);
+        localStorage.setItem("candence.settings.runDay", runDay);
+        localStorage.setItem("candence.settings.runTime", runTime);
+        localStorage.setItem("candence.settings.autoGenerate", autoGen);
+        localStorage.setItem("candence.settings.autoPublish", autoPub);
+        localStorage.setItem("candence.settings.notifications", JSON.stringify(savedNotifs));
+        localStorage.setItem("candence.settings.postingTimes", JSON.stringify(savedTimes));
 
         // Update name locally in mock data (so topbar & sidebar reflect new name immediately)
         u.name = name || u.name;
@@ -447,7 +447,7 @@
 
         // --- Try to persist profile to backend (soft failure) ---
         try {
-          await CadenceAPI.request('/auth/me/', {
+          await CandenceAPI.request('/auth/me/', {
             method: 'PATCH',
             body: JSON.stringify({
               first_name: firstName,
@@ -459,9 +459,9 @@
             })
           });
           // Refresh local user cache from backend
-          await CadenceAPI.getMe();
+          await CandenceAPI.getMe();
           await M.syncMockData();
-          const me = CadenceAPI.getUser();
+          const me = CandenceAPI.getUser();
           if (me) {
             u.name = (me.first_name + ' ' + me.last_name).trim() || u.name;
             u.initials = ((me.first_name ? me.first_name[0] : '') + (me.last_name ? me.last_name[0] : '')).toUpperCase() || u.initials;
@@ -538,7 +538,7 @@
           <label class="label">Webhook URL (Make.com, Zapier, or API Endpoint)</label>
           <input type="url" id="connectWebhookUrl" class="input" placeholder="e.g. https://hook.us1.make.com/..." required style="width:100%" />
           <div class="muted tsm" style="margin-top: 8px; line-height: 1.4;">
-            Enter a real webhook URL. When a post is published globally, Cadence will send a POST request with the content payload.
+            Enter a real webhook URL. When a post is published globally, Candence will send a POST request with the content payload.
           </div>
         </div>
       </div>

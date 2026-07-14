@@ -2,7 +2,7 @@
    CADENCE — website workspace logic
    ========================================================================== */
 (function () {
-  const C = window.Cadence, M = window.MOCK, I = C.icon;
+  const C = window.Candence, M = window.MOCK, I = C.icon;
   const params = new URLSearchParams(location.search);
   let site = M.site(params.get("site")) || M.websites[0];
 
@@ -230,7 +230,7 @@
         e.stopPropagation();
         const id = btn.dataset.delId;
         try {
-          await CadenceAPI.unscheduleDraft(id);
+          await CandenceAPI.unscheduleDraft(id);
           C.toast({ type: "success", title: "Removed from calendar" });
           await M.syncMockData();
           renderWorkspaceCalendar();
@@ -325,7 +325,7 @@
           return;
         }
         try {
-          await CadenceAPI.scheduleDraft(dragged.id, targetDate.toISOString());
+          await CandenceAPI.scheduleDraft(dragged.id, targetDate.toISOString());
           await M.syncMockData();
           renderWorkspaceCalendar();
           C.toast({ type: "success", title: "Rescheduled", desc: `Moved to ${slot.dataset.day}` });
@@ -372,7 +372,7 @@
       const targetDate = new Date(`${dateVal}T${timeVal}:00`);
       if (targetDate < new Date()) { C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule in the past." }); return; }
       try {
-        await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+        await CandenceAPI.scheduleDraft(card.id, targetDate.toISOString());
         C.closeModal("editScheduleModal");
         await M.syncMockData();
         renderWorkspaceCalendar();
@@ -489,7 +489,7 @@
           try {
             repubBtn.disabled = true;
             C.toast({ type: "info", title: "Updating Live Post", desc: "Pushing changes to the website..." });
-            await CadenceAPI.republishDraft(item.id);
+            await CandenceAPI.republishDraft(item.id);
             C.toast({ type: "success", title: "Republish Succeeded", desc: "Your live blog has been updated!" });
             C.closeModal("largePreviewModal");
           } catch(err) {
@@ -608,7 +608,7 @@
             data.logo_upload = logoUploadBase64;
           }
           
-          await CadenceAPI.updateWebsite(site.id, data);
+          await CandenceAPI.updateWebsite(site.id, data);
           
           // Sync local mock data
           await window.MOCK.syncMockData(site.id);
@@ -663,7 +663,7 @@
       const nextStatus = site.status === "Paused" ? "active" : "paused";
       pauseBtn.disabled = true;
       try {
-        await CadenceAPI.updateWebsite(site.id, { status: nextStatus });
+        await CandenceAPI.updateWebsite(site.id, { status: nextStatus });
         await window.MOCK.syncMockData(site.id);
         site = window.MOCK.site(site.id);
         
@@ -686,7 +686,7 @@
     confirmDeleteSiteBtn.addEventListener("click", async () => {
       confirmDeleteSiteBtn.disabled = true;
       try {
-        await CadenceAPI.deleteWebsite(site.id);
+        await CandenceAPI.deleteWebsite(site.id);
         C.toast({ type: "success", title: "Website removed", desc: "Successfully moved to Trash." });
         setTimeout(() => {
           window.location.href = "dashboard.html";
@@ -703,7 +703,7 @@
 
   async function loadSamples() {
     try {
-      currentSamples = await CadenceAPI.getSamples(site.id);
+      currentSamples = await CandenceAPI.getSamples(site.id);
       renderSamplesList();
     } catch (err) {
       console.error("Failed to load samples:", err);
@@ -750,7 +750,7 @@
         const id = cb.dataset.sampleId;
         const isActive = cb.checked;
         try {
-          await CadenceAPI.updateSample(site.id, id, { is_active: isActive });
+          await CandenceAPI.updateSample(site.id, id, { is_active: isActive });
           const sample = currentSamples.find(s => String(s.id) === String(id));
           if (sample) sample.is_active = isActive;
           C.toast({ type: "success", title: "Status updated", desc: `Sample is now ${isActive ? 'active' : 'inactive'}.` });
@@ -766,7 +766,7 @@
         const id = btn.dataset.sampleId;
         if (!confirm("Are you sure you want to delete this sample?")) return;
         try {
-          await CadenceAPI.deleteSample(site.id, id);
+          await CandenceAPI.deleteSample(site.id, id);
           currentSamples = currentSamples.filter(s => String(s.id) !== String(id));
           renderSamplesList();
           C.toast({ type: "success", title: "Sample deleted" });
@@ -805,8 +805,8 @@
       C.refreshIcons();
       
       try {
-        const content = await window.Cadence.readFileAsText(file);
-        const newSample = await CadenceAPI.addSample(site.id, {
+        const content = await window.Candence.readFileAsText(file);
+        const newSample = await CandenceAPI.addSample(site.id, {
           platform: platform,
           title: title,
           content: content,
@@ -836,7 +836,7 @@
 
   async function checkCrawlStatus() {
     try {
-      const res = await CadenceAPI.getCrawlStatus(site.id);
+      const res = await CandenceAPI.getCrawlStatus(site.id);
       if (res.status === "done" || res.status === "failed") {
         clearInterval(crawlInterval);
         crawlInterval = null;
@@ -907,7 +907,7 @@
       C.openModal("crawlProgressModal");
       
       try {
-        await CadenceAPI.triggerCrawl(site.id);
+        await CandenceAPI.triggerCrawl(site.id);
         C.toast({ type: "info", title: "Crawl started", desc: "Analyzing website style and page structure..." });
         crawlInterval = setInterval(async () => {
           await checkCrawlStatus();
@@ -1114,7 +1114,7 @@
         };
 
         try {
-          await CadenceAPI.updateWebsite(site.id, {
+          await CandenceAPI.updateWebsite(site.id, {
             style_guide: updatedGuide,
             tone: updatedGuide.primary_tone
           });
@@ -1174,7 +1174,7 @@
       };
 
       try {
-        await CadenceAPI.updateWebsite(site.id, {
+        await CandenceAPI.updateWebsite(site.id, {
           style_guide: updatedGuide,
           brand_colors: site.brand_colors || [],
           tone: tone
@@ -1201,7 +1201,7 @@
     if (!tableBody) return;
 
     try {
-      crawledPagesList = await CadenceAPI.getWebsitePages(site.id) || [];
+      crawledPagesList = await CandenceAPI.getWebsitePages(site.id) || [];
       renderCrawledPages();
     } catch (err) {
       console.error("Failed to load crawled pages:", err);
@@ -1367,7 +1367,7 @@
 
   async function loadConnections() {
     try {
-      activeConns = await CadenceAPI.getSocialConnections(site.id) || [];
+      activeConns = await CandenceAPI.getSocialConnections(site.id) || [];
     } catch(e) {
       console.error("Failed to load connections:", e);
       activeConns = [];
@@ -1516,7 +1516,7 @@
         const connId = btn.dataset.connId;
         if (confirm("Are you sure you want to disconnect this platform?")) {
           try {
-            await CadenceAPI.disconnectSocial(site.id, connId);
+            await CandenceAPI.disconnectSocial(site.id, connId);
             C.toast({ type: "info", title: "Channel disconnected", desc: "Configuration removed successfully" });
             await loadConnections();
           } catch(err) {
@@ -1575,7 +1575,7 @@
       btnSaveSocialConn.disabled = true;
       btnSaveSocialConn.textContent = "Connecting...";
       try {
-        await CadenceAPI.connectSocial(site.id, plat, url, authType, authPayload);
+        await CandenceAPI.connectSocial(site.id, plat, url, authType, authPayload);
         C.closeModal("connectSocialModal");
         C.toast({ type: "success", title: "Platform connected", desc: "Webhook configured successfully!" });
         await loadConnections();
@@ -1624,7 +1624,7 @@
       if (stdFields) stdFields.style.display = "block";
       if (ytFields) ytFields.style.display = "none";
       if (titleHeader) titleHeader.textContent = "New content idea";
-      if (subHeader) subHeader.textContent = "Pick a channel, give a topic — Cadence drafts it.";
+      if (subHeader) subHeader.textContent = "Pick a channel, give a topic — Candence drafts it.";
       if (iconHeader) {
         const pm = M.platMeta(curChan);
         iconHeader.className = `icon-tile tile-${pm.tile}`;
@@ -1633,6 +1633,10 @@
       if (genBtn) {
         genBtn.innerHTML = `<i data-lucide="sparkles"></i> Generate with AI`;
       }
+    }
+    const infoCheckboxCont = document.getElementById("infographicsCheckboxContainer");
+    if (infoCheckboxCont) {
+      infoCheckboxCont.style.display = (curChan === "Blog") ? "flex" : "none";
     }
     renderQueue();
     if (window.lucide) window.lucide.createIcons();
@@ -1683,7 +1687,7 @@
       document.getElementById("queueCount").textContent = "…";
     }
     try {
-      const suggestions = await CadenceAPI.getIdeaSuggestions(site.id) || [];
+      const suggestions = await CandenceAPI.getIdeaSuggestions(site.id) || [];
       ideaQueue = suggestions.map(s => ({
         chan: s.platform.charAt(0).toUpperCase() + s.platform.slice(1),
         title: s.title,
@@ -2302,7 +2306,7 @@
         
         if (act === "approve") {
           try {
-            await CadenceAPI.approveDraft(d.id);
+            await CandenceAPI.approveDraft(d.id);
             d.status = "Approved";
             C.toast({ type: "success", title: "Draft approved", desc: "Ready to schedule" });
             await M.syncMockData(site.id);
@@ -2314,7 +2318,7 @@
         }
         else if (act === "reject") {
           try {
-            await CadenceAPI.rejectDraft(d.id, "Rejected by administrator");
+            await CandenceAPI.rejectDraft(d.id, "Rejected by administrator");
             drafts = drafts.filter(x => x.id !== id);
             C.toast({ type: "info", title: "Draft rejected" });
             await M.syncMockData(site.id);
@@ -2352,7 +2356,7 @@
         }
         else if (act === "unschedule") {
           try {
-            await CadenceAPI.updateDraft(d.id, { status: "draft" });
+            await CandenceAPI.updateDraft(d.id, { status: "draft" });
             d.status = "Draft";
             C.toast({ type: "success", title: "Unscheduled", desc: "Draft moved back to Draft status" });
             await M.syncMockData(site.id);
@@ -2367,7 +2371,7 @@
             b.disabled = true;
             b.innerHTML = `${I("loader-circle", "class='spin' style='width:12px;height:12px'")} Linking...`;
             C.refreshIcons();
-            const updated = await CadenceAPI.injectInternalLinks(d.id);
+            const updated = await CandenceAPI.injectInternalLinks(d.id);
             d.body = updated.body;
             C.toast({ type: "success", title: "Links added", desc: "Successfully linked keywords to old posts!" });
             
@@ -2389,7 +2393,7 @@
             b.disabled = true;
             b.innerHTML = `${I("loader-circle", "class='spin' style='width:12px;height:12px'")} Removing...`;
             C.refreshIcons();
-            const updated = await CadenceAPI.removeInternalLinks(d.id);
+            const updated = await CandenceAPI.removeInternalLinks(d.id);
             d.body = updated.body;
             C.toast({ type: "success", title: "Links removed", desc: "Successfully removed all hyperlinks from the draft!" });
             
@@ -2422,7 +2426,7 @@
         else if (act === "more") {
           if (confirm("Move this draft to trash?")) {
             try {
-              await CadenceAPI.deleteDraft(d.id);
+              await CandenceAPI.deleteDraft(d.id);
               drafts = drafts.filter(x => x.id !== id);
               C.toast({ type: "success", title: "Draft moved to trash" });
               await M.syncMockData(site.id);
@@ -2444,18 +2448,23 @@
     let ideas = [];
     let draftsList = [];
     try {
-      ideas = JSON.parse(localStorage.getItem("cadence.active_ideas")) || [];
+      ideas = JSON.parse(localStorage.getItem("candence.active_ideas")) || [];
     } catch(e){}
     try {
-      draftsList = JSON.parse(localStorage.getItem("cadence.active_drafts")) || [];
+      draftsList = JSON.parse(localStorage.getItem("candence.active_drafts")) || [];
     } catch(e){}
     return { ideas, drafts: draftsList };
   }
 
   function saveActiveTasks(ideas, draftsList) {
-    localStorage.setItem("cadence.active_ideas", JSON.stringify(ideas));
-    localStorage.setItem("cadence.active_drafts", JSON.stringify(draftsList));
+    localStorage.setItem("candence.active_ideas", JSON.stringify(ideas));
+    localStorage.setItem("candence.active_drafts", JSON.stringify(draftsList));
   }
+
+  // IOS-Style Floating Progress Widget position state variables
+  let widgetCollapsed = false;
+  let widgetCustomX = null;
+  let widgetCustomY = null;
 
   function updateGlobalTaskWidget() {
     const { ideas, drafts: draftsList } = getActiveTasks();
@@ -2470,34 +2479,121 @@
     if (!widget) {
       widget = document.createElement("div");
       widget.id = "globalTaskWidget";
-      widget.style = `
-        position: fixed;
-        top: 76px;
-        right: 24px;
-        background: var(--surface);
-        border: 1px solid var(--border-strong);
-        border-radius: var(--r-md);
-        box-shadow: var(--sh-lg);
-        padding: 12px 18px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        z-index: 10000;
-        font-weight: 600;
-        font-size: 13px;
-        color: var(--text);
-        border-left: 4px solid var(--primary);
-      `;
+      widget.style.position = "fixed";
+      widget.style.zIndex = "100000";
+      widget.style.cursor = "grab";
+      widget.style.userSelect = "none";
+      widget.style.transition = "width 0.2s cubic-bezier(0.4, 0, 0.2, 1), height 0.2s, padding 0.2s, border-radius 0.2s";
+      
+      // Load custom position or default to top right
+      widget.style.top = widgetCustomY !== null ? `${widgetCustomY}px` : "76px";
+      if (widgetCustomX !== null) {
+        widget.style.left = `${widgetCustomX}px`;
+      } else {
+        widget.style.right = "24px";
+      }
+      
       document.body.appendChild(widget);
+
+      // Drag and drop event listeners
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let dragStartLeft = 0;
+      let dragStartTop = 0;
+      let hasMovedSignificant = false;
+
+      widget.addEventListener("mousedown", (e) => {
+        if (e.target.closest("button")) return;
+        
+        isDragging = true;
+        hasMovedSignificant = false;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        
+        const rect = widget.getBoundingClientRect();
+        dragStartLeft = rect.left;
+        dragStartTop = rect.top;
+        
+        widget.style.cursor = "grabbing";
+        e.preventDefault();
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+          hasMovedSignificant = true;
+        }
+        
+        let newX = dragStartLeft + dx;
+        let newY = dragStartTop + dy;
+        
+        newX = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, newX));
+        newY = Math.max(10, Math.min(window.innerHeight - widget.offsetHeight - 10, newY));
+        
+        widgetCustomX = newX;
+        widgetCustomY = newY;
+        
+        widget.style.left = `${newX}px`;
+        widget.style.top = `${newY}px`;
+        widget.style.right = "auto";
+      });
+
+      window.addEventListener("mouseup", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        widget.style.cursor = "grab";
+        
+        if (!hasMovedSignificant) {
+          widgetCollapsed = !widgetCollapsed;
+          updateGlobalTaskWidget();
+        }
+      });
     }
     
     const taskName = ideas.length > 0 ? `AI writing: "${ideas[0].title}"` : `Regenerating: "${draftsList[0].title}"`;
     const label = total > 1 ? `${taskName} (+${total - 1} more)` : taskName;
     
-    widget.innerHTML = `
-      <i data-lucide="loader-circle" class="spin" style="color:var(--primary); width:16px; height:16px;"></i>
-      <span>${label}</span>
-    `;
+    if (widgetCollapsed) {
+      widget.style.padding = "10px";
+      widget.style.borderRadius = "99px";
+      widget.style.background = "var(--primary)";
+      widget.style.border = "2px solid #ffffff";
+      widget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+      widget.style.display = "flex";
+      widget.style.alignItems = "center";
+      widget.style.justifyContent = "center";
+      widget.style.borderLeft = "none";
+      
+      widget.innerHTML = `
+        <div style="position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
+          <i data-lucide="loader-circle" class="spin" style="color:#ffffff; width:20px; height:20px;"></i>
+          <span style="position:absolute; top:-6px; right:-6px; background:#ef4444; color:#ffffff; font-size:9px; font-weight:bold; border-radius:99px; padding:1px 5px; border:1px solid #ffffff; box-shadow:0 2px 4px rgba(0,0,0,0.2);">${total}</span>
+        </div>
+      `;
+    } else {
+      widget.style.padding = "12px 18px";
+      widget.style.borderRadius = "var(--r-md)";
+      widget.style.background = "var(--surface)";
+      widget.style.border = "1px solid var(--border-strong)";
+      widget.style.boxShadow = "var(--sh-lg)";
+      widget.style.display = "flex";
+      widget.style.alignItems = "center";
+      widget.style.justifyContent = "flex-start";
+      widget.style.borderLeft = "4px solid var(--primary)";
+      
+      widget.innerHTML = `
+        <i data-lucide="loader-circle" class="spin" style="color:var(--primary); width:16px; height:16px; margin-right:12px;"></i>
+        <span style="font-weight:600; font-size:13px; color:var(--text); max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:10px;">${label}</span>
+        <button title="Collapse to Pill" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:11px; padding:2px; display:flex; align-items:center; opacity:0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+          <i data-lucide="minimize-2" style="width:12px; height:12px;"></i>
+        </button>
+      `;
+    }
+    
     C.refreshIcons();
   }
 
@@ -2526,7 +2622,7 @@
         const remainingIdeas = [];
         for (const idea of curIdeas) {
           try {
-            const updated = await CadenceAPI.getIdeaDetail(idea.id);
+            const updated = await CandenceAPI.getIdeaDetail(idea.id);
             if (updated && updated.status === 'done') {
               C.toast({ type: "success", title: "Content Generated", desc: `"${idea.title}" draft is now ready!` });
               changed = true;
@@ -2644,7 +2740,7 @@
     }
     
     try {
-      const res = await CadenceAPI.regenerateDraft(d.id, type);
+      const res = await CandenceAPI.regenerateDraft(d.id, type);
       
       // Save to localStorage active registry
       const { ideas: existingIdeas, drafts: existingDrafts } = getActiveTasks();
@@ -2665,7 +2761,7 @@
   }
 
   function genLoadingHTML() {
-    return `<div class="gen-loading"><div class="gl-head">${I("loader-circle","class='spin'")} Cadence is writing…</div>
+    return `<div class="gen-loading"><div class="gl-head">${I("loader-circle","class='spin'")} Candence is writing…</div>
       <div class="sk-line w80"></div><div class="sk-line"></div><div class="sk-line w60"></div><div class="sk-line"></div><div class="sk-line w40"></div></div>`;
   }
 
@@ -2692,7 +2788,7 @@
       C.refreshIcons();
       
       try {
-        const draft = await CadenceAPI.createDraft({
+        const draft = await CandenceAPI.createDraft({
           website: site.id,
           platform: "youtube",
           title: ytTitle,
@@ -2745,12 +2841,17 @@
     document.querySelectorAll(".ws-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "generate"));
     document.querySelectorAll("#wsPanels .tab-panel").forEach(pp => pp.classList.toggle("active", pp.dataset.panel === "generate"));
 
+    const addInfographicsEl = document.getElementById("addInfographics");
+    const includeInfographics = addInfographicsEl ? addInfographicsEl.checked : false;
+    const addCTAEl = document.getElementById("addCTA");
+    const includeCTA = addCTAEl ? addCTAEl.checked : false;
+
     try {
       const generatedIdeas = [];
       // Generate each title sequentially
       for (const title of titles) {
-        const idea = await CadenceAPI.submitIdea(site.id, title, curChan.toLowerCase(), notesVal);
-        await CadenceAPI.generateContent(idea.id);
+        const idea = await CandenceAPI.submitIdea(site.id, title, curChan.toLowerCase(), notesVal);
+        await CandenceAPI.generateContent(idea.id, includeInfographics, includeCTA);
         generatedIdeas.push({ id: idea.id, title: idea.title });
       }
 
@@ -3239,41 +3340,277 @@
         });
       }
       
+      // --- Premium Image Upload/URL Modal and Floating Remove Button ---
+      const modal = document.getElementById("insertInlineImageModal");
+      const tabUpload = document.getElementById("btnTabUpload");
+      const tabUrl = document.getElementById("btnTabUrl");
+      const panelUpload = document.getElementById("panelImageUpload");
+      const panelUrl = document.getElementById("panelImageUrl");
+      const fileInput = document.getElementById("inlineImageFileInput");
+      const urlInput = document.getElementById("inlineImageUrlInput");
+      const btnSubmitUrl = document.getElementById("btnSubmitImageUrl");
+
+      if (tabUpload && tabUrl && panelUpload && panelUrl) {
+        tabUpload.addEventListener("click", () => {
+          tabUpload.className = "btn btn-primary btn-sm";
+          tabUrl.className = "btn btn-ghost btn-sm";
+          panelUpload.style.display = "flex";
+          panelUrl.style.display = "none";
+        });
+        tabUrl.addEventListener("click", () => {
+          tabUrl.className = "btn btn-primary btn-sm";
+          tabUpload.className = "btn btn-ghost btn-sm";
+          panelUrl.style.display = "flex";
+          panelUpload.style.display = "none";
+        });
+      }
+
       const tbImg = document.getElementById("tb-image");
       if (tbImg) {
         tbImg.addEventListener("click", (e) => {
           e.preventDefault();
-          restoreSelection();
-          const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
-          if (url) {
-            restoreSelection();
-            document.execCommand("insertImage", false, url);
-            editBody.focus();
-            updateStats();
-          } else if (url === "") {
-            const inlineFileInput = document.getElementById("inlineImageFile");
-            if (inlineFileInput) inlineFileInput.click();
-          }
+          saveSelection();
+          C.openModal("insertInlineImageModal");
         });
       }
 
-      const inlineFileInput = document.getElementById("inlineImageFile");
-      if (inlineFileInput) {
-        inlineFileInput.addEventListener("change", (e) => {
+      const insertImageAtSelection = (src) => {
+        restoreSelection();
+        const img = document.createElement("img");
+        img.src = src;
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.display = "block";
+        img.style.margin = "16px auto";
+        img.style.borderRadius = "var(--r-md)";
+        img.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
+
+        const selection = window.getSelection();
+        let rangeInserted = false;
+        
+        if (selection.rangeCount > 0 && savedRange) {
+          try {
+            const range = savedRange;
+            // Ensure the range is inside the editor content
+            if (editBody.contains(range.commonAncestorContainer)) {
+              range.deleteContents();
+              range.insertNode(img);
+              
+              // Insert an empty paragraph or line break after the image for easy continuation
+              const p = document.createElement("p");
+              p.innerHTML = "<br>";
+              img.after(p);
+              
+              const newRange = document.createRange();
+              newRange.setStart(p, 0);
+              newRange.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(newRange);
+              rangeInserted = true;
+            }
+          } catch (e) {
+            console.error("DOM Range insertion failed:", e);
+          }
+        }
+        
+        if (!rangeInserted) {
+          editBody.appendChild(img);
+          const p = document.createElement("p");
+          p.innerHTML = "<br>";
+          editBody.appendChild(p);
+        }
+        
+        editBody.focus();
+        updateStats();
+      };
+
+      if (fileInput) {
+        if (panelUpload) {
+          panelUpload.addEventListener("click", () => {
+            fileInput.click();
+          });
+        }
+        fileInput.addEventListener("change", (e) => {
           const file = e.target.files[0];
           if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-              restoreSelection();
               const base64 = event.target.result;
-              document.execCommand("insertImage", false, base64);
-              editBody.focus();
-              updateStats();
+              insertImageAtSelection(base64);
+              C.closeModal("insertInlineImageModal");
+              fileInput.value = ""; // reset
             };
             reader.readAsDataURL(file);
           }
         });
       }
+
+      if (btnSubmitUrl) {
+        btnSubmitUrl.addEventListener("click", () => {
+          const url = urlInput.value.trim();
+          if (url) {
+            insertImageAtSelection(url);
+            C.closeModal("insertInlineImageModal");
+            urlInput.value = ""; // reset
+          }
+        });
+      }
+
+      // --- Floating Remove Image Widget ---
+      let imageDeleteBtn = document.getElementById("floatingImageDeleteBtn");
+      if (!imageDeleteBtn) {
+        imageDeleteBtn = document.createElement("button");
+        imageDeleteBtn.id = "floatingImageDeleteBtn";
+        imageDeleteBtn.type = "button";
+        imageDeleteBtn.style.position = "absolute";
+        imageDeleteBtn.style.zIndex = "10000";
+        imageDeleteBtn.style.display = "none";
+        imageDeleteBtn.style.background = "#ef4444";
+        imageDeleteBtn.style.color = "#ffffff";
+        imageDeleteBtn.style.border = "none";
+        imageDeleteBtn.style.padding = "6px 12px";
+        imageDeleteBtn.style.borderRadius = "4px";
+        imageDeleteBtn.style.fontSize = "12px";
+        imageDeleteBtn.style.fontWeight = "bold";
+        imageDeleteBtn.style.cursor = "pointer";
+        imageDeleteBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+        imageDeleteBtn.innerHTML = "🗑️ Remove Image";
+        document.body.appendChild(imageDeleteBtn);
+      }
+
+      let activeEditImage = null;
+
+      const hideImageDeleteBtn = () => {
+        imageDeleteBtn.style.display = "none";
+        if (activeEditImage) {
+          activeEditImage.style.outline = "";
+          activeEditImage = null;
+        }
+      };
+
+      if (editBody) {
+        editBody.addEventListener("click", (e) => {
+          if (e.target.tagName === "IMG") {
+            activeEditImage = e.target;
+            const rect = activeEditImage.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+            imageDeleteBtn.style.top = `${rect.top + scrollTop + 8}px`;
+            imageDeleteBtn.style.left = `${rect.right + scrollLeft - 130}px`;
+            imageDeleteBtn.style.display = "block";
+
+            e.target.style.outline = "2px solid #ef4444";
+            e.target.style.outlineOffset = "2px";
+          } else {
+            if (e.target !== imageDeleteBtn) {
+              hideImageDeleteBtn();
+            }
+          }
+        });
+
+        editBody.addEventListener("keyup", hideImageDeleteBtn);
+        editBody.addEventListener("scroll", hideImageDeleteBtn);
+
+        // Drag and drop helper for custom blocks (CTA, infographics, steps)
+        let draggedNode = null;
+
+        // Dynamically toggle draggable attribute only when grabbing the handle
+        editBody.addEventListener("mousedown", (e) => {
+          const handle = e.target.closest(".block-drag-handle");
+          if (handle) {
+            const wrapper = handle.closest(".custom-block-wrapper");
+            if (wrapper) {
+              wrapper.setAttribute("draggable", "true");
+            }
+          }
+        });
+
+        editBody.addEventListener("mouseup", (e) => {
+          document.querySelectorAll(".custom-block-wrapper[draggable='true']").forEach(el => {
+            el.setAttribute("draggable", "false");
+          });
+        });
+
+        editBody.addEventListener("dragstart", (e) => {
+          // Find the wrapper (which was set to draggable="true" on mousedown on handle)
+          const target = e.target.closest(".custom-block-wrapper");
+          if (target && target.getAttribute("draggable") === "true") {
+            draggedNode = target;
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/html", target.outerHTML);
+          } else {
+            e.preventDefault(); // Prevent standard text selection drag
+          }
+        });
+
+        editBody.addEventListener("dragover", (e) => {
+          if (draggedNode) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+
+            // Auto-scroll editBody when dragging near the edges
+            const rect = editBody.getBoundingClientRect();
+            const topThreshold = rect.top + 60;
+            const bottomThreshold = rect.bottom - 60;
+
+            if (e.clientY < topThreshold) {
+              editBody.scrollTop -= 12;
+            } else if (e.clientY > bottomThreshold) {
+              editBody.scrollTop += 12;
+            }
+          }
+        });
+
+        editBody.addEventListener("drop", (e) => {
+          if (draggedNode) {
+            e.preventDefault();
+            let range = null;
+            if (document.caretRangeFromPoint) {
+              range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            } else if (e.rangeParent) {
+              range = document.createRange();
+              range.setStart(e.rangeParent, e.rangeOffset);
+            }
+
+            if (range) {
+              let targetNode = range.startContainer;
+              
+              // Resolve to element node if it's a text node
+              if (targetNode.nodeType === Node.TEXT_NODE) {
+                targetNode = targetNode.parentNode;
+              }
+              
+              // Find the top-level block inside editBody (e.g. direct child paragraph/header)
+              while (targetNode && targetNode.parentNode !== editBody) {
+                targetNode = targetNode.parentNode;
+              }
+              
+              draggedNode.remove();
+              
+              if (targetNode && editBody.contains(targetNode)) {
+                // Insert directly after the top-level paragraph to avoid styling breaking
+                targetNode.after(draggedNode);
+              } else {
+                editBody.appendChild(draggedNode);
+              }
+              
+              window.getSelection().removeAllRanges();
+            }
+            draggedNode = null;
+            updateStats();
+          }
+        });
+      }
+
+      imageDeleteBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (activeEditImage) {
+          activeEditImage.remove();
+          hideImageDeleteBtn();
+          updateStats();
+        }
+      });
     }
 
     // 4. Floating Selection Formatting Toolbar
@@ -3574,7 +3911,7 @@
       const meta_title = document.getElementById("editMetaTitle") ? document.getElementById("editMetaTitle").value.trim() : "";
       
       try {
-        await CadenceAPI.updateDraft(editing.id, { title, body, cover_image, tags, author_name, custom_date, category, meta_description, meta_title });
+        await CandenceAPI.updateDraft(editing.id, { title, body, cover_image, tags, author_name, custom_date, category, meta_description, meta_title });
         editing.title = title;
         editing.body = body;
         editing.cover_image = cover_image;
@@ -3630,7 +3967,7 @@
       
       confirmScheduleBtn.disabled = true;
       try {
-        await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        await CandenceAPI.scheduleDraft(draftId, targetDate.toISOString());
         
         // Find draft in our local drafts list and update status
         const d = drafts.find(x => x.id == draftId);
@@ -3773,7 +4110,7 @@
 
   async function loadUsageStats() {
     try {
-      const stats = await CadenceAPI.getTokenUsageStats(site.id);
+      const stats = await CandenceAPI.getTokenUsageStats(site.id);
 
       // Render simple stats cards
       document.getElementById("usageTotalTokens").textContent = C.fmt(stats.total_tokens);

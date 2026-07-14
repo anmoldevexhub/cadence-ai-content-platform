@@ -275,6 +275,14 @@ class InternalLinkingTests(APITestCase):
             tags=["SEO", "AEO", "Search"],
             status="published"
         )
+        from websites.models import ScrapeResult
+        ScrapeResult.objects.create(
+            website=self.website,
+            page_url="https://seohub.com/blog/seo-vs-aeo-search-in-2026",
+            page_title="SEO vs AEO: Search in 2026",
+            raw_text="This is a complete guide to search engines.",
+            categories_tags=["SEO", "AEO", "Search"]
+        )
 
     def test_inject_internal_links_by_title_and_tag(self):
         # Create a new draft containing keyword "SEO vs AEO"

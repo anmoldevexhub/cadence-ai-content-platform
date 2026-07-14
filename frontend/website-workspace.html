@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Workspace · Cadence</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <title>Workspace · Candence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -131,7 +131,7 @@
                     <span class="icon-tile tile-blog" id="composerHeaderIcon"><i data-lucide="lightbulb"></i></span>
                     <div>
                       <h3 style="font-size:var(--fs-lg)" id="composerHeaderTitle">New content idea</h3>
-                      <div class="muted tsm" id="composerHeaderSub">Pick a channel, give a topic — Cadence drafts it.</div>
+                      <div class="muted tsm" id="composerHeaderSub">Pick a channel, give a topic — Candence drafts it.</div>
                     </div>
                   </div>
 
@@ -154,6 +154,22 @@
                     <div class="field" style="margin-bottom:var(--s4)">
                       <label class="label" for="ideaNotes">Notes <span class="opt">(optional)</span></label>
                       <textarea class="textarea" id="ideaNotes" placeholder="Angle, key points, links to include, target keyword…"></textarea>
+                    </div>
+                    <div class="field" id="infographicsCheckboxContainer" style="margin-bottom:var(--s4); display:flex; flex-direction:column; gap:6px;">
+                      <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <input type="checkbox" id="addInfographics" checked style="width:16px; height:16px; cursor:pointer;" />
+                          <label for="addInfographics" style="font-size:var(--fs-sm); font-weight:500; cursor:pointer; user-select:none;">Add Infographics</label>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <input type="checkbox" id="addCTA" checked style="width:16px; height:16px; cursor:pointer;" />
+                          <label for="addCTA" style="font-size:var(--fs-sm); font-weight:500; cursor:pointer; user-select:none;">Add Contact Us (CTA)</label>
+                        </div>
+                      </div>
+                      <div class="muted txs" style="display:flex; align-items:center; gap:4px; color:var(--primary); background:rgba(9,80,117,0.06); padding:6px 10px; border-radius:6px; border:1px solid rgba(9,80,117,0.1)">
+                        <i data-lucide="image" style="width:12px;height:12px"></i>
+                        <span>Automatically generates custom AI infographics & diagrams in your blog to increase reader engagement.</span>
+                      </div>
                     </div>
                   </div>
 
@@ -448,7 +464,7 @@
                   <p class="muted txs mb3">Pausing stops all scheduled posting. Removing deletes all content.</p>
                   <div class="row gap2">
                     <button class="btn btn-secondary btn-sm" id="pauseSiteBtn"><i data-lucide="pause"></i> Pause website</button>
-                    <button class="btn btn-danger btn-sm" onclick="Cadence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button>
+                    <button class="btn btn-danger btn-sm" onclick="Candence.openModal('delModal')"><i data-lucide="trash-2"></i> Remove</button>
                   </div>
                 </div>
 
@@ -572,7 +588,7 @@
         </div>
 
         <div class="muted tsm" style="margin-top: 12px; line-height: 1.4;">
-          When a post is published, Cadence will send a POST request with the content title, body, and image URL to this endpoint.
+          When a post is published, Candence will send a POST request with the content title, body, and image URL to this endpoint.
         </div>
       </div>
       <div class="modal__foot" style="display: flex; justify-content: flex-end; gap: var(--s2); padding: var(--s4) var(--s5); border-top: 1px solid var(--border); align-items: center;">
@@ -592,6 +608,14 @@
           <div class="editor-main" id="editorMainArea">
             <div class="editor-paper" id="editorPaper">
               <input class="editor-title-input" id="editTitle" placeholder="Untitled Draft" />
+              
+              <!-- Drag-and-Drop & Custom Block Helper Banner -->
+              <div class="editor-helper-banner" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; margin:10px 0 16px; display:flex; align-items:center; gap:8px; font-size:12px; color:#1e40af; line-height:1.4;">
+                <span style="font-size:16px;">💡</span>
+                <div>
+                  <strong>Advanced Editor Tip:</strong> You can drag &amp; drop <strong>CTA banners</strong>, <strong>Infographics</strong>, and <strong>Step diagrams</strong> using their <code>⠿</code> grab handles. Click directly on text or button labels inside them to customize their content!
+                </div>
+              </div>
               
               <div class="rich-editor">
                 <div class="rich-toolbar" id="editorToolbar">
@@ -787,6 +811,40 @@
       <p class="muted tsm" style="margin-bottom: var(--s5); font-size: 13px;">Analyzing website layout, styles, and extracting brand voice. This might take a few moments...</p>
       <div class="progress-bar-wrap" style="width: 100%; height: 6px; background: var(--bg-subtle); border-radius: var(--r-full); overflow: hidden;">
         <div id="crawlProgressBar" style="width: 25%; height: 100%; background: var(--primary); transition: width 0.5s ease; border-radius: var(--r-full);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insert Inline Image Modal -->
+  <div class="modal-overlay" id="insertInlineImageModal">
+    <div class="modal" style="max-width: 420px; width: 90vw;">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Insert Inline Image</h3>
+          <div class="sub">Upload an image or paste a URL.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding:var(--s5); display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; gap:10px; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:4px;">
+          <button class="btn btn-primary btn-sm" id="btnTabUpload" style="flex:1;">Upload File</button>
+          <button class="btn btn-ghost btn-sm" id="btnTabUrl" style="flex:1;">Image URL</button>
+        </div>
+        
+        <!-- Tab 1: Upload File -->
+        <div id="panelImageUpload" style="display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px dashed var(--border); border-radius:8px; padding:32px; cursor:pointer; background:rgba(0,0,0,0.02); text-align:center;">
+          <i data-lucide="upload-cloud" style="width:36px; height:36px; color:var(--text-muted); margin-bottom:8px;"></i>
+          <span style="font-weight:600; font-size:14px; color:var(--text);">Select Image File</span>
+          <span class="txs muted mt1">Click to select an image from your computer</span>
+          <input type="file" id="inlineImageFileInput" accept="image/*" style="display:none;" />
+        </div>
+        
+        <!-- Tab 2: Image URL -->
+        <div id="panelImageUrl" style="display:none; flex-direction:column; gap:8px;">
+          <label class="label txs" style="font-weight:600;">Image URL</label>
+          <input class="input" type="url" id="inlineImageUrlInput" placeholder="https://example.com/image.jpg" style="width:100%; height:38px; padding:0 8px; border-radius:var(--r-sm); border:1px solid var(--border); background:var(--surface); color:var(--text);" />
+          <button class="btn btn-primary btn-sm mt2" id="btnSubmitImageUrl" style="width:100%;">Insert Image URL</button>
+        </div>
       </div>
     </div>
   </div>

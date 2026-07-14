@@ -43,11 +43,11 @@ def send_invite_email(invited_user, invited_by, password, request=None):
         inviter_name = invited_by.get_full_name() or invited_by.username
         role_display = 'Super Admin' if invited_user.role == 'super_admin' else 'Admin'
 
-        subject = f"You've been invited to Cadence as {role_display}"
+        subject = f"You've been invited to Candence as {role_display}"
 
         text_body = f"""Hi {full_name},
 
-{inviter_name} has added you to Cadence as {role_display}.
+{inviter_name} has added you to Candence as {role_display}.
 
 Your login details:
   Email:    {invited_user.email}
@@ -57,7 +57,7 @@ Sign in here: {login_url}
 
 Please change your password after logging in.
 
-The Cadence Team"""
+The Candence Team"""
 
         html_body = f"""
 <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8fafc">
@@ -66,18 +66,18 @@ The Cadence Team"""
       <div style="width:36px;height:36px;background:#6366f1;border-radius:10px;display:flex;align-items:center;justify-content:center">
         <span style="color:#fff;font-size:18px;font-weight:700">&#9835;</span>
       </div>
-      <span style="font-size:20px;font-weight:700;color:#1e293b">Cadence</span>
+      <span style="font-size:20px;font-weight:700;color:#1e293b">Candence</span>
     </div>
     <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0 0 8px">You're invited! &#127881;</h1>
     <p style="color:#64748b;margin:0 0 28px;line-height:1.6">
-      <strong>{inviter_name}</strong> has added you to <strong>Cadence</strong> as <strong>{role_display}</strong>.
+      <strong>{inviter_name}</strong> has added you to <strong>Candence</strong> as <strong>{role_display}</strong>.
     </p>
     <div style="background:#f1f5f9;border-radius:10px;padding:20px;margin-bottom:28px">
       <p style="margin:0 0 10px;font-size:13px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Your login details</p>
       <p style="margin:0 0 6px;color:#1e293b"><strong>Email:</strong> {invited_user.email}</p>
       <p style="margin:0;color:#1e293b"><strong>Temporary password:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px">{password}</code></p>
     </div>
-    <a href="{login_url}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:600;font-size:15px">Sign in to Cadence</a>
+    <a href="{login_url}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:600;font-size:15px">Sign in to Candence</a>
     <p style="margin:24px 0 0;font-size:12px;color:#94a3b8">Please change your password after your first login.</p>
   </div>
 </div>"""
@@ -393,17 +393,17 @@ class PasswordResetRequestView(APIView):
 
         full_name = user.get_full_name() or user.username
 
-        subject = "Reset your Cadence password"
+        subject = "Reset your Candence password"
         text_body = f"""Hi {full_name},
 
-We received a request to reset your Cadence password.
+We received a request to reset your Candence password.
 
 Click the link below to set a new password (expires in 30 minutes):
 {reset_url}
 
 If you didn't request this, you can safely ignore this email.
 
-The Cadence Team"""
+The Candence Team"""
 
         html_body = f"""
 <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f8fafc">
@@ -412,7 +412,7 @@ The Cadence Team"""
       <div style="width:36px;height:36px;background:#095075;border-radius:10px;display:flex;align-items:center;justify-content:center">
         <span style="color:#fff;font-size:18px;font-weight:700">&#9835;</span>
       </div>
-      <span style="font-size:20px;font-weight:700;color:#1e293b">Cadence</span>
+      <span style="font-size:20px;font-weight:700;color:#1e293b">Candence</span>
     </div>
     <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0 0 8px">Reset your password 🔐</h1>
     <p style="color:#64748b;margin:0 0 28px;line-height:1.6">

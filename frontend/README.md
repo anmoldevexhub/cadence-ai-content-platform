@@ -1,4 +1,4 @@
-# Cadence — AI Content Generation Dashboard
+# Candence — AI Content Generation Dashboard
 
 A complete front-end (UI only, **mock data, no backend**) for a SaaS tool that generates and
 schedules content across multiple client websites. Built with **plain HTML5, CSS3 and vanilla
@@ -34,7 +34,7 @@ Open **`index.html`** in any modern browser. It links every page. No `npm`, no b
   component styles (buttons, inputs, cards, tables, tabs, modals, toasts, badges, avatars, empty
   states, skeletons, etc.).
 - **`app.js`** — injects the shared sidebar + top bar into every page and wires the theme toggle,
-  role toggle, dropdowns, modals, tabs and toasts. Exposes `window.Cadence`.
+  role toggle, dropdowns, modals, tabs and toasts. Exposes `window.Candence`.
 - **`mock-data.js`** — all sample data (`window.MOCK`): websites, content drafts, admins, activity,
   notifications and analytics series.
 - **`workspace.css` / `workspace.js`** — styles and logic specific to the website workspace.

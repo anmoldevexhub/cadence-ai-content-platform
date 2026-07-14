@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard · Cadence</title>
+  <title>Dashboard · Candence</title>
   <script>
     (function() {
-      const role = localStorage.getItem("cadence.role") || "admin";
+      const role = localStorage.getItem("candence.role") || "admin";
       if (role === "super") {
         window.location.replace("super-dashboard.html");
       } else {
@@ -14,7 +14,7 @@
       }
     })();
   </script>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -111,7 +111,7 @@
   <script src="app.js"></script>
   <script>
   (function () {
-    const M = window.MOCK, C = window.Cadence, I = C.icon;
+    const M = window.MOCK, C = window.Candence, I = C.icon;
 
     // greeting by role
     const role = C.store.role;

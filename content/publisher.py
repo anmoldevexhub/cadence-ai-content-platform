@@ -29,6 +29,28 @@ PLATFORM_WEBHOOK_DEFAULTS = {
 IMGBB_API_KEY = config('IMGBB_API_KEY', default='')
 
 
+def clean_published_content(html_content: str) -> str:
+    """Strips drag handles, editor classes, and drag attributes from HTML before publishing."""
+    if not html_content:
+        return ""
+    import re
+    # Remove block drag handle elements
+    html_content = re.sub(
+        r'<div class="block-drag-handle"[^>]*>.*?</div>', 
+        '', 
+        html_content, 
+        flags=re.IGNORECASE
+    )
+    # Remove drag classes, cursors and attributes
+    html_content = html_content.replace('contenteditable="false"', '')
+    html_content = html_content.replace('contenteditable="true"', '')
+    html_content = html_content.replace('draggable="false"', '')
+    html_content = html_content.replace('draggable="true"', '')
+    html_content = html_content.replace('class="custom-block-wrapper"', '')
+    html_content = html_content.replace('cursor:grab;', '')
+    return html_content
+
+
 def upload_video_to_cloudinary(filepath) -> str:
     """
     Uploads a local video file to Cloudinary and returns the secure public CDN URL.
@@ -88,6 +110,10 @@ def upload_cover_image_to_imgbb(draft) -> str:
     if not draft.cover_image:
         logger.warning(f"Draft {draft.id} has no cover_image path — skipping image upload.")
         return ""
+
+    # Return directly if the URL is already a public cloud URL or inline base64 Data URL
+    if draft.cover_image.startswith(('http://', 'https://', 'data:')):
+        return draft.cover_image
 
     # Bypass imgbb for videos (or YouTube platform posts) since imgbb only hosts images
     is_video = draft.platform == 'youtube' or draft.cover_image.lower().endswith(('.mp4', '.webm', '.ogg', '.ogv', '.mov'))
@@ -287,6 +313,7 @@ def republish_to_custom_blog(draft, conn) -> dict:
     import json
     from websites.utils import decrypt_value
     from django.conf import settings
+    from django.utils.text import slugify
 
     create_url = conn.make_webhook_url
     auth_type = conn.auth_type
@@ -357,7 +384,8 @@ def republish_to_custom_blog(draft, conn) -> dict:
             meta_desc = meta_desc[:157] + "..."
         payload = {
             "title": draft.title,
-            "content": draft.body,
+            "slug": slugify(draft.title),
+            "content": clean_published_content(draft.body),
             "description": draft.excerpt or draft.meta_description or draft.title,
             "tags": tags_str,
             "status": "PUBLISHED",
@@ -380,13 +408,14 @@ def republish_to_custom_blog(draft, conn) -> dict:
         read_time_display = f"{max(1, round(word_count / 200))} min read"
         payload = {
             "title": draft.title,
-            "content": draft.body,
+            "slug": slugify(draft.title),
+            "content": clean_published_content(draft.body),
             "excerpt": draft.excerpt or "",
             "meta_description": draft.meta_description or "",
             "meta_title": draft.meta_title or draft.title,
             "category": draft.category or "Technology",
             "read_time": read_time_display,
-            "author_name": draft.author_name or "Cadence Publisher",
+            "author_name": draft.author_name or "Candence Publisher",
             "cover_image_url": cover_image_url,
             "tags": draft.tags or [],
             "flow": "all",
@@ -454,11 +483,24 @@ def republish_to_custom_blog(draft, conn) -> dict:
                 logger.info(f"REST-style update succeeded ({resp.status_code})")
                 result = resp.json() if resp.content else {}
                 return {"status_code": resp.status_code, "response": result, "url": target, "method": "PUT (id appended)"}
-            logger.warning(f"REST-style update returned {resp.status_code} — falling back to create.")
+            logger.warning(f"REST-style update returned {resp.status_code} — trying Webhook-style POST update.")
         except Exception as e:
-            logger.warning(f"REST-style update request failed: {e} — falling back to create.")
+            logger.warning(f"REST-style update request failed: {e} — trying Webhook-style POST update.")
 
-    # ── Step 3: Fallback → POST to create URL as a brand-new post (no ID) ───
+    # ── Step 3: Try Webhook-style update (POST to create URL WITH ID fields) ─
+    if external_id:
+        logger.info(f"Trying Webhook-style update: POST {create_url} WITH ID fields")
+        try:
+            resp = _do_request("POST", create_url, is_form_data, include_id=True)
+            if resp.status_code < 400:
+                logger.info(f"Webhook-style update succeeded ({resp.status_code})")
+                result = resp.json() if resp.content else {}
+                return {"status_code": resp.status_code, "response": result, "url": create_url, "method": "POST (webhook update)"}
+            logger.warning(f"Webhook-style update returned {resp.status_code} — falling back to create new post.")
+        except Exception as e:
+            logger.warning(f"Webhook-style update request failed: {e} — falling back to create new post.")
+
+    # ── Step 4: Fallback → POST to create URL as a brand-new post (no ID) ───
     # IMPORTANT: Send WITHOUT any ID fields so the target treats this as a fresh creation
     logger.info(f"Fallback: POSTing to create URL WITHOUT ID fields: {create_url}")
     resp = _do_request("POST", create_url, is_form_data, include_id=False)
@@ -483,6 +525,7 @@ def publish_to_custom_blog(draft, conn) -> dict:
     import json
     from websites.utils import decrypt_value
     from django.conf import settings
+    from django.utils.text import slugify
 
     url = conn.make_webhook_url
     auth_type = conn.auth_type
@@ -570,11 +613,10 @@ def publish_to_custom_blog(draft, conn) -> dict:
             meta_desc = meta_desc[:157] + "..."
 
         data_payload = {
-            "id": str(external_id or draft.id),
             "draft_id": str(draft.id),
-            "external_id": str(external_id) if external_id else "",
             "title": draft.title,
-            "content": draft.body,
+            "slug": slugify(draft.title),
+            "content": clean_published_content(draft.body),
             "description": draft.excerpt or draft.meta_description or draft.title,
             "tags": tags_str,
             "status": "PUBLISHED",
@@ -585,6 +627,9 @@ def publish_to_custom_blog(draft, conn) -> dict:
             "canonical": conn.website.url,
             "email": email_val
         }
+        if external_id:
+            data_payload["id"] = str(external_id)
+            data_payload["external_id"] = str(external_id)
 
         # POST with file if it exists
         if img_filepath and os.path.exists(img_filepath):
@@ -596,27 +641,27 @@ def publish_to_custom_blog(draft, conn) -> dict:
                         mime_type = 'image/jpeg' if img_filepath.endswith(('.jpg', '.jpeg')) else 'image/png'
                     files = {'image': (os.path.basename(img_filepath), f, mime_type)}
                     response = requests.request(
-                        method,
-                        clean_url,
-                        data=data_payload,
-                        files=files,
-                        headers=headers,
-                        params=params,
-                        auth=auth_credentials if auth_type == 'basic_auth' else None,
-                        timeout=60
+                         method,
+                         clean_url,
+                         data=data_payload,
+                         files=files,
+                         headers=headers,
+                         params=params,
+                         auth=auth_credentials if auth_type == 'basic_auth' else None,
+                         timeout=60
                     )
             except Exception as e:
                 logger.error(f"Failed to post to Vidhya Core with file: {e}")
                 raise e
         else:
             response = requests.request(
-                method,
-                clean_url,
-                data=data_payload,
-                headers=headers,
-                params=params,
-                auth=auth_credentials if auth_type == 'basic_auth' else None,
-                timeout=60
+                 method,
+                 clean_url,
+                 data=data_payload,
+                 headers=headers,
+                 params=params,
+                 auth=auth_credentials if auth_type == 'basic_auth' else None,
+                 timeout=60
             )
     else:
         # Standard custom blog JSON implementation
@@ -624,7 +669,7 @@ def publish_to_custom_blog(draft, conn) -> dict:
         cover_image_url = upload_cover_image_to_imgbb(draft)
         if not cover_image_url:
             logger.warning(
-                f"No public image URL available for blog draft {draft.id} — sending without cover_image_url."
+                 f"No public image URL available for blog draft {draft.id} — sending without cover_image_url."
             )
             cover_image_url = ""
 
@@ -633,21 +678,23 @@ def publish_to_custom_blog(draft, conn) -> dict:
         read_time_display = f"{read_time_minutes} min read"
 
         json_payload = {
-            "id": external_id or draft.id,
             "draft_id": draft.id,
-            "external_id": external_id or "",
             "title": draft.title,
-            "content": draft.body,
+            "slug": slugify(draft.title),
+            "content": clean_published_content(draft.body),
             "excerpt": draft.excerpt or "",
             "meta_description": draft.meta_description or "",
             "meta_title": draft.meta_title or draft.title,
             "category": draft.category or "Technology",
             "read_time": read_time_display,
-            "author_name": draft.author_name or "Cadence Publisher",
+            "author_name": draft.author_name or "Candence Publisher",
             "cover_image_url": cover_image_url,
             "tags": draft.tags or [],
             "flow": "all"
         }
+        if external_id:
+            json_payload["id"] = external_id
+            json_payload["external_id"] = external_id
 
         logger.info(f"Dispatching standard custom blog post to {url}...")
         response = requests.request(

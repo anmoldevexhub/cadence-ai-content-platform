@@ -8,10 +8,10 @@
 
   /* ---------- persisted prefs ---------- */
   const store = {
-    get theme() { return localStorage.getItem("cadence.theme") || "light"; },
-    set theme(v) { localStorage.setItem("cadence.theme", v); },
-    get role() { return localStorage.getItem("cadence.role") || "admin"; },
-    set role(v) { localStorage.setItem("cadence.role", v); },
+    get theme() { return localStorage.getItem("candence.theme") || "light"; },
+    set theme(v) { localStorage.setItem("candence.theme", v); },
+    get role() { return localStorage.getItem("candence.role") || "admin"; },
+    set role(v) { localStorage.setItem("candence.role", v); },
   };
 
   // apply theme ASAP (also done inline in <head> to avoid flash)
@@ -77,7 +77,7 @@
     return `
       <div class="sidebar__brand">
         <span class="brand-mark">${I("audio-waveform")}</span>
-        <span class="brand-name">Cadence</span>
+        <span class="brand-name">Candence</span>
       </div>
       <div class="sidebar__scroll">
         <div class="nav-group">
@@ -98,7 +98,7 @@
       <div class="sidebar__footer">
         <div class="dropdown">
           <div class="user-card" data-menu="usermenu">
-            <span class="avatar" style="background:${user.color}">${localStorage.getItem("cadence.settings.avatar") ? `<img src="${localStorage.getItem("cadence.settings.avatar")}" alt="${user.name}">` : user.initials}</span>
+            <span class="avatar" style="background:${user.color}">${localStorage.getItem("candence.settings.avatar") ? `<img src="${localStorage.getItem("candence.settings.avatar")}" alt="${user.name}">` : user.initials}</span>
             <span class="meta"><span class="nm">${user.name}</span><span class="rl">${role === "super" ? "Super Admin" : "Admin"}</span></span>
             ${I("chevrons-up-down")}
           </div>
@@ -118,7 +118,7 @@
     
     let readIds = [];
     try {
-      readIds = JSON.parse(localStorage.getItem("cadence.read_notifications")) || [];
+      readIds = JSON.parse(localStorage.getItem("candence.read_notifications")) || [];
     } catch(e) {}
     
     notifs.forEach(n => {
@@ -127,7 +127,7 @@
       }
     });
     
-    localStorage.setItem("cadence.read_notifications", JSON.stringify(readIds));
+    localStorage.setItem("candence.read_notifications", JSON.stringify(readIds));
     
     // Hide the badge-count element
     const badge = document.querySelector("[data-menu='notifs'] .badge-count");
@@ -143,7 +143,7 @@
     
     let readIds = [];
     try {
-      readIds = JSON.parse(localStorage.getItem("cadence.read_notifications")) || [];
+      readIds = JSON.parse(localStorage.getItem("candence.read_notifications")) || [];
     } catch(e) {}
     
     const notifs = window.MOCK?.notifications || [];
@@ -172,7 +172,7 @@
         <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle theme">${I("sun-moon")}</button>
         <div class="dropdown">
           <button class="icon-btn" data-menu="topuser" aria-label="Account" style="width:auto;padding:3px;border-radius:99px">
-            <span class="avatar avatar-sm" style="background:${user.color}">${localStorage.getItem("cadence.settings.avatar") ? `<img src="${localStorage.getItem("cadence.settings.avatar")}" alt="User">` : user.initials}</span>
+            <span class="avatar avatar-sm" style="background:${user.color}">${localStorage.getItem("candence.settings.avatar") ? `<img src="${localStorage.getItem("candence.settings.avatar")}" alt="User">` : user.initials}</span>
           </button>
           <div class="menu" id="topuser">
             <a class="menu-item" href="settings.html">${I("user")}Profile</a>
@@ -280,7 +280,7 @@
       const trigger = e.target.closest(".topbar__search");
       if (trigger && !trigger.closest("#globalSearchModal")) {
         e.preventDefault();
-        window.Cadence.openModal("globalSearchModal");
+        window.Candence.openModal("globalSearchModal");
         searchInput.value = "";
         searchInput.focus();
         searchResults.innerHTML = `<div class="muted tsm" style="padding: 10px; text-align: center;">Type to search...</div>`;
@@ -291,7 +291,7 @@
     document.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        window.Cadence.openModal("globalSearchModal");
+        window.Candence.openModal("globalSearchModal");
         searchInput.value = "";
         searchInput.focus();
         searchResults.innerHTML = `<div class="muted tsm" style="padding: 10px; text-align: center;">Type to search...</div>`;
@@ -360,12 +360,12 @@
       const a = e.target.closest('a[href="login.html"]');
       if (a) {
         e.preventDefault();
-        if (window.CadenceAPI) {
-          window.CadenceAPI.logout();
+        if (window.CandenceAPI) {
+          window.CandenceAPI.logout();
         } else {
-          localStorage.removeItem('cadence.access_token');
-          localStorage.removeItem('cadence.refresh_token');
-          localStorage.removeItem('cadence.user');
+          localStorage.removeItem('candence.access_token');
+          localStorage.removeItem('candence.refresh_token');
+          localStorage.removeItem('candence.user');
           location.href = 'login.html';
         }
       }
@@ -470,7 +470,7 @@
   }
 
   /* ---------- helpers exposed ---------- */
-  window.Cadence = {
+  window.Candence = {
     store, toast, openModal, closeModal, wireTabs, refreshIcons, mountShell,
     icon: I,
     fmt: (n) => n.toLocaleString("en-US"),

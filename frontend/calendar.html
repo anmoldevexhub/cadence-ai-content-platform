@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Calendar · Cadence</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <title>Calendar · Candence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -133,7 +133,7 @@
   <script src="app.js"></script>
   <script>
   (function () {
-    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    const C = window.Candence, M = window.MOCK, I = C.icon;
     const role = C.store.role;
 
     // Define Date.prototype.weekday first
@@ -434,7 +434,7 @@
           e.stopPropagation();
           const id = btn.dataset.delId;
           try {
-            await CadenceAPI.unscheduleDraft(id);
+            await CandenceAPI.unscheduleDraft(id);
             C.toast({ type: "success", title: "Removed from calendar" });
             await M.syncMockData();
             loadCards();
@@ -594,7 +594,7 @@
             }
 
             try {
-              await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+              await CandenceAPI.scheduleDraft(card.id, targetDate.toISOString());
               card.day = slot.dataset.day; 
               await M.syncMockData();
               loadCards();
@@ -638,7 +638,7 @@
       }
 
       try {
-        await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        await CandenceAPI.scheduleDraft(draftId, targetDate.toISOString());
         C.closeModal("addEventModal");
         await M.syncMockData();
         loadCards();
@@ -675,7 +675,7 @@
       const newDay = daysShort[targetDate.getDay()];
       
       try {
-        await CadenceAPI.scheduleDraft(card.id, targetDate.toISOString());
+        await CandenceAPI.scheduleDraft(card.id, targetDate.toISOString());
         C.closeModal("editScheduleModal");
         await M.syncMockData();
         loadCards();

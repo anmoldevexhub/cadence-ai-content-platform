@@ -53,9 +53,11 @@ class GenerateContentView(APIView):
         except ContentIdea.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=404)
         
+        include_infographics = request.data.get('include_infographics', True)
+        include_cta = request.data.get('include_cta', True)
         idea.status = 'generating'
         idea.save(update_fields=['status'])
-        generate_content_task.delay(pk)
+        generate_content_task.delay(pk, include_infographics=include_infographics, include_cta=include_cta)
         return Response({'status': 'generating', 'idea_id': pk})
 
 

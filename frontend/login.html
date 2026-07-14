@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Sign in to your Cadence workspace to generate, approve, and auto-schedule AI content across all your client websites." />
-  <title>Sign in · Cadence</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <meta name="description" content="Sign in to your Candence workspace to generate, approve, and auto-schedule AI content across all your client websites." />
+  <title>Sign in · Candence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -435,11 +435,11 @@
     <!-- Brand panel -->
     <div class="auth__brand">
       <div class="auth-logo">
-        <span class="brand-mark"><i data-lucide="audio-waveform"></i></span> Cadence
+        <span class="brand-mark"><i data-lucide="audio-waveform"></i></span> Candence
       </div>
       <div class="auth-hero">
-        <h2>AI content, on a weekly cadence.</h2>
-        <p>Add a website, let Cadence crawl it, then generate, approve, and auto-publish content across every channel — all week long.</p>
+        <h2>AI content, on a weekly candence.</h2>
+        <p>Add a website, let Candence crawl it, then generate, approve, and auto-publish content across every channel — all week long.</p>
         <div class="auth-points">
           <div class="auth-point"><span class="pc"><i data-lucide="radar"></i></span> Crawls each site for brand-aware context</div>
           <div class="auth-point"><span class="pc"><i data-lucide="sparkles"></i></span> Drafts blogs, LinkedIn, YouTube &amp; Instagram</div>
@@ -457,7 +457,7 @@
       <div class="auth-card">
         <div class="ac-head">
           <h1>Welcome back</h1>
-          <p class="sub">Sign in to your Cadence workspace.</p>
+          <p class="sub">Sign in to your Candence workspace.</p>
         </div>
 
         <form id="loginForm" novalidate>
@@ -492,7 +492,7 @@
     lucide.createIcons();
 
     // Restore remember-me preference
-    const savedEmail = localStorage.getItem('cadence.remembered_email');
+    const savedEmail = localStorage.getItem('candence.remembered_email');
     if (savedEmail) {
       document.getElementById('email').value = savedEmail;
       document.querySelector('.check input[type=checkbox]').checked = true;
@@ -503,24 +503,24 @@
       const email = document.getElementById("email").value.trim();
       const pw = document.getElementById("pw").value;
       const rememberMe = document.querySelector('.check input[type=checkbox]').checked;
-      if (!email || !pw) { Cadence.toast({ type: "error", title: "Enter your email and password" }); return; }
+      if (!email || !pw) { Candence.toast({ type: "error", title: "Enter your email and password" }); return; }
       const btn = e.target.querySelector("button[type=submit]");
       btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-circle" class="spin"></i> Signing in…'; lucide.createIcons();
       try {
-        const res = await CadenceAPI.login(email, pw, rememberMe);
+        const res = await CandenceAPI.login(email, pw, rememberMe);
         const name = res.user.first_name || res.user.username;
         // Save/clear the email based on remember me
         if (rememberMe) {
-          localStorage.setItem('cadence.remembered_email', email);
+          localStorage.setItem('candence.remembered_email', email);
         } else {
-          localStorage.removeItem('cadence.remembered_email');
+          localStorage.removeItem('candence.remembered_email');
         }
-        Cadence.toast({ type: "success", title: `Welcome back, ${name}`, desc: "Redirecting to your dashboard…" });
+        Candence.toast({ type: "success", title: `Welcome back, ${name}`, desc: "Redirecting to your dashboard…" });
         setTimeout(() => location.href = "dashboard.html", 900);
       } catch (err) {
         console.error(err);
         btn.disabled = false; btn.innerHTML = 'Sign in <i data-lucide="arrow-right"></i>'; lucide.createIcons();
-        Cadence.toast({ type: "error", title: "Sign in failed", desc: err.message || "Invalid credentials." });
+        Candence.toast({ type: "error", title: "Sign in failed", desc: err.message || "Invalid credentials." });
       }
     });
   </script>

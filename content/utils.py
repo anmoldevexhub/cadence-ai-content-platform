@@ -19,32 +19,13 @@ def inject_internal_links(new_draft):
     
     targets = []
     
-    # 1a. Fetch other published blog posts created within the platform
-    platform_posts = ContentDraft.objects.filter(
-        website=new_draft.website,
-        platform='blog',
-        status='published',
-        is_deleted=False
-    ).exclude(id=new_draft.id)
-    
-    for post in platform_posts:
-        title = post.title.strip()
-        tags = post.tags if isinstance(post.tags, list) else []
-        post_url = f"{new_draft.website.url.rstrip('/')}/blog/{slugify(title)}"
-        targets.append({
-            'title': title,
-            'tags': tags,
-            'url': post_url
-        })
-        
-    # 1b. Fetch crawled blog posts from the live site
-    crawled_posts = ScrapeResult.objects.filter(
-        website=new_draft.website,
-        page_type='blog post'
-    )
+    # 1. Fetch crawled pages from the live site (only crawled data)
+    crawled_posts = ScrapeResult.objects.filter(website=new_draft.website)
     
     for post in crawled_posts:
         title = post.page_title.strip()
+        if not title:
+            continue
         tags = post.categories_tags if isinstance(post.categories_tags, list) else []
         post_url = post.page_url
         
@@ -57,7 +38,7 @@ def inject_internal_links(new_draft):
             })
             
     if not targets:
-        logger.info(f"No target posts (published drafts or crawled pages) found for website {new_draft.website.id}")
+        logger.info(f"No target crawled pages found for website {new_draft.website.id}")
         return
         
     soup = BeautifulSoup(new_draft.body or '', 'html.parser')
@@ -114,6 +95,11 @@ def inject_internal_links(new_draft):
             elif len(kw_clean) >= 6 and kw_clean.lower() not in common_generic:
                 keywords.append(kw_clean)
         
+        # Prevent duplicate links to the same target URL in the entire article
+        existing_links = [a.get('href') for a in soup.find_all('a', href=True)]
+        if any(post_url.rstrip('/') == url.rstrip('/') for url in existing_links):
+            continue
+
         linked = False
         for kw in keywords:
             if linked:

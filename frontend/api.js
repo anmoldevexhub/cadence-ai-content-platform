@@ -5,10 +5,10 @@
   "use strict";
 
   const API_BASE = '/api';
-  const ACCESS_KEY = 'cadence.access_token';
-  const REFRESH_KEY = 'cadence.refresh_token';
-  const USER_KEY = 'cadence.user';
-  const REMEMBER_KEY = 'cadence.remember_me';
+  const ACCESS_KEY = 'candence.access_token';
+  const REFRESH_KEY = 'candence.refresh_token';
+  const USER_KEY = 'candence.user';
+  const REMEMBER_KEY = 'candence.remember_me';
 
   // Get a token from either storage (localStorage takes priority)
   function getStoredItem(key) {
@@ -159,7 +159,7 @@
     if (!access) {
       redirectToLogin();
     } else {
-      const role = localStorage.getItem('cadence.role') || 'admin';
+      const role = localStorage.getItem('candence.role') || 'admin';
       const path = window.location.pathname;
       const isSuperOnly = ['super-dashboard.html', 'admins.html', 'all-websites.html'].some(p => path.includes(p));
       const isAdminOnly = ['admin-dashboard.html'].some(p => path.includes(p));
@@ -208,8 +208,8 @@
         storage.setItem(ACCESS_KEY, data.access);
         storage.setItem(REFRESH_KEY, data.refresh);
         storage.setItem(USER_KEY, JSON.stringify(data.user));
-        // Sync role to Cadence store (always in localStorage for UI state)
-        localStorage.setItem("cadence.role", data.user.role === 'super_admin' ? 'super' : 'admin');
+        // Sync role to Candence store (always in localStorage for UI state)
+        localStorage.setItem("candence.role", data.user.role === 'super_admin' ? 'super' : 'admin');
       }
       return data;
     },
@@ -254,7 +254,7 @@
       const user = await request('/auth/me/');
       if (user) {
         localStorage.setItem(USER_KEY, JSON.stringify(user));
-        localStorage.setItem("cadence.role", user.role === 'super_admin' ? 'super' : 'admin');
+        localStorage.setItem("candence.role", user.role === 'super_admin' ? 'super' : 'admin');
       }
       return user;
     },
@@ -410,9 +410,13 @@
       });
     },
 
-    async generateContent(ideaId) {
+    async generateContent(ideaId, includeInfographics = true, includeCTA = true) {
       return await request(`/content/ideas/${ideaId}/generate/`, {
-        method: 'POST'
+        method: 'POST',
+        body: JSON.stringify({
+          include_infographics: includeInfographics,
+          include_cta: includeCTA
+        })
       });
     },
 
@@ -668,8 +672,8 @@
         // Set user details
         const me = this.getUser();
         if (me) {
-          const name = localStorage.getItem("cadence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
-          const email = localStorage.getItem("cadence.settings.email") || me.email || '';
+          const name = localStorage.getItem("candence.settings.name") || ((me.first_name || '') + ' ' + (me.last_name || '')).trim() || me.username || '';
+          const email = localStorage.getItem("candence.settings.email") || me.email || '';
           const initials = (((me.first_name && me.first_name[0]) || '') + ((me.last_name && me.last_name[0]) || '')).toUpperCase() || (me.username ? me.username.substring(0, 2).toUpperCase() : 'U');
           const mappedUser = { name, email, initials, color: me.avatar_color || '#095075', role: me.role === 'super_admin' ? 'super' : 'admin' };
           
@@ -694,7 +698,7 @@
     };
   }
 
-  window.CadenceAPI = api;
+  window.CandenceAPI = api;
   if (window.MOCK) {
     window.MOCK.syncMockData = api.syncMockData.bind(api);
   }

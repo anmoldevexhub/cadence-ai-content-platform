@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Approvals · Cadence</title>
-  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("cadence.theme") || "light");</script>
+  <title>Approvals · Candence</title>
+  <script>document.documentElement.setAttribute("data-theme", localStorage.getItem("candence.theme") || "light");</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -77,6 +77,14 @@
           <div class="editor-main" id="editorMainArea">
             <div class="editor-paper" id="editorPaper">
               <input class="editor-title-input" id="editTitle" placeholder="Untitled Draft" />
+              
+              <!-- Drag-and-Drop & Custom Block Helper Banner -->
+              <div class="editor-helper-banner" style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; margin:10px 0 16px; display:flex; align-items:center; gap:8px; font-size:12px; color:#1e40af; line-height:1.4;">
+                <span style="font-size:16px;">💡</span>
+                <div>
+                  <strong>Advanced Editor Tip:</strong> You can drag &amp; drop <strong>CTA banners</strong>, <strong>Infographics</strong>, and <strong>Step diagrams</strong> using their <code>⠿</code> grab handles. Click directly on text or button labels inside them to customize their content!
+                </div>
+              </div>
               
               <div class="rich-editor">
                 <div class="rich-toolbar" id="editorToolbar">
@@ -227,11 +235,45 @@
     </div>
   </div>
 
+  <!-- Insert Inline Image Modal -->
+  <div class="modal-overlay" id="insertInlineImageModal">
+    <div class="modal" style="max-width: 420px; width: 90vw;">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Insert Inline Image</h3>
+          <div class="sub">Upload an image or paste a URL.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding:var(--s5); display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; gap:10px; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:4px;">
+          <button class="btn btn-primary btn-sm" id="btnTabUpload" style="flex:1;">Upload File</button>
+          <button class="btn btn-ghost btn-sm" id="btnTabUrl" style="flex:1;">Image URL</button>
+        </div>
+        
+        <!-- Tab 1: Upload File -->
+        <div id="panelImageUpload" style="display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px dashed var(--border); border-radius:8px; padding:32px; cursor:pointer; background:rgba(0,0,0,0.02); text-align:center;">
+          <i data-lucide="upload-cloud" style="width:36px; height:36px; color:var(--text-muted); margin-bottom:8px;"></i>
+          <span style="font-weight:600; font-size:14px; color:var(--text);">Select Image File</span>
+          <span class="txs muted mt1">Click to select an image from your computer</span>
+          <input type="file" id="inlineImageFileInput" accept="image/*" style="display:none;" />
+        </div>
+        
+        <!-- Tab 2: Image URL -->
+        <div id="panelImageUrl" style="display:none; flex-direction:column; gap:8px;">
+          <label class="label txs" style="font-weight:600;">Image URL</label>
+          <input class="input" type="url" id="inlineImageUrlInput" placeholder="https://example.com/image.jpg" style="width:100%; height:38px; padding:0 8px; border-radius:var(--r-sm); border:1px solid var(--border); background:var(--surface); color:var(--text);" />
+          <button class="btn btn-primary btn-sm mt2" id="btnSubmitImageUrl" style="width:100%;">Insert Image URL</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="mock-data.js"></script>
   <script src="app.js"></script>
   <script>
   (function () {
-    const C = window.Cadence, M = window.MOCK, I = C.icon;
+    const C = window.Candence, M = window.MOCK, I = C.icon;
     let queue = M.approvals.map(a => ({ ...a }));
     let platFilter = "all", activeTab = "pending", selected = new Set(), activeId = queue[0]?.id;
     let currentPage = 1;
@@ -809,41 +851,271 @@
         });
       }
       
+      // --- Premium Image Upload/URL Modal and Floating Remove Button ---
+      const modal = document.getElementById("insertInlineImageModal");
+      const tabUpload = document.getElementById("btnTabUpload");
+      const tabUrl = document.getElementById("btnTabUrl");
+      const panelUpload = document.getElementById("panelImageUpload");
+      const panelUrl = document.getElementById("panelImageUrl");
+      const fileInput = document.getElementById("inlineImageFileInput");
+      const urlInput = document.getElementById("inlineImageUrlInput");
+      const btnSubmitUrl = document.getElementById("btnSubmitImageUrl");
+
+      if (tabUpload && tabUrl && panelUpload && panelUrl) {
+        tabUpload.addEventListener("click", () => {
+          tabUpload.className = "btn btn-primary btn-sm";
+          tabUrl.className = "btn btn-ghost btn-sm";
+          panelUpload.style.display = "flex";
+          panelUrl.style.display = "none";
+        });
+        tabUrl.addEventListener("click", () => {
+          tabUrl.className = "btn btn-primary btn-sm";
+          tabUpload.className = "btn btn-ghost btn-sm";
+          panelUrl.style.display = "flex";
+          panelUpload.style.display = "none";
+        });
+      }
+
       const tbImg = document.getElementById("tb-image");
       if (tbImg) {
         tbImg.addEventListener("click", (e) => {
           e.preventDefault();
-          restoreSelection();
-          const url = prompt("Enter the image URL (or leave blank to select a file from your computer):");
-          if (url) {
-            restoreSelection();
-            document.execCommand("insertImage", false, url);
-            editBody.focus();
-            updateStats();
-          } else if (url === "") {
-            const inlineFileInput = document.getElementById("inlineImageFile");
-            if (inlineFileInput) inlineFileInput.click();
-          }
+          saveSelection();
+          C.openModal("insertInlineImageModal");
         });
       }
 
-      const inlineFileInput = document.getElementById("inlineImageFile");
-      if (inlineFileInput) {
-        inlineFileInput.addEventListener("change", (e) => {
+      const insertImageAtSelection = (src) => {
+        restoreSelection();
+        const img = document.createElement("img");
+        img.src = src;
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.display = "block";
+        img.style.margin = "16px auto";
+        img.style.borderRadius = "var(--r-md)";
+        img.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
+
+        const selection = window.getSelection();
+        let rangeInserted = false;
+        
+        if (selection.rangeCount > 0 && savedRange) {
+          try {
+            const range = savedRange;
+            if (editBody.contains(range.commonAncestorContainer)) {
+              range.deleteContents();
+              range.insertNode(img);
+              
+              const p = document.createElement("p");
+              p.innerHTML = "<br>";
+              img.after(p);
+              
+              const newRange = document.createRange();
+              newRange.setStart(p, 0);
+              newRange.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(newRange);
+              rangeInserted = true;
+            }
+          } catch (e) {
+            console.error("DOM Range insertion failed:", e);
+          }
+        }
+        
+        if (!rangeInserted) {
+          editBody.appendChild(img);
+          const p = document.createElement("p");
+          p.innerHTML = "<br>";
+          editBody.appendChild(p);
+        }
+        
+        editBody.focus();
+        updateStats();
+      };
+
+      if (fileInput) {
+        if (panelUpload) {
+          panelUpload.addEventListener("click", () => {
+            fileInput.click();
+          });
+        }
+        fileInput.addEventListener("change", (e) => {
           const file = e.target.files[0];
           if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-              restoreSelection();
               const base64 = event.target.result;
-              document.execCommand("insertImage", false, base64);
-              editBody.focus();
-              updateStats();
+              insertImageAtSelection(base64);
+              C.closeModal("insertInlineImageModal");
+              fileInput.value = ""; // reset
             };
             reader.readAsDataURL(file);
           }
         });
       }
+
+      if (btnSubmitUrl) {
+        btnSubmitUrl.addEventListener("click", () => {
+          const url = urlInput.value.trim();
+          if (url) {
+            insertImageAtSelection(url);
+            C.closeModal("insertInlineImageModal");
+            urlInput.value = ""; // reset
+          }
+        });
+      }
+
+      // --- Floating Remove Image Widget ---
+      let imageDeleteBtn = document.getElementById("floatingImageDeleteBtn");
+      if (!imageDeleteBtn) {
+        imageDeleteBtn = document.createElement("button");
+        imageDeleteBtn.id = "floatingImageDeleteBtn";
+        imageDeleteBtn.type = "button";
+        imageDeleteBtn.style.position = "absolute";
+        imageDeleteBtn.style.zIndex = "10000";
+        imageDeleteBtn.style.display = "none";
+        imageDeleteBtn.style.background = "#ef4444";
+        imageDeleteBtn.style.color = "#ffffff";
+        imageDeleteBtn.style.border = "none";
+        imageDeleteBtn.style.padding = "6px 12px";
+        imageDeleteBtn.style.borderRadius = "4px";
+        imageDeleteBtn.style.fontSize = "12px";
+        imageDeleteBtn.style.fontWeight = "bold";
+        imageDeleteBtn.style.cursor = "pointer";
+        imageDeleteBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+        imageDeleteBtn.innerHTML = "🗑️ Remove Image";
+        document.body.appendChild(imageDeleteBtn);
+      }
+
+      let activeEditImage = null;
+
+      const hideImageDeleteBtn = () => {
+        imageDeleteBtn.style.display = "none";
+        if (activeEditImage) {
+          activeEditImage.style.outline = "";
+          activeEditImage = null;
+        }
+      };
+
+      if (editBody) {
+        editBody.addEventListener("click", (e) => {
+          if (e.target.tagName === "IMG") {
+            activeEditImage = e.target;
+            const rect = activeEditImage.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+            imageDeleteBtn.style.top = `${rect.top + scrollTop + 8}px`;
+            imageDeleteBtn.style.left = `${rect.right + scrollLeft - 130}px`;
+            imageDeleteBtn.style.display = "block";
+
+            e.target.style.outline = "2px solid #ef4444";
+            e.target.style.outlineOffset = "2px";
+          } else {
+            if (e.target !== imageDeleteBtn) {
+              hideImageDeleteBtn();
+            }
+          }
+        });
+
+        editBody.addEventListener("keyup", hideImageDeleteBtn);
+        editBody.addEventListener("scroll", hideImageDeleteBtn);
+
+        // Drag and drop helper for custom blocks (CTA, infographics, steps)
+        let draggedNode = null;
+
+        // Dynamically toggle draggable attribute only when grabbing the handle
+        editBody.addEventListener("mousedown", (e) => {
+          const handle = e.target.closest(".block-drag-handle");
+          if (handle) {
+            const wrapper = handle.closest(".custom-block-wrapper");
+            if (wrapper) {
+              wrapper.setAttribute("draggable", "true");
+            }
+          }
+        });
+
+        editBody.addEventListener("mouseup", (e) => {
+          document.querySelectorAll(".custom-block-wrapper[draggable='true']").forEach(el => {
+            el.setAttribute("draggable", "false");
+          });
+        });
+
+        editBody.addEventListener("dragstart", (e) => {
+          const target = e.target.closest(".custom-block-wrapper");
+          if (target && target.getAttribute("draggable") === "true") {
+            draggedNode = target;
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/html", target.outerHTML);
+          } else {
+            e.preventDefault();
+          }
+        });
+
+        editBody.addEventListener("dragover", (e) => {
+          if (draggedNode) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+
+            // Auto-scroll editBody when dragging near the edges
+            const rect = editBody.getBoundingClientRect();
+            const topThreshold = rect.top + 60;
+            const bottomThreshold = rect.bottom - 60;
+
+            if (e.clientY < topThreshold) {
+              editBody.scrollTop -= 12;
+            } else if (e.clientY > bottomThreshold) {
+              editBody.scrollTop += 12;
+            }
+          }
+        });
+
+        editBody.addEventListener("drop", (e) => {
+          if (draggedNode) {
+            e.preventDefault();
+            let range = null;
+            if (document.caretRangeFromPoint) {
+              range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            } else if (e.rangeParent) {
+              range = document.createRange();
+              range.setStart(e.rangeParent, e.rangeOffset);
+            }
+
+            if (range) {
+              let targetNode = range.startContainer;
+              
+              if (targetNode.nodeType === Node.TEXT_NODE) {
+                targetNode = targetNode.parentNode;
+              }
+              
+              while (targetNode && targetNode.parentNode !== editBody) {
+                targetNode = targetNode.parentNode;
+              }
+              
+              draggedNode.remove();
+              
+              if (targetNode && editBody.contains(targetNode)) {
+                targetNode.after(draggedNode);
+              } else {
+                editBody.appendChild(draggedNode);
+              }
+              
+              window.getSelection().removeAllRanges();
+            }
+            draggedNode = null;
+            updateStats();
+          }
+        });
+      }
+
+      imageDeleteBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (activeEditImage) {
+          activeEditImage.remove();
+          hideImageDeleteBtn();
+          updateStats();
+        }
+      });
     }
 
     // 4. Floating Selection Formatting Toolbar
@@ -1074,7 +1346,7 @@
         const meta_description = document.getElementById("editMetaDescription") ? document.getElementById("editMetaDescription").value.trim() : "";
         
         try {
-          await CadenceAPI.updateDraft(editingDraft.id, { title, body, cover_image, tags, author_name, custom_date, category, meta_title, meta_description });
+          await CandenceAPI.updateDraft(editingDraft.id, { title, body, cover_image, tags, author_name, custom_date, category, meta_title, meta_description });
           
           // Sync local state
           editingDraft.title = title;
@@ -1197,7 +1469,7 @@
         const b = document.getElementById("prevBody");
         b.style.opacity = ".4"; C.toast({ type: "info", title: "Regenerating…" });
         try {
-          const res = await CadenceAPI.regenerateDraft(c.id, type);
+          const res = await CandenceAPI.regenerateDraft(c.id, type);
           await M.syncMockData();
           queue = M.approvals;
           const nextId = (res && res.new_draft_id) ? String(res.new_draft_id) : c.id;
@@ -1307,7 +1579,7 @@
       }
       
       try {
-        await CadenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        await CandenceAPI.scheduleDraft(draftId, targetDate.toISOString());
         C.closeModal("scheduleModal");
         C.toast({ type: "success", title: "Post scheduled successfully" });
         
@@ -1326,7 +1598,7 @@
     async function decide(id, action) {
       try {
         if (action === "approve") {
-          await CadenceAPI.approveDraft(id);
+          await CandenceAPI.approveDraft(id);
           const item = queue.find(c => c.id === id);
           if (item) item.status = "Approved";
           
@@ -1340,7 +1612,7 @@
           // Option A: Prompt scheduling immediately!
           openScheduleModal(id);
         } else {
-          await CadenceAPI.rejectDraft(id, "Rejected via approvals queue");
+          await CandenceAPI.rejectDraft(id, "Rejected via approvals queue");
           queue = queue.filter(c => c.id !== id);
           selected.delete(id);
           C.toast({ type: "info", title: "Draft rejected" });
@@ -1372,7 +1644,7 @@
       const ids = Array.from(selected);
       try {
         for (const id of ids) {
-          await CadenceAPI.approveDraft(id);
+          await CandenceAPI.approveDraft(id);
           const item = queue.find(c => c.id === id);
           if (item) item.status = "Approved";
         }
@@ -1389,7 +1661,7 @@
       const ids = Array.from(selected);
       try {
         for (const id of ids) {
-          await CadenceAPI.rejectDraft(id, "Bulk rejected via approvals queue");
+          await CandenceAPI.rejectDraft(id, "Bulk rejected via approvals queue");
           queue = queue.filter(c => !ids.includes(c.id));
         }
         selected.clear();

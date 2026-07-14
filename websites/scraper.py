@@ -285,6 +285,47 @@ def _classify_page_type_helper(url: str, soup, author: str, pub_date) -> str:
     return 'other'
 
 
+def extract_colors_from_css(style_content: str) -> list:
+    if not style_content:
+        return []
+    # 1. Look for CSS variables representing primary/secondary/theme/accent colors
+    var_colors = []
+    var_matches = re.findall(
+        r'--(?:primary|secondary|accent|main|theme|color-primary|color-secondary)\s*:\s*([^;}\n]+)',
+        style_content,
+        re.I
+    )
+    for match in var_matches:
+        color = match.strip()
+        hex_match = re.search(r'#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}', color)
+        if hex_match:
+            var_colors.append(hex_match.group(0).lower())
+            
+    # Deduplicate var colors
+    var_colors = list(dict.fromkeys(var_colors))
+    
+    # 2. Extract and count frequency of all hex colors in stylesheets
+    hex_codes = re.findall(r'#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b', style_content)
+    neutral_colors = {
+        '#ffffff', '#000000', '#fff', '#000', '#cccccc', '#ccc', '#eeeeee', '#eee', '#333333', '#333', 
+        '#6c757d', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#495057', '#343a40', '#212529'
+    }
+    valid_hexes = []
+    for h in hex_codes:
+        h_lower = h.lower()
+        if len(h_lower) == 4:
+            h_lower = '#' + ''.join(c*2 for c in h_lower[1:])
+        if h_lower not in neutral_colors:
+            valid_hexes.append(h_lower)
+            
+    from collections import Counter
+    common_hexes = [color for color, count in Counter(valid_hexes).most_common(8)]
+    
+    # Combine prioritizing theme variables
+    combined = var_colors + [c for c in common_hexes if c not in var_colors]
+    return combined[:5]
+
+
 def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
     """Extracts structured metadata, headings, main content, CTAs, comments, and page types."""
     title = soup.title.get_text().strip() if soup.title else ''
@@ -536,6 +577,8 @@ def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
             scraped_phones.append(phone.strip())
     scraped_phones = list(dict.fromkeys(scraped_phones))
             
+    brand_colors = extract_colors_from_css(style_content)
+
     return {
         'url': url,
         'title': title,
@@ -558,6 +601,7 @@ def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
         'heading_font': heading_font,
         'text_color': text_color,
         'heading_color': heading_color,
+        'brand_colors': brand_colors,
         'logo_url': logo_url,
         'scraped_emails': scraped_emails,
         'scraped_phones': scraped_phones,
