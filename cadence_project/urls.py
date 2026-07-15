@@ -29,3 +29,14 @@ urlpatterns = [
     # Serve frontend — redirect root to static login.html
     path('', RedirectView.as_view(url='/static/login.html', permanent=False), name='home'),
 ]
+
+from django.conf import settings
+from django.views.static import serve
+import os
+
+# Unconditionally serve generated cover images from frontend/media/ under the /static/media/ path
+urlpatterns += [
+    path('static/media/<path:path>', serve, {
+        'document_root': os.path.join(settings.BASE_DIR, 'frontend', 'media'),
+    }),
+]

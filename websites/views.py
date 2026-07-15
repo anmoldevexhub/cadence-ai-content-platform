@@ -178,7 +178,6 @@ class SocialConnectionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = SocialConnection.objects.all()
     lookup_url_kwarg = 'conn_pk'
 
-
 class WebsiteStatsView(APIView):
     """Returns published/scheduled/pending counts for dashboard cards."""
     permission_classes = [IsAuthenticated]
@@ -188,7 +187,16 @@ class WebsiteStatsView(APIView):
         from django.utils import timezone
         from datetime import timedelta
         
-        drafts = ContentDraft.objects.filter(website_id=pk)
+        # Verify website exists and is owned by the user
+        try:
+            if request.user.role == 'super_admin':
+                website = Website.objects.get(pk=pk)
+            else:
+                website = Website.objects.get(pk=pk, owner=request.user)
+        except Website.DoesNotExist:
+            return Response({'detail': 'Website not found.'}, status=404)
+            
+        drafts = ContentDraft.objects.filter(website=website)
         
         # Calculate current week boundaries (Monday to Sunday)
         now = timezone.now()
@@ -196,7 +204,7 @@ class WebsiteStatsView(APIView):
         end_of_week = start_of_week + timedelta(days=7)
         
         scheduled_count = ScheduledPost.objects.filter(
-            draft__website_id=pk,
+            draft__website=website,
             scheduled_for__range=(start_of_week, end_of_week)
         ).count()
         
@@ -206,9 +214,8 @@ class WebsiteStatsView(APIView):
             'pending': drafts.filter(status='draft').count(),
             'approved': drafts.filter(status='approved').count(),
             'rejected': drafts.filter(status='rejected').count(),
-            'pages': ScrapeResult.objects.filter(website_id=pk).count(),
+            'pages': ScrapeResult.objects.filter(website=website).count(),
         })
-
 
 
 class WebsitePagesListView(generics.ListAPIView):
@@ -217,7 +224,16 @@ class WebsitePagesListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return ScrapeResult.objects.filter(website_id=self.kwargs['pk'])
+        user = self.request.user
+        pk = self.kwargs['pk']
+        try:
+            if user.role == 'super_admin':
+                website = Website.objects.get(pk=pk)
+            else:
+                website = Website.objects.get(pk=pk, owner=user)
+        except Website.DoesNotExist:
+            return ScrapeResult.objects.none()
+        return ScrapeResult.objects.filter(website=website)
 
 
 class SampleContentView(generics.ListCreateAPIView):
@@ -226,10 +242,29 @@ class SampleContentView(generics.ListCreateAPIView):
     permission_classes = [IsAdminOrSuperAdmin]
     
     def get_queryset(self):
-        return SampleContent.objects.filter(website_id=self.kwargs['pk'])
+        user = self.request.user
+        pk = self.kwargs['pk']
+        try:
+            if user.role == 'super_admin':
+                website = Website.objects.get(pk=pk)
+            else:
+                website = Website.objects.get(pk=pk, owner=user)
+        except Website.DoesNotExist:
+            return SampleContent.objects.none()
+        return SampleContent.objects.filter(website=website)
     
     def perform_create(self, serializer):
-        website = Website.objects.get(pk=self.kwargs['pk'])
+        user = self.request.user
+        pk = self.kwargs['pk']
+        try:
+            if user.role == 'super_admin':
+                website = Website.objects.get(pk=pk)
+            else:
+                website = Website.objects.get(pk=pk, owner=user)
+        except Website.DoesNotExist:
+            from rest_framework.exceptions import NotFound
+            raise NotFound('Website not found.')
+            
         instance = serializer.save(website=website)
         
         website.scrape_status = 'done'
@@ -252,8 +287,14 @@ class SampleContentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a sample."""
     serializer_class = SampleContentSerializer
     permission_classes = [IsAdminOrSuperAdmin]
-    queryset = SampleContent.objects.all()
     lookup_url_kwarg = 'sample_pk'
+    
+    def get_queryset(self):
+        user = self.request.user
+        qs = SampleContent.objects.all()
+        if user.role != 'super_admin':
+            qs = qs.filter(website__owner=user)
+        return qs
 
 
 class TestConnectionView(APIView):

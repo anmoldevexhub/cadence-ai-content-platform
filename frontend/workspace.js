@@ -6,14 +6,18 @@
   const params = new URLSearchParams(location.search);
   let site = M.site(params.get("site")) || M.websites[0];
 
-  // Intercept relative domain links in content previews/editor to prevent local 404 redirects (e.g. www.devexhub.com -> https://www.devexhub.com)
+  // Intercept relative domain links in content previews/editor to prevent local 404 redirects and force opening in a new tab
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a");
     if (a && a.closest(".bp, .li, .ig, .yt, .rich-editor, #largePreviewBody, #draftPreviewContent")) {
-      const href = a.getAttribute("href");
-      if (href && href.trim() && !/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(href.trim())) {
-        e.preventDefault();
-        window.open("https://" + href.trim(), "_blank");
+      e.preventDefault();
+      let href = a.getAttribute("href");
+      if (href && href.trim()) {
+        href = href.trim();
+        if (!/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(href)) {
+          href = "https://" + href;
+        }
+        window.open(href, "_blank");
       }
     }
   });
@@ -133,6 +137,7 @@
       d.setDate(startOfWeek.getDate() + i);
       weekDates.push(d);
     }
+    window.currentWorkspaceWeekDates = weekDates;
 
     // Format week label
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -237,6 +242,41 @@
         } catch (err) {
           C.toast({ type: "error", title: "Removal failed", desc: err.message });
         }
+      });
+    });
+
+    // Empty slot clicks -> open addEventModal
+    board.querySelectorAll(".cal-empty").forEach(empty => {
+      empty.addEventListener("click", () => {
+        const selectedDayForAdd = empty.dataset.addDay;
+        
+        // Find approved drafts for this site
+        const approvedDrafts = drafts.filter(c => c.status === "Approved");
+        
+        const select = document.getElementById("aeDraft");
+        if (select) {
+          select.innerHTML = "";
+          if (!approvedDrafts.length) {
+            select.innerHTML = `<option value="">No approved drafts available</option>`;
+            document.getElementById("aeSave").disabled = true;
+          } else {
+            approvedDrafts.forEach(d => {
+              const opt = document.createElement("option");
+              opt.value = d.id;
+              opt.textContent = `[${d.platform}] ${d.title}`;
+              select.appendChild(opt);
+            });
+            document.getElementById("aeSave").disabled = false;
+          }
+        }
+        
+        const addEventTitle = document.getElementById("addEventTitle");
+        if (addEventTitle) {
+          addEventTitle.textContent = `Schedule draft for ${selectedDayForAdd}`;
+        }
+        
+        window.selectedDayForAddWorkspace = selectedDayForAdd;
+        C.openModal("addEventModal");
       });
     });
 
@@ -3985,6 +4025,65 @@
         C.toast({ type: "error", title: "Scheduling failed", desc: err.message });
       } finally {
         confirmScheduleBtn.disabled = false;
+      }
+    });
+  }
+
+  const aeSaveBtn = document.getElementById("aeSave");
+  if (aeSaveBtn) {
+    aeSaveBtn.addEventListener("click", async () => {
+      const draftId = document.getElementById("aeDraft").value;
+      const timeVal = document.getElementById("aeTime").value || "09:00";
+      const selectedDay = window.selectedDayForAddWorkspace;
+      
+      if (!draftId) {
+        C.toast({ type: "warning", title: "No draft selected" });
+        return;
+      }
+      if (!selectedDay) {
+        C.toast({ type: "warning", title: "No day selected" });
+        return;
+      }
+      
+      const dayOffsets = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+      const offset = dayOffsets[selectedDay];
+      if (offset === undefined) return;
+      
+      const weekDates = window.currentWorkspaceWeekDates;
+      if (!weekDates || !weekDates[offset]) {
+        C.toast({ type: "error", title: "Error", desc: "Unable to retrieve calendar week dates." });
+        return;
+      }
+      
+      const targetDate = new Date(weekDates[offset]);
+      const [hh, min] = timeVal.split(":").map(Number);
+      targetDate.setHours(hh, min, 0, 0);
+      
+      const now = new Date();
+      if (targetDate < now) {
+        C.toast({ type: "warning", title: "Scheduling blocked", desc: "Cannot schedule posts in the past." });
+        return;
+      }
+      
+      aeSaveBtn.disabled = true;
+      try {
+        await CandenceAPI.scheduleDraft(draftId, targetDate.toISOString());
+        
+        const d = drafts.find(x => x.id == draftId);
+        if (d) {
+          d.status = "Scheduled";
+        }
+        
+        await window.MOCK.syncMockData(site.id);
+        drafts = window.MOCK.content.filter(x => x.site === site.id);
+        renderDrafts();
+        renderWorkspaceCalendar();
+        C.toast({ type: "success", title: "Draft scheduled", desc: `Scheduled for ${selectedDay} at ${timeVal}` });
+        C.closeModal("addEventModal");
+      } catch (err) {
+        C.toast({ type: "error", title: "Scheduling failed", desc: err.message });
+      } finally {
+        aeSaveBtn.disabled = false;
       }
     });
   }

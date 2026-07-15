@@ -94,11 +94,121 @@
     let currentSiteId = "all";
     let currentRange = "8w";
 
-    function updateAnalytics(siteId = currentSiteId, range = currentRange) {
-      currentSiteId = siteId;
-      currentRange = range;
+    function getAnalyticsData(range, filteredContent) {
+      const nowObj = new Date();
+      if (range === '30') { // 30d
+        const labels = [];
+        const publishedSeries = [];
+        const approvalRateSeries = [];
+        const totalSeries = [];
+        const approvedSeries = [];
+        
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(nowObj);
+          d.setDate(nowObj.getDate() - i);
+          labels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+          publishedSeries.push(0);
+          approvalRateSeries.push(0);
+          totalSeries.push(0);
+          approvedSeries.push(0);
+        }
+        
+        filteredContent.forEach(c => {
+          const createdDate = new Date(c.created_at || nowObj);
+          const diffDays = Math.floor((nowObj - createdDate) / (1000 * 60 * 60 * 24));
+          const idx = 29 - diffDays;
+          if (idx >= 0 && idx < 30) {
+            totalSeries[idx]++;
+            const s = c.status.toLowerCase();
+            if (s === 'approved' || s === 'scheduled' || s === 'published') {
+              approvedSeries[idx]++;
+            }
+            if (s === 'published') {
+              publishedSeries[idx]++;
+            }
+          }
+        });
+        
+        for (let i = 0; i < 30; i++) {
+          if (totalSeries[i] > 0) {
+            approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
+          } else {
+            approvalRateSeries[i] = 100;
+          }
+        }
+        return { labels, publishedSeries, approvalRateSeries };
+        
+      } else if (range === '8w') { // 8 weeks
+        const labels = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"];
+        const publishedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+        const approvalRateSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+        const totalSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+        const approvedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
+        
+        filteredContent.forEach(c => {
+          const createdDate = new Date(c.created_at || nowObj);
+          const diffDays = Math.floor((nowObj - createdDate) / (1000 * 60 * 60 * 24));
+          const weekIndex = 7 - Math.floor(diffDays / 7);
+          if (weekIndex >= 0 && weekIndex < 8) {
+            totalSeries[weekIndex]++;
+            const s = c.status.toLowerCase();
+            if (s === 'approved' || s === 'scheduled' || s === 'published') {
+              approvedSeries[weekIndex]++;
+            }
+            if (s === 'published') {
+              publishedSeries[weekIndex]++;
+            }
+          }
+        });
+        
+        for (let i = 0; i < 8; i++) {
+          if (totalSeries[i] > 0) {
+            approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
+          } else {
+            approvalRateSeries[i] = 100;
+          }
+        }
+        return { labels, publishedSeries, approvalRateSeries };
+        
+      } else { // 'q' (Quarter / 12 weeks)
+        const labels = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"];
+        const publishedSeries = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        const approvalRateSeries = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        const totalSeries = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        const approvedSeries = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        
+        filteredContent.forEach(c => {
+          const createdDate = new Date(c.created_at || nowObj);
+          const diffDays = Math.floor((nowObj - createdDate) / (1000 * 60 * 60 * 24));
+          const weekIndex = 11 - Math.floor(diffDays / 7);
+          if (weekIndex >= 0 && weekIndex < 12) {
+            totalSeries[weekIndex]++;
+            const s = c.status.toLowerCase();
+            if (s === 'approved' || s === 'scheduled' || s === 'published') {
+              approvedSeries[weekIndex]++;
+            }
+            if (s === 'published') {
+              publishedSeries[weekIndex]++;
+            }
+          }
+        });
+        
+        for (let i = 0; i < 12; i++) {
+          if (totalSeries[i] > 0) {
+            approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
+          } else {
+            approvalRateSeries[i] = 100;
+          }
+        }
+        return { labels, publishedSeries, approvalRateSeries };
+      }
+    }
 
-      const filteredContent = liveDrafts.filter(c => siteId === "all" || String(c.website) === String(siteId));
+    function updateAnalytics(siteId, range) {
+      if (siteId !== undefined) currentSiteId = siteId;
+      if (range !== undefined) currentRange = range;
+
+      const filteredContent = liveDrafts.filter(c => currentSiteId === "all" || String(c.website) === String(currentSiteId));
       const publishedContent = filteredContent.filter(c => c.status.toLowerCase() === 'published');
       const pubCount = publishedContent.length;
 
@@ -116,43 +226,7 @@
       ].map(s=>`<div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div>
         <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up">${I("trending-up")} ${s.d} <span class="muted">vs prev.</span></div></div>`).join("");
 
-      // Recalculate Weekly series data
-      const nowObj = new Date();
-      const publishedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
-      const approvalRateSeries = [0, 0, 0, 0, 0, 0, 0, 0];
-      const totalSeries = [0, 0, 0, 0, 0, 0, 0, 0];
-      const approvedSeries = [0, 0, 0, 0, 0, 0, 0, 0];
-
-      filteredContent.forEach(c => {
-        const createdDate = new Date(c.created_at || nowObj);
-        const diffMs = nowObj - createdDate;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        const weekIndex = 7 - Math.floor(diffDays / 7);
-        
-        if (weekIndex >= 0 && weekIndex <= 7) {
-          totalSeries[weekIndex]++;
-          const s = c.status.toLowerCase();
-          if (s === 'approved' || s === 'scheduled' || s === 'published') {
-            approvedSeries[weekIndex]++;
-          }
-          if (s === 'published') {
-            publishedSeries[weekIndex]++;
-          }
-        }
-      });
-
-      for (let i = 0; i < 8; i++) {
-        if (publishedSeries[i] > 0) {
-          // Keep array defined
-        } else {
-          publishedSeries[i] = 0;
-        }
-        if (totalSeries[i] > 0) {
-          approvalRateSeries[i] = Math.round((approvedSeries[i] / totalSeries[i]) * 100);
-        } else {
-          approvalRateSeries[i] = 0;
-        }
-      }
+      const chartData = getAnalyticsData(currentRange, filteredContent);
 
       // Include YouTube in doughnut chart distribution
       const byPlatform = { Blog: 0, LinkedIn: 0, Instagram: 0, YouTube: 0 };
@@ -170,12 +244,18 @@
       
       const vctx = document.getElementById("volChart");
       const grad = vctx.getContext("2d").createLinearGradient(0,0,0,260); grad.addColorStop(0,t.primary+"4d"); grad.addColorStop(1,t.primary+"00");
-      charts.vol = new Chart(vctx,{type:"line",data:{labels:M.weeks,datasets:[{data:publishedSeries,borderColor:t.primary,backgroundColor:grad,fill:true,tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:baseOpts(t)});
+      charts.vol = new Chart(vctx,{type:"line",data:{labels:chartData.labels,datasets:[{data:chartData.publishedSeries,borderColor:t.primary,backgroundColor:grad,fill:true,tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:baseOpts(t)});
 
       charts.plat = new Chart(document.getElementById("platChart"),{type:"doughnut",data:{labels:Object.keys(byPlatform),datasets:[{data:Object.values(byPlatform),backgroundColor:[t.blog,t.linkedin,t.instagram],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:"64%",plugins:{legend:{display:false},tooltip:{displayColors:false,padding:10}}}});
       document.getElementById("platLegend").innerHTML=Object.entries(byPlatform).map(([k,v],i)=>`<div class="pl-row"><span class="lg-dot" style="background:${[t.blog,t.linkedin,t.instagram][i]}"></span><span class="pl-name">${k}</span><span class="pl-val mono">${totalPlatform > 0 ? Math.round(v/totalPlatform*100) : 0}%</span></div>`).join("");
 
-      charts.appr = new Chart(document.getElementById("apprChart"),{type:"line",data:{labels:M.weeks,datasets:[{data:approvalRateSeries,borderColor:t.success,backgroundColor:"transparent",tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:{...baseOpts(t),scales:{...baseOpts(t).scales,y:{...baseOpts(t).scales.y,min:50,max:100,ticks:{color:t.text,callback:v=>v+"%"}}}}});
+      charts.appr = new Chart(document.getElementById("apprChart"),{type:"line",data:{labels:chartData.labels,datasets:[{data:chartData.approvalRateSeries,borderColor:t.success,backgroundColor:"transparent",tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5}]},options:{...baseOpts(t),scales:{...baseOpts(t).scales,y:{...baseOpts(t).scales.y,min:50,max:100,ticks:{color:t.text,callback:v=>v+"%"}}}}});
+
+      // Update subtitle subheadings in chart card headers
+      const volSub = vctx.closest('.card').querySelector('.card__header .sub');
+      if (volSub) {
+        volSub.textContent = currentRange === '30' ? 'Posts published per day' : 'Posts published per week';
+      }
 
       setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()),90);
       C.refreshIcons();
@@ -236,7 +316,7 @@
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `cadence_analytics_report_${currentSiteId}.csv`);
+      link.setAttribute("download", `candence_analytics_report_${currentSiteId}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

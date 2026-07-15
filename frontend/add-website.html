@@ -192,6 +192,13 @@
                         <option value="basic_auth">Basic Auth (Username/Password)</option>
                       </select>
                     </div>
+                    <div class="field" style="margin-bottom:8px">
+                      <label class="label">Request Payload Format</label>
+                      <select class="select" id="val_blog_format" style="width:100%">
+                        <option value="json">JSON (application/json)</option>
+                        <option value="form_data">Form-Data (multipart/form-data)</option>
+                      </select>
+                    </div>
 
                     <!-- Dynamic API Key fields -->
                     <div id="blog_auth_fields_api_key" class="hide" style="margin-bottom:8px">
@@ -409,23 +416,31 @@
 
       if (plat === 'blog') {
         authType = document.getElementById('val_blog_auth_type').value;
+        const payload_format = document.getElementById('val_blog_format').value;
         if (authType === 'api_key') {
           authPayload = {
             api_key_name: document.getElementById('val_blog_api_key_name').value.trim(),
-            api_key_value: document.getElementById('val_blog_api_key_value').value.trim()
+            api_key_value: document.getElementById('val_blog_api_key_value').value.trim(),
+            payload_format: payload_format
           };
         } else if (authType === 'bearer_token') {
           authPayload = {
-            token_value: document.getElementById('val_blog_bearer_token_value').value.trim()
+            token_value: document.getElementById('val_blog_bearer_token_value').value.trim(),
+            payload_format: payload_format
           };
         } else if (authType === 'basic_auth') {
           authPayload = {
             username: document.getElementById('val_blog_username').value.trim(),
-            password: document.getElementById('val_blog_password').value.trim()
+            password: document.getElementById('val_blog_password').value.trim(),
+            payload_format: payload_format
+          };
+        } else {
+          authPayload = {
+            payload_format: payload_format
           };
         }
       }
-
+ 
       try {
         const res = await CandenceAPI.testConnection(0, plat, url, authType, authPayload);
         if (res && res.connected) {
@@ -438,7 +453,7 @@
       }
       lucide.createIcons();
     };
-
+ 
     async function saveConnectionsForSite(siteId) {
       const platforms = ['linkedin', 'youtube', 'instagram', 'blog'];
       for (const plat of platforms) {
@@ -450,19 +465,27 @@
             let authPayload = {};
             if (plat === 'blog') {
               authType = document.getElementById('val_blog_auth_type').value;
+              const payload_format = document.getElementById('val_blog_format').value;
               if (authType === 'api_key') {
                 authPayload = {
                   api_key_name: document.getElementById('val_blog_api_key_name').value.trim(),
-                  api_key_value: document.getElementById('val_blog_api_key_value').value.trim()
+                  api_key_value: document.getElementById('val_blog_api_key_value').value.trim(),
+                  payload_format: payload_format
                 };
               } else if (authType === 'bearer_token') {
                 authPayload = {
-                  token_value: document.getElementById('val_blog_bearer_token_value').value.trim()
+                  token_value: document.getElementById('val_blog_bearer_token_value').value.trim(),
+                  payload_format: payload_format
                 };
               } else if (authType === 'basic_auth') {
                 authPayload = {
                   username: document.getElementById('val_blog_username').value.trim(),
-                  password: document.getElementById('val_blog_password').value.trim()
+                  password: document.getElementById('val_blog_password').value.trim(),
+                  payload_format: payload_format
+                };
+              } else {
+                authPayload = {
+                  payload_format: payload_format
                 };
               }
             }
@@ -485,10 +508,15 @@
         chip.className = "chip";
         chip.innerHTML = kwField.value.trim() + ' <button type="button" aria-label="remove"><i data-lucide="x"></i></button>';
         kwField.before(chip); kwField.value = ""; lucide.createIcons();
+        if (typeof saveFormState === "function") saveFormState();
       }
     });
     document.getElementById("kwInput").addEventListener("click", (e) => {
-      const b = e.target.closest("button"); if (b) b.closest(".chip").remove();
+      const b = e.target.closest("button");
+      if (b) {
+        b.closest(".chip").remove();
+        if (typeof saveFormState === "function") saveFormState();
+      }
     });
 
     function setStep(n) {
@@ -517,9 +545,9 @@
       const row = document.createElement("div");
       row.className = "log-row";
       if (spin) {
-        row.innerHTML = `<i data-lucide="${iconName}" class="spin" style="color:${color}"></i><span style="color:${color}">${text}</span>`;
+        row.innerHTML = window.Candence.icon(iconName, `class="spin" style="color:${color}"`) + `<span style="color:${color}">${text}</span>`;
       } else {
-        row.innerHTML = `<i data-lucide="${iconName}" style="color:${color}"></i><span style="color:${color}">${text}</span>`;
+        row.innerHTML = window.Candence.icon(iconName, `style="color:${color}"`) + `<span style="color:${color}">${text}</span>`;
       }
       log.appendChild(row);
       lucide.createIcons();
@@ -758,6 +786,22 @@
       } else {
         setStep(2); 
 
+        // Reset orb and bar state for a new crawl attempt
+        const orb = document.querySelector(".crawl-orb");
+        if (orb) {
+          orb.classList.remove("failed");
+          const icon = orb.querySelector("i, svg");
+          if (icon) {
+            icon.outerHTML = '<i data-lucide="radar"></i>';
+          }
+        }
+        const bar = document.getElementById("crawlBar");
+        if (bar) {
+          bar.style.width = "4%";
+          bar.style.backgroundColor = ""; // reset to CSS default
+        }
+        lucide.createIcons();
+
         try {
           const log = document.getElementById("crawlLog");
           log.innerHTML = "";
@@ -782,6 +826,39 @@
           console.error("Onboarding setup failed:", err);
           addLogMessage("Onboarding setup failed: " + err.message, "x-circle", false, "var(--danger)");
           C.toast({ type: "error", title: "Failed to initiate crawl", desc: err.message });
+          
+          // Stop animation and show failed state in crawler orb
+          const orb = document.querySelector(".crawl-orb");
+          if (orb) {
+            orb.classList.add("failed");
+            const icon = orb.querySelector("i, svg");
+            if (icon) {
+              icon.outerHTML = '<i data-lucide="alert-circle" style="width:28px;height:28px"></i>';
+              lucide.createIcons();
+            }
+          }
+          
+          // Stop progress bar and turn it red
+          const bar = document.getElementById("crawlBar");
+          if (bar) {
+            bar.style.width = "100%";
+            bar.style.backgroundColor = "var(--error)";
+          }
+          
+          // Add a "Go Back" button to the crawl log
+          const log = document.getElementById("crawlLog");
+          if (log) {
+            const btnRow = document.createElement("div");
+            btnRow.style.marginTop = "20px";
+            btnRow.style.textAlign = "center";
+            btnRow.innerHTML = `<button type="button" class="btn btn-secondary" id="onboardBackBtn" style="margin:0 auto; display:inline-flex; align-items:center; gap:8px;">${window.Candence.icon("arrow-left")} Go Back & Edit Details</button>`;
+            log.appendChild(btnRow);
+            
+            document.getElementById("onboardBackBtn").addEventListener("click", () => {
+              setStep(1);
+            });
+            lucide.createIcons();
+          }
         }
       }
     });
@@ -789,6 +866,23 @@
     document.getElementById("recrawl").addEventListener("click", async () => {
       if (!createdSiteId) return;
       setStep(2);
+      
+      // Reset orb and bar state
+      const orb = document.querySelector(".crawl-orb");
+      if (orb) {
+        orb.classList.remove("failed");
+        const icon = orb.querySelector("i, svg");
+        if (icon) {
+          icon.outerHTML = '<i data-lucide="radar"></i>';
+        }
+      }
+      const bar = document.getElementById("crawlBar");
+      if (bar) {
+        bar.style.width = "4%";
+        bar.style.backgroundColor = ""; // reset to CSS default
+      }
+      lucide.createIcons();
+
       try {
         const log = document.getElementById("crawlLog");
         log.innerHTML = "";
@@ -798,6 +892,39 @@
       } catch (err) {
         console.error("Re-crawl trigger failed:", err);
         addLogMessage("Re-crawl failed: " + err.message, "x-circle", false, "var(--danger)");
+        
+        // Stop animation and show failed state in crawler orb
+        const orb = document.querySelector(".crawl-orb");
+        if (orb) {
+          orb.classList.add("failed");
+          const icon = orb.querySelector("i, svg");
+          if (icon) {
+            icon.outerHTML = '<i data-lucide="alert-circle" style="width:28px;height:28px"></i>';
+            lucide.createIcons();
+          }
+        }
+        
+        // Stop progress bar and turn it red
+        const bar = document.getElementById("crawlBar");
+        if (bar) {
+          bar.style.width = "100%";
+          bar.style.backgroundColor = "var(--error)";
+        }
+        
+        // Add a "Go Back" button to the crawl log
+        const log = document.getElementById("crawlLog");
+        if (log) {
+          const btnRow = document.createElement("div");
+          btnRow.style.marginTop = "20px";
+          btnRow.style.textAlign = "center";
+          btnRow.innerHTML = `<button type="button" class="btn btn-secondary" id="recrawlBackBtn" style="margin:0 auto; display:inline-flex; align-items:center; gap:8px;">${window.Candence.icon("arrow-left")} Go Back & Edit Details</button>`;
+          log.appendChild(btnRow);
+          
+          document.getElementById("recrawlBackBtn").addEventListener("click", () => {
+            setStep(1);
+          });
+          lucide.createIcons();
+        }
       }
     });
 
@@ -809,6 +936,9 @@
         });
         
         await M.syncMockData();
+        
+        // Clear saved form state on success
+        clearFormState();
         
         C.toast({ type: "success", title: `${siteName} added`, desc: "Opening the workspace…" });
         setTimeout(() => location.href = `website-workspace.html?site=${createdSiteId}`, 1100);
@@ -832,6 +962,94 @@
       }
     });
 
+    // ---- Autosave Form State ----
+    const formFields = [
+      "name", "desc", "industry", "customIndustry", "tone", "audience"
+    ];
+
+    function saveFormState() {
+      const state = {};
+      formFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === "checkbox") {
+          state[id] = el.checked;
+        } else {
+          state[id] = el.value;
+        }
+      });
+      // Save keyword chips
+      const keywords = [];
+      document.querySelectorAll("#kwInput .chip").forEach(chip => {
+        const text = chip.textContent.replace(/[\s\n\r]/g, "").replace(/x$/i, "").trim();
+        if (text) keywords.push(text);
+      });
+      state.keywords = keywords;
+      
+      localStorage.setItem("candence_add_website_form", JSON.stringify(state));
+    }
+
+    function restoreFormState() {
+      const saved = localStorage.getItem("candence_add_website_form");
+      if (!saved) return;
+      try {
+        const state = JSON.parse(saved);
+        formFields.forEach(id => {
+          const el = document.getElementById(id);
+          if (!el || state[id] === undefined) return;
+          if (el.type === "checkbox") {
+            el.checked = state[id];
+            // Trigger checkbox panel toggle
+            const name = id.replace("chk_", "");
+            if (typeof window.toggleChanPanel === "function") window.toggleChanPanel(name);
+          } else {
+            el.value = state[id];
+          }
+        });
+        
+        // Restore customIndustry visibility
+        const indSelect = document.getElementById("industry");
+        if (indSelect) {
+          const isOther = indSelect.value === "Other";
+          document.getElementById("customIndustryField").classList.toggle("hide", !isOther);
+        }
+        
+        // Restore blog auth fields visibility
+        if (typeof window.showBlogAuthFields === "function") window.showBlogAuthFields();
+        
+        // Restore keyword chips
+        if (state.keywords && state.keywords.length) {
+          const kwField = document.getElementById("kwField");
+          if (kwField) {
+            state.keywords.forEach(kw => {
+              const chip = document.createElement("span");
+              chip.className = "chip";
+              chip.innerHTML = kw + ' <button type="button" aria-label="remove"><i data-lucide="x"></i></button>';
+              kwField.before(chip);
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore form state:", err);
+      }
+    }
+
+    function clearFormState() {
+      localStorage.removeItem("candence_add_website_form");
+    }
+
+    // Attach listeners to input fields for autosave
+    formFields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener("input", saveFormState);
+        el.addEventListener("change", saveFormState);
+      }
+    });
+
+    // Run restore on page load
+    restoreFormState();
+
     C.refreshIcons();
   })();
   </script>
@@ -851,6 +1069,9 @@
     .crawl-orb .r2 { animation-delay:.8s; } .crawl-orb .r3 { animation-delay:1.6s; }
     .crawl-core { position:absolute; inset:30px; border-radius:99px; background:linear-gradient(140deg,var(--primary),#1e8fc6); display:grid; place-items:center; color:#fff; box-shadow:var(--sh-lg); }
     .crawl-core svg { width:28px; height:28px; animation:spin 3s linear infinite; }
+    .crawl-orb.failed .ring { animation: none; border-color: var(--error); opacity: 0.3; }
+    .crawl-orb.failed .crawl-core { background: linear-gradient(140deg, var(--error), #ef4444); }
+    .crawl-orb.failed .crawl-core svg { animation: none; }
     @keyframes crawlPulse { 0%{transform:scale(.5);opacity:.7;} 100%{transform:scale(1.25);opacity:0;} }
     .crawl-log { max-width:420px; margin:var(--s6) auto 0; text-align:left; display:flex; flex-direction:column; gap:10px; }
     .log-row { display:flex; align-items:center; gap:10px; font-size:var(--fs-md); color:var(--text-secondary); }

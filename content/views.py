@@ -20,7 +20,10 @@ class ContentIdeaListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdminOrSuperAdmin]
 
     def get_queryset(self):
+        user = self.request.user
         qs = ContentIdea.objects.select_related('website', 'submitted_by')
+        if user.role != 'super_admin':
+            qs = qs.filter(website__owner=user)
         website_id = self.request.query_params.get('website')
         if website_id:
             qs = qs.filter(website_id=website_id)
@@ -40,7 +43,36 @@ class ContentIdeaListCreateView(generics.ListCreateAPIView):
 class ContentIdeaDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ContentIdeaSerializer
     permission_classes = [IsAdminOrSuperAdmin]
-    queryset = ContentIdea.objects.all()
+    
+    def get_queryset(self):
+        user = self.request.user
+        qs = ContentIdea.objects.all()
+        if user.role != 'super_admin':
+            qs = qs.filter(website__owner=user)
+        return qs
+
+
+import logging
+import threading
+
+logger = logging.getLogger(__name__)
+
+def run_task_async(task_func, *args, **kwargs):
+    """
+    Tries to run a task asynchronously using Celery (.delay()).
+    If Celery/Redis connection fails or is unavailable, falls back to running
+    it in a background Python Thread to ensure it still executes.
+    """
+    try:
+        task_func.delay(*args, **kwargs)
+    except Exception as celery_err:
+        logger.warning(f"Failed to queue task {task_func.__name__} with Celery: {celery_err}. Falling back to background thread.")
+        threading.Thread(
+            target=task_func,
+            args=args,
+            kwargs=kwargs,
+            daemon=True
+        ).start()
 
 
 class GenerateContentView(APIView):
@@ -57,7 +89,7 @@ class GenerateContentView(APIView):
         include_cta = request.data.get('include_cta', True)
         idea.status = 'generating'
         idea.save(update_fields=['status'])
-        generate_content_task.delay(pk, include_infographics=include_infographics, include_cta=include_cta)
+        run_task_async(generate_content_task, pk, include_infographics=include_infographics, include_cta=include_cta)
         return Response({'status': 'generating', 'idea_id': pk})
 
 
@@ -66,7 +98,10 @@ class ContentDraftListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
         qs = ContentDraft.objects.select_related('website', 'reviewed_by')
+        if user.role != 'super_admin':
+            qs = qs.filter(website__owner=user)
         # Filters
         website_id = self.request.query_params.get('website')
         draft_status = self.request.query_params.get('status')
@@ -84,7 +119,13 @@ class ContentDraftListView(generics.ListCreateAPIView):
 class ContentDraftDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ContentDraftSerializer
     permission_classes = [IsAdminOrSuperAdmin]
-    queryset = ContentDraft.objects.all()
+    
+    def get_queryset(self):
+        user = self.request.user
+        qs = ContentDraft.objects.all()
+        if user.role != 'super_admin':
+            qs = qs.filter(website__owner=user)
+        return qs
 
     def perform_destroy(self, instance):
         ip, _ = get_client_ip(self.request)
@@ -143,7 +184,11 @@ class ApproveDraftView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
 
     def post(self, request, pk):
-        draft = ContentDraft.objects.get(pk=pk)
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Draft not found.'}, status=404)
+            
         old_status = draft.status
         draft.status = 'approved'
         draft.reviewed_by = request.user
@@ -163,7 +208,11 @@ class RejectDraftView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
 
     def post(self, request, pk):
-        draft = ContentDraft.objects.get(pk=pk)
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Draft not found.'}, status=404)
+            
         old_status = draft.status
         draft.status = 'rejected'
         draft.reviewed_by = request.user
@@ -187,7 +236,11 @@ class RegenerateDraftView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
 
     def post(self, request, pk):
-        draft = ContentDraft.objects.get(pk=pk)
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Draft not found.'}, status=404)
+            
         old_status = draft.status
         regenerate_type = request.data.get('type', 'all')
         
@@ -196,9 +249,9 @@ class RegenerateDraftView(APIView):
             draft.body = ''
             draft.save()
         
-        idea_id = draft.idea_id if draft.idea else None
+        idea_id = draft.idea_id
         
-        regenerate_draft_task.delay(pk, regenerate_type=regenerate_type)
+        run_task_async(regenerate_draft_task, pk, regenerate_type=regenerate_type)
         
         new_draft_id = pk
         if idea_id and regenerate_type in ['all', 'content']:
@@ -227,7 +280,7 @@ class RepublishDraftView(APIView):
 
     def post(self, request, pk):
         from .tasks import republish_published_post_task
-        republish_published_post_task.delay(pk)
+        run_task_async(republish_published_post_task, pk)
         return Response({'status': 'republishing', 'draft_id': pk})
 
 
@@ -235,7 +288,11 @@ class ScheduleDraftView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
 
     def post(self, request, pk):
-        draft = ContentDraft.objects.get(pk=pk)
+        try:
+            draft = ContentDraft.objects.get(pk=pk)
+        except ContentDraft.DoesNotExist:
+            return Response({'detail': 'Draft not found.'}, status=404)
+            
         if draft.status not in ['draft', 'approved', 'scheduled']:
             return Response({'detail': 'Draft must be in draft, approved, or scheduled status first.'}, status=400)
         
@@ -269,7 +326,10 @@ class ScheduledPostListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
         qs = ScheduledPost.objects.select_related('draft__website')
+        if user.role != 'super_admin':
+            qs = qs.filter(draft__website__owner=user)
         website_id = self.request.query_params.get('website')
         if website_id:
             qs = qs.filter(draft__website_id=website_id)

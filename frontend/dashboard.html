@@ -35,7 +35,7 @@
         </div>
         <div class="page-head">
           <div class="ph-text">
-            <h1 class="page-title" id="greeting">Good morning, Maya</h1>
+            <h1 class="page-title" id="greeting">Good morning</h1>
             <p class="page-sub">Here's what's happening across your websites this week.</p>
           </div>
           <div class="ph-actions">
@@ -160,7 +160,7 @@
     const qa = [
       { icon: "plus", t: "Add a website", d: "Crawl &amp; set up a new client", href: "add-website.html", tile: "blog" },
       { icon: "sparkles", t: "Generate content", d: "Draft posts with AI", href: genHref, tile: "linkedin" },
-      { icon: "calendar-check", t: "Auto-schedule week", d: "Distribute approved drafts", href: "calendar.html", tile: "instagram" },
+      { icon: "calendar-check", t: "Schedule week", d: "Distribute approved drafts", href: "calendar.html", tile: "instagram" },
     ];
     document.getElementById("quickActions").innerHTML = qa.map(a => `
       <a class="qa-item" href="${a.href}">
@@ -266,17 +266,80 @@
         grid: cs.getPropertyValue("--border").trim(),
       };
     }
-    function drawChart() {
+    function getChartData(range) {
+      const nowObj = new Date();
+      const content = M.content || [];
+      if (range === '8 weeks') {
+        const labels = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"];
+        const data = [0, 0, 0, 0, 0, 0, 0, 0];
+        content.forEach(c => {
+          if (c.status === 'Published' || c.status === 'published') {
+            const createdDate = new Date(c.created_at || nowObj);
+            const diffDays = Math.floor((nowObj - createdDate) / (1000 * 60 * 60 * 24));
+            const weekIndex = 7 - Math.floor(diffDays / 7);
+            if (weekIndex >= 0 && weekIndex < 8) {
+              data[weekIndex]++;
+            }
+          }
+        });
+        return { labels, data };
+      } else if (range === 'Quarter') {
+        const labels = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"];
+        const data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        content.forEach(c => {
+          if (c.status === 'Published' || c.status === 'published') {
+            const createdDate = new Date(c.created_at || nowObj);
+            const diffDays = Math.floor((nowObj - createdDate) / (1000 * 60 * 60 * 24));
+            const weekIndex = 11 - Math.floor(diffDays / 7);
+            if (weekIndex >= 0 && weekIndex < 12) {
+              data[weekIndex]++;
+            }
+          }
+        });
+        return { labels, data };
+      } else { // 'Year'
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const labels = [];
+        const data = [];
+        const currentMonth = nowObj.getMonth();
+        const currentYear = nowObj.getFullYear();
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(currentYear, currentMonth - i, 1);
+          labels.push(months[d.getMonth()]);
+          data.push(0);
+        }
+        content.forEach(c => {
+          if (c.status === 'Published' || c.status === 'published') {
+            const createdDate = new Date(c.created_at || nowObj);
+            const diffMonths = (nowObj.getFullYear() - createdDate.getFullYear()) * 12 + (nowObj.getMonth() - createdDate.getMonth());
+            const monthIndex = 11 - diffMonths;
+            if (monthIndex >= 0 && monthIndex < 12) {
+              data[monthIndex]++;
+            }
+          }
+        });
+        return { labels, data };
+      }
+    }
+    function drawChart(range = '8 weeks') {
       const ctx = document.getElementById("outputChart");
       const tc = themeColors();
       const grad = ctx.getContext("2d").createLinearGradient(0, 0, 0, 240);
       grad.addColorStop(0, tc.primary + "55");
       grad.addColorStop(1, tc.primary + "00");
       if (chart) chart.destroy();
+      
+      const chartData = getChartData(range);
+      
+      const subEl = ctx.closest('.card').querySelector('.card__header .sub');
+      if (subEl) {
+        subEl.textContent = `Published items over the last ${range}`;
+      }
+      
       chart = new Chart(ctx, {
         type: "line",
-        data: { labels: M.weeks, datasets: [{
-          data: M.series.published, borderColor: tc.primary, backgroundColor: grad,
+        data: { labels: chartData.labels, datasets: [{
+          data: chartData.data, borderColor: tc.primary, backgroundColor: grad,
           fill: true, tension: .4, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: tc.primary,
         }]},
         options: {
@@ -289,14 +352,17 @@
           },
         },
       });
-      // settle layout race without depending on rAF (throttled when tab hidden)
       setTimeout(() => { if (chart) chart.resize(); }, 90);
     }
-    drawChart();
-    window.addEventListener("themechange", () => { drawChart(); });
+    let currentRange = '8 weeks';
+    drawChart(currentRange);
+    window.addEventListener("themechange", () => { drawChart(currentRange); });
     window.addEventListener("rolechange", () => location.reload());
     document.querySelectorAll("#chartRange button").forEach(b => b.addEventListener("click", () => {
-      document.querySelectorAll("#chartRange button").forEach(x => x.classList.remove("active")); b.classList.add("active");
+      document.querySelectorAll("#chartRange button").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      currentRange = b.textContent.trim();
+      drawChart(currentRange);
     }));
 
     C.refreshIcons();

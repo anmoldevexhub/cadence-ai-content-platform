@@ -310,7 +310,7 @@
                   <span class="tsm bold muted">Estimated Cost</span>
                 </div>
                 <div class="stat-card__val" id="usageTotalCost">$0.00</div>
-                <div class="stat-card__desc" id="usageCostDesc">Based on OpenAI & Gemini pricing</div>
+                <div class="stat-card__desc" id="usageCostDesc">Based on OpenAI & DALL-E pricing</div>
               </div>
               <div class="stat-card">
                 <div class="stat-card__meta">
@@ -716,6 +716,33 @@
         </div>
       </div>
       <div class="modal__foot"><button class="btn btn-ghost" data-close-modal>Cancel</button><button class="btn btn-primary" id="saveEdit"><i data-lucide="check"></i> Save changes</button></div>
+    </div>
+  </div>
+
+  <!-- Schedule draft modal from calendar slot click -->
+  <div class="modal-overlay" id="addEventModal">
+    <div class="modal">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3 id="addEventTitle">Schedule draft</h3>
+          <div class="sub">Choose an approved draft and set the publishing time.</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body">
+        <div class="field">
+          <label class="label">Approved Draft</label>
+          <select class="select" id="aeDraft" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"></select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="label">Publish Time</label>
+          <input class="input" type="time" id="aeTime" value="09:00" style="width: 100%; height: 38px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text);"/>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn-ghost" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" id="aeSave"><i data-lucide="calendar-plus"></i> Schedule</button>
+      </div>
     </div>
   </div>
 

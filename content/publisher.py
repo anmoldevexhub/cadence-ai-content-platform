@@ -347,7 +347,7 @@ def republish_to_custom_blog(draft, conn) -> dict:
         from requests.auth import HTTPBasicAuth
         auth_credentials = HTTPBasicAuth(username, password)
 
-    is_form_data = auth_payload.get('payload_format') == 'form_data' or 'vidhyacore.com' in create_url.lower()
+    is_form_data = auth_payload.get('payload_format') == 'form_data'
 
     # ── Resolve external ID from previous publish history ───────────────────
     from .models import ScheduledPost
@@ -559,8 +559,8 @@ def publish_to_custom_blog(draft, conn) -> dict:
         from requests.auth import HTTPBasicAuth
         auth_credentials = HTTPBasicAuth(username, password)
 
-    # Detect format preference from connection settings, fallback to vidhyacore.com domain matching
-    is_form_data = auth_payload.get('payload_format') == 'form_data' or 'vidhyacore.com' in url.lower()
+    # Detect format preference from connection settings
+    is_form_data = auth_payload.get('payload_format') == 'form_data'
     clean_url = url
 
     # Look up if this draft has a previously successful ScheduledPost response ID
