@@ -1,0 +1,19 @@
+# Python caches
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local environments and dependency directories
+venv/
+.env
+.git
+.gitignore
+.vscode
+.agents
+.gemini
+
+# Databases and build outputs
+db.sqlite3
+staticfiles/
+node_modules/
