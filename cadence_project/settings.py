@@ -193,8 +193,15 @@ SIMPLE_JWT = {
 BASE_URL = os.environ.get('BACKEND_URL', 'http://localhost:8006')
 
 # Celery Configuration
-CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+_raw_redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+if _raw_redis_url.startswith('rediss://') and 'ssl_cert_reqs' not in _raw_redis_url:
+    if '?' in _raw_redis_url:
+        _raw_redis_url += '&ssl_cert_reqs=none'
+    else:
+        _raw_redis_url += '?ssl_cert_reqs=none'
+
+CELERY_BROKER_URL = _raw_redis_url
+CELERY_RESULT_BACKEND = _raw_redis_url
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -202,6 +209,15 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_TRANSPORT_OPTIONS = {
     'protocol': 2   # Force RESP2 protocol for Redis 5.0
 }
+if CELERY_BROKER_URL.startswith('rediss://'):
+    import ssl
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE
+    }
+
 import sys
 CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv   # Run synchronously ONLY during unit tests
 CELERY_TASK_EAGER_PROPAGATES = True

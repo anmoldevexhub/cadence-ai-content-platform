@@ -122,8 +122,9 @@ class TriggerCrawlView(APIView):
         website.scrape_status = 'crawling'
         website.save(update_fields=['scrape_status'])
         
-        # Fire async Celery task
-        crawl_website_task.delay(pk)
+        # Fire async Celery task safely
+        from content.views import run_task_async
+        run_task_async(crawl_website_task, pk)
         
         ip, _ = get_client_ip(request)
         ActivityLog.objects.create(

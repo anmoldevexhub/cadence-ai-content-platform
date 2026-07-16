@@ -575,6 +575,7 @@
             clearInterval(pollInterval);
             bar.style.width = "100%";
             addLogMessage("Extraction complete! Summarizing content tone...", "check-circle-2", false, "var(--success)");
+            C.toast({ type: "success", title: "Crawl Complete", desc: "Website pages and tone guidelines extracted successfully!" });
             setTimeout(async () => {
               await fillRealResults(siteId);
               setStep(3);
