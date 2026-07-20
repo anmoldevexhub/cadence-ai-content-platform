@@ -713,6 +713,8 @@
           const now = new Date();
           let fetchedIdeas = [];
           let fetchSuccess = false;
+          let changed = false;
+          let needsRefresh = false;
           
           if (window.CandenceAPI && typeof window.CandenceAPI.request === "function") {
             try {
@@ -777,14 +779,14 @@
                 changed = true;
                 
                 if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
-                await window.triggerPageRefresh();
+                needsRefresh = true;
               } else if (updated.status === 'failed' || elapsedSeconds >= 300) {
                 const msg = elapsedSeconds >= 300 ? `Generation for "${idea.title}" timed out.` : `Failed to generate "${idea.title}".`;
                 toast({ type: "error", title: "Generation Failed", desc: msg });
                 changed = true;
                 
                 if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
-                await window.triggerPageRefresh();
+                needsRefresh = true;
               } else {
                 remainingIdeas.push(idea);
               }
@@ -820,7 +822,7 @@
           if (isStuck) {
             toast({ type: "error", title: "Regeneration Failed", desc: `Regeneration task for "${d.title}" timed out.` });
             changed = true;
-            await window.triggerPageRefresh();
+            needsRefresh = true;
             continue;
           }
 
@@ -834,7 +836,7 @@
             if (updated && updated.cover_image !== d.oldCover) {
               toast({ type: "success", title: "Cover Image Ready", desc: `Regenerated cover image for "${d.title}"` });
               changed = true;
-              await window.triggerPageRefresh();
+              needsRefresh = true;
             } else {
               remainingDrafts.push(d);
             }
@@ -845,7 +847,7 @@
             if (hasNewDraft || (updatedOld && updatedOld.body && updatedOld.body !== "" && updatedOld.body !== d.oldBody)) {
               toast({ type: "success", title: "Draft Regenerated", desc: `"${d.title}" content regenerated successfully!` });
               changed = true;
-              await window.triggerPageRefresh();
+              needsRefresh = true;
             } else {
               remainingDrafts.push(d);
             }
@@ -855,6 +857,9 @@
         if (changed || curIdeas.length !== remainingIdeas.length || curDraftsList.length !== remainingDrafts.length) {
           window.saveActiveTasks(remainingIdeas, remainingDrafts);
           window.updateGlobalTaskWidget();
+        }
+        if (needsRefresh) {
+          await window.triggerPageRefresh();
         }
       } catch (globalErr) {
         console.error("Error in global task poller tick:", globalErr);
