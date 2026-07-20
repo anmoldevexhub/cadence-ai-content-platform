@@ -814,7 +814,10 @@
         
         for (const d of curDraftsList) {
           // Check for draft regeneration timeout (5 minutes)
-          const isStuck = d.timestamp ? (Date.now() - d.timestamp > 300000) : true;
+          // Only treat as stuck when timestamp is present AND older than 5 min.
+          // A missing timestamp means the draft was enqueued before the timestamp
+          // field existed (e.g. in-flight across a deploy) — do NOT fail it.
+          const isStuck = d.timestamp ? (Date.now() - d.timestamp > 300000) : false;
           if (isStuck) {
             toast({ type: "error", title: "Regeneration Failed", desc: `Regeneration task for "${d.title}" timed out.` });
             changed = true;

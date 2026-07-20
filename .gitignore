@@ -47,6 +47,8 @@ frontend/dist/
 # Celery
 celerybeat-schedule
 celerybeat-schedule.db
+celerybeat-schedule-shm
+celerybeat-schedule-wal
 celerybeat.pid
 
 # Scratch / debug scripts
