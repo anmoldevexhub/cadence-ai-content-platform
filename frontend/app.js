@@ -761,7 +761,6 @@
               }
             }
           });
-        }
         
         // Only reconcile ideas when fetch actually succeeded; otherwise keep
         // existing curIdeas so a single failed request doesn't silently discard tasks.
