@@ -48,7 +48,7 @@
   const totalCount = siteContent.length;
 
   const ovStats = [
-    { l: "Posts published", v: publishedCount, d: site.engagement, icon: "send", tile: "blog" },
+    { l: "Posts published", v: publishedCount, d: "all time", icon: "send", tile: "blog" },
     { l: "Scheduled", v: scheduledCount, d: "this week", icon: "calendar-clock", tile: "linkedin" },
     { l: "Pending approval", v: pendingCount, d: "needs review", icon: "clock", tile: "youtube" },
     { l: "Total posts", v: totalCount, d: "all time", icon: "layers", tile: "instagram" },
@@ -2413,13 +2413,29 @@
             b.innerHTML = `${I("loader-circle", "class='spin' style='width:12px;height:12px'")} Linking...`;
             C.refreshIcons();
             const updated = await CandenceAPI.injectInternalLinks(d.id);
-            d.body = updated.body;
+            
+            // Show success notification immediately
             C.toast({ type: "success", title: "Links added", desc: "Successfully linked keywords to old posts!" });
+            
+            // Update local state immediately
+            d.body = updated.body;
             
             // Update preview body directly
             const bodyContainer = document.querySelector(".draft-preview-body");
             if (bodyContainer) {
               bodyContainer.innerHTML = previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+            }
+
+            // Update editor rich body if open
+            const richBody = document.getElementById("editBodyRich");
+            if (richBody && editing && String(editing.id) === String(d.id)) {
+              richBody.innerHTML = d.body || "";
+              editing.body = d.body;
+            }
+
+            // Sync backend data in background to prevent modal/toast lag
+            if (window.refreshWorkspaceViews) {
+              window.refreshWorkspaceViews();
             }
           } catch (err) {
             C.toast({ type: "error", title: "Linking failed", desc: err.message });
@@ -2435,13 +2451,29 @@
             b.innerHTML = `${I("loader-circle", "class='spin' style='width:12px;height:12px'")} Removing...`;
             C.refreshIcons();
             const updated = await CandenceAPI.removeInternalLinks(d.id);
-            d.body = updated.body;
+            
+            // Show success notification immediately
             C.toast({ type: "success", title: "Links removed", desc: "Successfully removed all hyperlinks from the draft!" });
+            
+            // Update local state immediately
+            d.body = updated.body;
             
             // Update preview body directly
             const bodyContainer = document.querySelector(".draft-preview-body");
             if (bodyContainer) {
               bodyContainer.innerHTML = previewHTML(d.chan, d.title, d.body, d.cover_image, d.tags, d.category, d.created_at, d.author_name, d.custom_date);
+            }
+
+            // Update editor rich body if open
+            const richBody = document.getElementById("editBodyRich");
+            if (richBody && editing && String(editing.id) === String(d.id)) {
+              richBody.innerHTML = d.body || "";
+              editing.body = d.body;
+            }
+
+            // Sync backend data in background to prevent modal/toast lag
+            if (window.refreshWorkspaceViews) {
+              window.refreshWorkspaceViews();
             }
           } catch (err) {
             C.toast({ type: "error", title: "Failed to remove links", desc: err.message });
@@ -2476,7 +2508,7 @@
               renderDrafts();
             } catch (err) {
               C.toast({ type: "error", title: "Delete failed", desc: err.message });
-            }
+            } 
           }
         }
       });
@@ -2484,294 +2516,31 @@
 
   }
 
-  /* ----- Global Task Polling & UI Indicators ----- */
-  function getActiveTasks() {
-    let ideas = [];
-    let draftsList = [];
-    try {
-      ideas = JSON.parse(localStorage.getItem("candence.active_ideas")) || [];
-    } catch(e){}
-    try {
-      draftsList = JSON.parse(localStorage.getItem("candence.active_drafts")) || [];
-    } catch(e){}
-    return { ideas, drafts: draftsList };
-  }
-
-  function saveActiveTasks(ideas, draftsList) {
-    localStorage.setItem("candence.active_ideas", JSON.stringify(ideas));
-    localStorage.setItem("candence.active_drafts", JSON.stringify(draftsList));
-  }
-
-  // IOS-Style Floating Progress Widget position state variables
-  let widgetCollapsed = false;
-  let widgetCustomX = null;
-  let widgetCustomY = null;
-
-  function updateGlobalTaskWidget() {
-    const { ideas, drafts: draftsList } = getActiveTasks();
-    const total = ideas.length + draftsList.length;
-    
-    let widget = document.getElementById("globalTaskWidget");
-    if (total === 0) {
-      if (widget) widget.remove();
-      return;
+  window.refreshWorkspaceViews = async () => {
+    if (site?.id) {
+      await window.MOCK.syncMockData(site.id);
+      drafts = window.MOCK.content.filter(x => x.site === site.id);
+      renderDrafts();
+      await loadIdeaQueue();
     }
-    
-    if (!widget) {
-      widget = document.createElement("div");
-      widget.id = "globalTaskWidget";
-      widget.style.position = "fixed";
-      widget.style.zIndex = "100000";
-      widget.style.cursor = "grab";
-      widget.style.userSelect = "none";
-      widget.style.transition = "width 0.2s cubic-bezier(0.4, 0, 0.2, 1), height 0.2s, padding 0.2s, border-radius 0.2s";
-      
-      // Load custom position or default to top right
-      widget.style.top = widgetCustomY !== null ? `${widgetCustomY}px` : "76px";
-      if (widgetCustomX !== null) {
-        widget.style.left = `${widgetCustomX}px`;
-      } else {
-        widget.style.right = "24px";
-      }
-      
-      document.body.appendChild(widget);
+  };
 
-      // Drag and drop event listeners
-      let isDragging = false;
-      let dragStartX = 0;
-      let dragStartY = 0;
-      let dragStartLeft = 0;
-      let dragStartTop = 0;
-      let hasMovedSignificant = false;
-
-      widget.addEventListener("mousedown", (e) => {
-        if (e.target.closest("button")) return;
-        
-        isDragging = true;
-        hasMovedSignificant = false;
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-        
-        const rect = widget.getBoundingClientRect();
-        dragStartLeft = rect.left;
-        dragStartTop = rect.top;
-        
-        widget.style.cursor = "grabbing";
-        e.preventDefault();
-      });
-
-      window.addEventListener("mousemove", (e) => {
-        if (!isDragging) return;
-        const dx = e.clientX - dragStartX;
-        const dy = e.clientY - dragStartY;
-        
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-          hasMovedSignificant = true;
-        }
-        
-        let newX = dragStartLeft + dx;
-        let newY = dragStartTop + dy;
-        
-        newX = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, newX));
-        newY = Math.max(10, Math.min(window.innerHeight - widget.offsetHeight - 10, newY));
-        
-        widgetCustomX = newX;
-        widgetCustomY = newY;
-        
-        widget.style.left = `${newX}px`;
-        widget.style.top = `${newY}px`;
-        widget.style.right = "auto";
-      });
-
-      window.addEventListener("mouseup", () => {
-        if (!isDragging) return;
-        isDragging = false;
-        widget.style.cursor = "grab";
-        
-        if (!hasMovedSignificant) {
-          widgetCollapsed = !widgetCollapsed;
-          updateGlobalTaskWidget();
-        }
-      });
+  window.completeWorkspaceProgressBar = () => {
+    if (window._genProgressInterval) {
+      clearInterval(window._genProgressInterval);
+      window._genProgressInterval = null;
     }
-    
-    const taskName = ideas.length > 0 ? `AI writing: "${ideas[0].title}"` : `Regenerating: "${draftsList[0].title}"`;
-    const label = total > 1 ? `${taskName} (+${total - 1} more)` : taskName;
-    
-    if (widgetCollapsed) {
-      widget.style.padding = "10px";
-      widget.style.borderRadius = "99px";
-      widget.style.background = "var(--primary)";
-      widget.style.border = "2px solid #ffffff";
-      widget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
-      widget.style.display = "flex";
-      widget.style.alignItems = "center";
-      widget.style.justifyContent = "center";
-      widget.style.borderLeft = "none";
-      
-      widget.innerHTML = `
-        <div style="position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
-          <i data-lucide="loader-circle" class="spin" style="color:#ffffff; width:20px; height:20px;"></i>
-          <span style="position:absolute; top:-6px; right:-6px; background:#ef4444; color:#ffffff; font-size:9px; font-weight:bold; border-radius:99px; padding:1px 5px; border:1px solid #ffffff; box-shadow:0 2px 4px rgba(0,0,0,0.2);">${total}</span>
-        </div>
-      `;
-    } else {
-      widget.style.padding = "12px 18px";
-      widget.style.borderRadius = "var(--r-md)";
-      widget.style.background = "var(--surface)";
-      widget.style.border = "1px solid var(--border-strong)";
-      widget.style.boxShadow = "var(--sh-lg)";
-      widget.style.display = "flex";
-      widget.style.alignItems = "center";
-      widget.style.justifyContent = "flex-start";
-      widget.style.borderLeft = "4px solid var(--primary)";
-      
-      widget.innerHTML = `
-        <i data-lucide="loader-circle" class="spin" style="color:var(--primary); width:16px; height:16px; margin-right:12px;"></i>
-        <span style="font-weight:600; font-size:13px; color:var(--text); max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:10px;">${label}</span>
-        <button title="Collapse to Pill" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:11px; padding:2px; display:flex; align-items:center; opacity:0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
-          <i data-lucide="minimize-2" style="width:12px; height:12px;"></i>
-        </button>
-      `;
+    const progressBar = document.getElementById("generationProgressBar");
+    const progressPercent = document.getElementById("generationProgressPercent");
+    if (progressBar && progressPercent) {
+      progressBar.style.width = "100%";
+      progressPercent.textContent = "100%";
     }
-    
-    C.refreshIcons();
-  }
-
-  let globalTaskPollerInterval = null;
-  
-  function initGlobalTaskPoller() {
-    if (globalTaskPollerInterval) return;
-    
-    updateGlobalTaskWidget();
-    const { ideas, drafts: draftsList } = getActiveTasks();
-    if (ideas.length === 0 && draftsList.length === 0) return;
-    
-    globalTaskPollerInterval = setInterval(async () => {
-      try {
-        const { ideas: curIdeas, drafts: curDraftsList } = getActiveTasks();
-        if (curIdeas.length === 0 && curDraftsList.length === 0) {
-          clearInterval(globalTaskPollerInterval);
-          globalTaskPollerInterval = null;
-          updateGlobalTaskWidget();
-          return;
-        }
-        
-        let changed = false;
-        
-        // 1. Poll Active Ideas
-        const remainingIdeas = [];
-        for (const idea of curIdeas) {
-          try {
-            const updated = await CandenceAPI.getIdeaDetail(idea.id);
-            if (updated && updated.status === 'done') {
-              C.toast({ type: "success", title: "Content Generated", desc: `"${idea.title}" draft is now ready!` });
-              changed = true;
-            } else if (updated && updated.status === 'failed') {
-              C.toast({ type: "error", title: "Generation Failed", desc: `Failed to generate "${idea.title}".` });
-              changed = true;
-            } else {
-              remainingIdeas.push(idea);
-            }
-          } catch(e) {
-            console.error("Error polling global task idea:", e);
-            remainingIdeas.push(idea); // Keep trying
-          }
-        }
-        
-        // 2. Poll Active Drafts
-        const remainingDrafts = [];
-        let currentDrafts = [];
-        if (curDraftsList.length > 0 && site?.id) {
-          try {
-            await window.MOCK.syncMockData(site.id);
-            currentDrafts = window.MOCK.content.filter(x => x.site === site.id);
-          } catch(e) {
-            console.error("Failed to sync mock data during global poll:", e);
-          }
-        }
-        
-        for (const d of curDraftsList) {
-          if (currentDrafts.length === 0) {
-            remainingDrafts.push(d);
-            continue;
-          }
-          
-          if (d.type === "image") {
-            const updated = currentDrafts.find(x => x.id === d.id);
-            if (updated && updated.cover_image !== d.oldCover) {
-              C.toast({ type: "success", title: "Cover Image Ready", desc: `Regenerated cover image for "${d.title}"` });
-              changed = true;
-            } else {
-              remainingDrafts.push(d);
-            }
-          } else {
-            const updatedOld = currentDrafts.find(x => x.id === d.id);
-            const hasNewDraft = currentDrafts.some(x => parseInt(x.id) > parseInt(d.id) && x.body && x.body !== "");
-            
-            if (hasNewDraft || (updatedOld && updatedOld.body && updatedOld.body !== "" && updatedOld.body !== d.oldBody)) {
-              C.toast({ type: "success", title: "Draft Regenerated", desc: `"${d.title}" content regenerated successfully!` });
-              changed = true;
-            } else {
-              remainingDrafts.push(d);
-            }
-          }
-        }
-        
-        if (changed || curIdeas.length !== remainingIdeas.length || curDraftsList.length !== remainingDrafts.length) {
-          saveActiveTasks(remainingIdeas, remainingDrafts);
-          updateGlobalTaskWidget();
-          
-          // Refresh the drafts list view automatically if present
-          if (site?.id) {
-            const oldDraftIds = drafts.map(d => parseInt(d.id));
-            const maxOldId = oldDraftIds.length > 0 ? Math.max(...oldDraftIds) : 0;
-            
-            await window.MOCK.syncMockData(site.id);
-            drafts = window.MOCK.content.filter(x => x.site === site.id);
-            
-            // If we completed an idea generation task
-            if (curIdeas.length > remainingIdeas.length) {
-              // Finish the progress bar
-              if (window._genProgressInterval) {
-                clearInterval(window._genProgressInterval);
-                window._genProgressInterval = null;
-              }
-              const progressBar = document.getElementById("generationProgressBar");
-              const progressPercent = document.getElementById("generationProgressPercent");
-              if (progressBar && progressPercent) {
-                progressBar.style.width = "100%";
-                progressPercent.textContent = "100%";
-              }
-              setTimeout(() => {
-                const progressContainer = document.getElementById("generationProgressContainer");
-                if (progressContainer) progressContainer.style.display = "none";
-              }, 1500);
-
-              // Map newly created drafts to sessionGeneratedDrafts based on maxOldId
-              drafts.forEach(d => {
-                const idNum = parseInt(d.id);
-                if (idNum > maxOldId && !sessionGeneratedDrafts.includes(String(d.id))) {
-                  sessionGeneratedDrafts.push(String(d.id));
-                }
-              });
-
-              // Auto-select the newly generated draft
-              const sorted = [...drafts].sort((a, b) => parseInt(b.id) - parseInt(a.id));
-              if (sorted.length > 0) {
-                selectedDraftId = sorted[0].id;
-              }
-            }
-            
-            renderDrafts();
-            await loadIdeaQueue();
-          }
-        }
-      } catch (globalErr) {
-        console.error("Error in global task poller tick:", globalErr);
-      }
-    }, 4000);
-  }
+    setTimeout(() => {
+      const progressContainer = document.getElementById("generationProgressContainer");
+      if (progressContainer) progressContainer.style.display = "none";
+    }, 1500);
+  };
 
   async function regenerate(d, type = "all") {
     C.toast({ type: "info", title: "Regeneration Started", desc: "AI is rewriting draft in the background..." });
@@ -2784,17 +2553,18 @@
       const res = await CandenceAPI.regenerateDraft(d.id, type);
       
       // Save to localStorage active registry
-      const { ideas: existingIdeas, drafts: existingDrafts } = getActiveTasks();
+      const { ideas: existingIdeas, drafts: existingDrafts } = window.getActiveTasks();
       const newActiveDraft = {
         id: d.id,
         title: d.title,
         type: type,
         oldCover: d.cover_image,
-        oldBody: d.body
+        oldBody: d.body,
+        timestamp: Date.now()
       };
       
-      saveActiveTasks(existingIdeas, [...existingDrafts, newActiveDraft]);
-      initGlobalTaskPoller();
+      window.saveActiveTasks(existingIdeas, [...existingDrafts, newActiveDraft]);
+      window.initGlobalTaskPoller();
     } catch (err) {
       C.toast({ type: "error", title: "Regeneration failed", desc: err.message });
       renderDrafts();
@@ -2925,11 +2695,11 @@
       }
 
       // Save to localStorage active registry
-      const { ideas: existingIdeas, drafts: existingDrafts } = getActiveTasks();
-      saveActiveTasks([...existingIdeas, ...generatedIdeas], existingDrafts);
+      const { ideas: existingIdeas, drafts: existingDrafts } = window.getActiveTasks();
+      window.saveActiveTasks([...existingIdeas, ...generatedIdeas], existingDrafts);
       
       // Start global polling
-      initGlobalTaskPoller();
+      window.initGlobalTaskPoller();
 
       document.getElementById("ideaTitle").value = "";
       if (document.getElementById("ideaNotes")) document.getElementById("ideaNotes").value = "";
@@ -3192,7 +2962,10 @@
 
       coverPreview.addEventListener("click", (e) => {
         if (e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT") {
-          coverFileInput.click();
+          const bg = coverPreview.style.backgroundImage;
+          if (!bg || bg === "none" || bg === "") {
+            coverFileInput.click();
+          }
         }
       });
     }
@@ -4353,8 +4126,7 @@
     usageTabBtn.addEventListener("click", loadUsageStats);
   }
 
-  // Initialize global poller on load in case there are running tasks from a previous session/page
-  initGlobalTaskPoller();
+
 
   renderDrafts();
   C.refreshIcons();

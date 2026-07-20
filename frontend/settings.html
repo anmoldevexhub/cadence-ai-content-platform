@@ -107,7 +107,8 @@
     if (sAutoPublish) sAutoPublish.checked = localStorage.getItem("candence.settings.autoPublish") !== "false";
 
     function updateProfileAvatar() {
-      const savedAv = localStorage.getItem("candence.settings.avatar");
+      const role = C.store.role;
+      const savedAv = localStorage.getItem("candence.settings.avatar." + role);
       const profAv = document.getElementById("profAv");
       if (profAv) {
         if (savedAv) {
@@ -153,7 +154,8 @@
               ctx.drawImage(img, x, y, size, size, 0, 0, 150, 150);
               
               const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-              localStorage.setItem("candence.settings.avatar", dataUrl);
+              const role = C.store.role;
+              localStorage.setItem("candence.settings.avatar." + role, dataUrl);
               updateProfileAvatar();
               C.mountShell(); // rebuilds the topbar and sidebar instantly
               C.toast({ type: "success", title: "Photo uploaded successfully" });

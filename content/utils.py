@@ -34,9 +34,9 @@ def inject_internal_links(new_draft):
             targets.append({
                 'title': title,
                 'tags': tags,
-                'url': post_url
+                'url': post_url,
+                'meta_description': post.meta_description.strip() if post.meta_description else ""
             })
-            
     if not targets:
         logger.info(f"No target crawled pages found for website {new_draft.website.id}")
         return
@@ -51,30 +51,44 @@ def inject_internal_links(new_draft):
         title = target['title']
         tags = target['tags']
         post_url = target['url']
+        meta_description = target.get('meta_description', '')
         
-        # Target keywords: exact title, title parts, and tags
+        # Target keywords: exact title, title parts, meta description parts, and tags
         # Split by punctuation (excluding hyphens) and common transition words/prepositions to extract sub-phrases
         delimiters = r'[:\?|,\.]|\b(?:help|achieve|for|in|on|with|by|and|to|is|are|the|how|why|about)\b'
-        parts = re.split(delimiters, title, flags=re.IGNORECASE)
         
-        # Clean title parts and strip leading stop words
+        # Helper to split and clean phrase parts
         stop_words = {'how', 'why', 'the', 'a', 'an', 'what', 'is', 'are', 'about', 'to', 'for', 'in', 'on', 'with', 'by'}
-        extracted_parts = []
-        for p in parts:
-            p_clean = p.strip()
-            # Loop to strip leading stop words
-            while True:
-                words = p_clean.split()
-                if words and words[0].lower() in stop_words:
-                    words = words[1:]
-                    p_clean = " ".join(words)
-                else:
-                    break
-            if p_clean:
-                extracted_parts.append(p_clean)
-                
-        title_parts = [title] + extracted_parts
-        raw_keywords = title_parts + [tag for tag in tags if tag]
+        def extract_parts(text):
+            if not text:
+                return []
+            parts = re.split(delimiters, text, flags=re.IGNORECASE)
+            extracted = []
+            for p in parts:
+                p_clean = p.strip()
+                while True:
+                    words = p_clean.split()
+                    if words and words[0].lower() in stop_words:
+                        words = words[1:]
+                        p_clean = " ".join(words)
+                    else:
+                        break
+                if p_clean:
+                    extracted.append(p_clean)
+            return extracted
+
+        title_parts = [title] + extract_parts(title)
+        meta_parts = extract_parts(meta_description)
+        
+        # Collect raw keywords, tagging if they come from the title/meta description or tags
+        raw_keywords = []
+        for kw in title_parts:
+            raw_keywords.append((kw, True)) # (keyword, is_from_title_or_meta)
+        for kw in meta_parts:
+            raw_keywords.append((kw, True))
+        for kw in tags:
+            if kw:
+                raw_keywords.append((kw, False))
         
         # Filter keywords: must be multi-word phrases (>= 2 words) or specific terms (>= 6 chars and not generic)
         common_generic = {
@@ -82,18 +96,34 @@ def inject_internal_links(new_draft):
             'immune', 'health', 'sleep', 'doctor', 'doctors', 'career', 'skills', 'balance', 
             'tutors', 'teachers', 'nature', 'brief', 'guide', 'future', 'efficiency', 'innovation',
             'support', 'impact', 'device', 'devices', 'unlocked', 'unleashed', 'diagnostics',
-            'complexity', 'businesses', 'automation', 'understanding', 'business', 'process'
+            'complexity', 'businesses', 'automation', 'understanding', 'business', 'process',
+            'answer', 'answers', 'question', 'questions', 'asking', 'directly', 'successfully', 
+            'emerging', 'concept', 'latest', 'learn', 'learning', 'students', 'student', 
+            'courses', 'course', 'training', 'professional', 'institute', 'insights', 'insight', 'success'
         }
+        
+        # High-value short industry acronyms we want to allow even though they are under 6 characters
+        high_value_short_terms = {
+            'seo', 'geo', 'aeo', 'ai', 'b2b', 'roi', 'crm', 'saas', 'api', 'llm', 'python', 'django', 'fintech'
+        }
+        
         keywords = []
-        for kw in raw_keywords:
+        for kw, is_from_title_or_meta in raw_keywords:
             kw_clean = kw.strip()
             if not kw_clean:
                 continue
             word_count = len(kw_clean.split())
+            kw_lower = kw_clean.lower()
+            
             if word_count >= 2:
+                # Multi-word phrases are allowed from anywhere (title, meta, or tags)
                 keywords.append(kw_clean)
-            elif len(kw_clean) >= 6 and kw_clean.lower() not in common_generic:
-                keywords.append(kw_clean)
+            elif is_from_title_or_meta:
+                # Single-word keywords are ONLY allowed if they come from the title or meta description
+                if kw_lower in high_value_short_terms:
+                    keywords.append(kw_clean)
+                elif len(kw_clean) >= 6 and kw_lower not in common_generic:
+                    keywords.append(kw_clean)
         
         # Prevent duplicate links to the same target URL in the entire article
         existing_links = [a.get('href') for a in soup.find_all('a', href=True)]

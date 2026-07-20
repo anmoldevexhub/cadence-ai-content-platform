@@ -845,23 +845,27 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 /* Custom Scrollbars for Dashboard Slots & Feeds */
 .week-items::-webkit-scrollbar,
 #activityFeed::-webkit-scrollbar,
-#pendingList::-webkit-scrollbar {
+#pendingList::-webkit-scrollbar,
+.sidebar-sites-scroll::-webkit-scrollbar {
   width: 4px;
 }
 .week-items::-webkit-scrollbar-track,
 #activityFeed::-webkit-scrollbar-track,
-#pendingList::-webkit-scrollbar-track {
+#pendingList::-webkit-scrollbar-track,
+.sidebar-sites-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 .week-items::-webkit-scrollbar-thumb,
 #activityFeed::-webkit-scrollbar-thumb,
-#pendingList::-webkit-scrollbar-thumb {
+#pendingList::-webkit-scrollbar-thumb,
+.sidebar-sites-scroll::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 4px;
 }
 .week-items::-webkit-scrollbar-thumb:hover,
 #activityFeed::-webkit-scrollbar-thumb:hover,
-#pendingList::-webkit-scrollbar-thumb:hover {
+#pendingList::-webkit-scrollbar-thumb:hover,
+.sidebar-sites-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--text-faint);
 }
 

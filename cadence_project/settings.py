@@ -221,6 +221,8 @@ if CELERY_BROKER_URL.startswith('rediss://'):
 import sys
 CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv   # Run synchronously ONLY during unit tests
 CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 10
+
 
 
 

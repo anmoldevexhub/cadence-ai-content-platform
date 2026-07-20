@@ -50,7 +50,7 @@
 
   function buildSidebar(active) {
     const role = store.role;
-    const sites = (window.MOCK?.websites || []).filter(s => !s.is_deleted).slice(0, 6);
+    const sites = (window.MOCK?.websites || []).filter(s => !s.is_deleted);
     const pendingCount = (window.MOCK?.approvals || []).filter(a => a.status === "Draft").length;
 
     const navItem = (n) => {
@@ -61,8 +61,12 @@
     };
 
     const sitesHTML = sites.map(s => `
-      <a class="nav-item site-item ${active === "site-" + s.id ? "active" : ""}" href="website-workspace.html?site=${s.id}">
-        ${faviconHTML(s)}<span class="site-name">${s.name}</span>
+      <a class="nav-item site-item ${active === "site-" + s.id ? "active" : ""}" href="website-workspace.html?site=${s.id}" title="${s.name} (${s.url})">
+        ${faviconHTML(s)}
+        <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
+          <span class="site-name" style="font-size: 13px; font-weight: 600; line-height: 1.2;">${s.name}</span>
+          <span class="site-url" style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; line-height: 1.1;">${s.url}</span>
+        </div>
         <span class="site-dot ${s.statusClass}"></span>
       </a>`).join("");
 
@@ -88,7 +92,9 @@
         ${adminGroup}
         <div class="nav-group">
           <div class="nav-label">Websites <a href="add-website.html" title="Add website" style="color:var(--text-muted)">${I("plus", "style='width:14px;height:14px'")}</a></div>
-          ${sites.length ? sitesHTML : `<div class="muted tsm" style="padding:6px 12px">No websites yet</div>`}
+          <div class="sidebar-sites-scroll" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 4px;">
+            ${sites.length ? sitesHTML : `<div class="muted tsm" style="padding:6px 12px">No websites yet</div>`}
+          </div>
           <a class="nav-item" href="add-website.html" style="color:var(--text-muted)">${I("plus-circle")}<span>Add website</span></a>
         </div>
         <div class="nav-group">
@@ -99,7 +105,7 @@
       <div class="sidebar__footer">
         <div class="dropdown">
           <div class="user-card" data-menu="usermenu">
-            <span class="avatar" style="background:${user.color}">${localStorage.getItem("candence.settings.avatar") ? `<img src="${localStorage.getItem("candence.settings.avatar")}" alt="${user.name}">` : user.initials}</span>
+            <span class="avatar" style="background:${user.color}">${localStorage.getItem("candence.settings.avatar." + role) ? `<img src="${localStorage.getItem("candence.settings.avatar." + role)}" alt="${user.name}">` : user.initials}</span>
             <span class="meta"><span class="nm">${user.name}</span><span class="rl">${role === "super" ? "Super Admin" : "Admin"}</span></span>
             ${I("chevrons-up-down")}
           </div>
@@ -173,7 +179,7 @@
         <button class="icon-btn" data-action="toggle-theme" aria-label="Toggle theme">${I("sun-moon")}</button>
         <div class="dropdown">
           <button class="icon-btn" data-menu="topuser" aria-label="Account" style="width:auto;padding:3px;border-radius:99px">
-            <span class="avatar avatar-sm" style="background:${user.color}">${localStorage.getItem("candence.settings.avatar") ? `<img src="${localStorage.getItem("candence.settings.avatar")}" alt="User">` : user.initials}</span>
+            <span class="avatar avatar-sm" style="background:${user.color}">${localStorage.getItem("candence.settings.avatar." + role) ? `<img src="${localStorage.getItem("candence.settings.avatar." + role)}" alt="User">` : user.initials}</span>
           </button>
           <div class="menu" id="topuser">
             <a class="menu-item" href="settings.html">${I("user")}Profile</a>
@@ -461,6 +467,367 @@
     });
   }
 
+  /* ----- Global Task Polling & UI Indicators ----- */
+  window.getActiveTasks = function() {
+    let ideas = [];
+    let draftsList = [];
+    try {
+      ideas = JSON.parse(localStorage.getItem("candence.active_ideas")) || [];
+    } catch(e){}
+    try {
+      draftsList = JSON.parse(localStorage.getItem("candence.active_drafts")) || [];
+    } catch(e){}
+    return { ideas, drafts: draftsList };
+  };
+
+  window.saveActiveTasks = function(ideas, draftsList) {
+    localStorage.setItem("candence.active_ideas", JSON.stringify(ideas));
+    localStorage.setItem("candence.active_drafts", JSON.stringify(draftsList));
+  };
+
+  let widgetCollapsed = false;
+  let widgetCustomX = null;
+  let widgetCustomY = null;
+
+  window.updateGlobalTaskWidget = function() {
+    const { ideas, drafts: draftsList } = window.getActiveTasks();
+    const total = ideas.length + draftsList.length;
+    
+    let widget = document.getElementById("globalTaskWidget");
+    if (total === 0) {
+      if (widget) widget.remove();
+      return;
+    }
+    
+    if (!widget) {
+      widget = document.createElement("div");
+      widget.id = "globalTaskWidget";
+      widget.style.position = "fixed";
+      widget.style.zIndex = "100000";
+      widget.style.cursor = "grab";
+      widget.style.userSelect = "none";
+      widget.style.transition = "width 0.2s cubic-bezier(0.4, 0, 0.2, 1), height 0.2s, padding 0.2s, border-radius 0.2s";
+      
+      widget.style.top = widgetCustomY !== null ? `${widgetCustomY}px` : "76px";
+      if (widgetCustomX !== null) {
+        widget.style.left = `${widgetCustomX}px`;
+      } else {
+        widget.style.right = "24px";
+      }
+      
+      document.body.appendChild(widget);
+
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let dragStartLeft = 0;
+      let dragStartTop = 0;
+      let hasMovedSignificant = false;
+
+      widget.addEventListener("mousedown", (e) => {
+        if (e.target.closest("button")) return;
+        isDragging = true;
+        hasMovedSignificant = false;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        const rect = widget.getBoundingClientRect();
+        dragStartLeft = rect.left;
+        dragStartTop = rect.top;
+        widget.style.cursor = "grabbing";
+        e.preventDefault();
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+          hasMovedSignificant = true;
+        }
+        let newX = dragStartLeft + dx;
+        let newY = dragStartTop + dy;
+        newX = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, newX));
+        newY = Math.max(10, Math.min(window.innerHeight - widget.offsetHeight - 10, newY));
+        widgetCustomX = newX;
+        widgetCustomY = newY;
+        widget.style.left = `${newX}px`;
+        widget.style.top = `${newY}px`;
+        widget.style.right = "auto";
+      });
+
+      widget.addEventListener("mouseup", (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        widget.style.cursor = "grab";
+        if (!hasMovedSignificant) {
+          if (widgetCollapsed) {
+            widgetCollapsed = false;
+            window.updateGlobalTaskWidget();
+          } else {
+            // Check if dropdown toggle or button was clicked
+            const dropdownToggle = e.target.closest(".task-dropdown-toggle");
+            if (dropdownToggle) {
+              const dropdown = widget.querySelector(".global-task-dropdown");
+              if (dropdown) {
+                const isShowing = dropdown.style.display === "flex";
+                dropdown.style.display = isShowing ? "none" : "flex";
+              }
+            } else {
+              // Clicked anywhere else collapses it
+              widgetCollapsed = true;
+              window.updateGlobalTaskWidget();
+            }
+          }
+        }
+      });
+    }
+    
+    if (widgetCollapsed) {
+      widget.style.padding = "10px";
+      widget.style.borderRadius = "99px";
+      widget.style.background = "var(--primary)";
+      widget.style.border = "2px solid #ffffff";
+      widget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+      widget.style.display = "flex";
+      widget.style.alignItems = "center";
+      widget.style.justifyContent = "center";
+      widget.style.borderLeft = "none";
+      widget.style.width = "auto";
+      
+      widget.innerHTML = `
+        <div style="position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
+          ${I("loader-circle", "class='spin' style='color:#ffffff; width:20px; height:20px;'")}
+          <span style="position:absolute; top:-6px; right:-6px; background:#ef4444; color:#ffffff; font-size:9px; font-weight:bold; border-radius:99px; padding:1px 5px; border:1px solid #ffffff; box-shadow:0 2px 4px rgba(0,0,0,0.2);">${total}</span>
+        </div>
+      `;
+    } else {
+      // Single Bar styling
+      widget.style.padding = "0";
+      widget.style.borderRadius = "0";
+      widget.style.background = "none";
+      widget.style.border = "none";
+      widget.style.boxShadow = "none";
+      widget.style.display = "block";
+      widget.style.width = "auto";
+      
+      const listItems = [];
+      ideas.forEach(idea => {
+        listItems.push({ title: idea.title, subtitle: "AI writing post...", icon: "sparkles", color: "var(--primary)" });
+      });
+      draftsList.forEach(d => {
+        const sub = d.type === "image" ? "Regenerating cover image..." : "Rewriting draft content...";
+        listItems.push({ title: d.title, subtitle: sub, icon: "refresh-cw", color: "var(--success)" });
+      });
+      
+      const firstTask = listItems[0];
+      const taskText = firstTask ? firstTask.title : "";
+      const truncatedTitle = taskText.length > 25 ? taskText.substring(0, 22) + "..." : taskText;
+      const label = `AI writing: "${truncatedTitle}"`;
+      
+      const badgeHTML = total > 1 ? `
+        <span class="task-dropdown-toggle" style="cursor: pointer; background: var(--primary-light); color: var(--primary); font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+          +${total - 1} more
+          ${I("chevron-down", "style='width:12px;height:12px'")}
+        </span>
+      ` : "";
+      
+      widget.innerHTML = `
+        <div class="global-task-bar" style="display: flex; align-items: center; padding: 12px 18px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border-strong); border-left: 4px solid var(--primary); box-shadow: var(--sh-lg); gap: 10px; cursor: pointer;">
+          ${I("loader-circle", "class='spin' style='color:var(--primary); width:16px; height:16px;'")}
+          <span style="font-weight:600; font-size:13px; color:var(--text); white-space:nowrap;">${label}</span>
+          ${badgeHTML}
+          <button class="widget-collapse-btn" title="Collapse to Pill" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:11px; padding:2px; display:flex; align-items:center; opacity:0.6; margin-left: auto;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+            ${I("minimize-2", "style='width:12px; height:12px;'")}
+          </button>
+        </div>
+        
+        <div class="global-task-dropdown" style="position: absolute; top: calc(100% + 6px); right: 0; width: 280px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--sh-lg); padding: 10px; display: none; flex-direction: column; gap: 8px; z-index: 99999;">
+          <div style="font-weight: 700; font-size: 11px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 2px;">Other Running Tasks</div>
+          <div style="display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto;" class="sidebar-sites-scroll">
+            ${listItems.slice(1).map(item => `
+              <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.3;">
+                <span class="spin" style="color:${item.color}; flex-shrink: 0; margin-top: 2px; display: inline-block;">
+                  ${I("loader-circle", "style='width: 12px; height: 12px;'")}
+                </span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.title}">${item.title}</div>
+                  <div style="font-size: 10px; color: var(--text-muted); margin-top: 1px;">${item.subtitle}</div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+    
+    refreshIcons();
+  };
+
+  window.triggerPageRefresh = async function() {
+    try {
+      if (window.refreshWorkspaceViews) {
+        await window.refreshWorkspaceViews();
+      } else if (window.refreshApprovalsView) {
+        await window.refreshApprovalsView();
+      } else if (window.refreshCalendarView) {
+        await window.refreshCalendarView();
+      } else {
+        location.reload();
+      }
+    } catch (e) {
+      console.error("Error refreshing page views:", e);
+    }
+  };
+
+  let globalTaskPollerInterval = null;
+  window.initGlobalTaskPoller = function() {
+    if (globalTaskPollerInterval) return;
+    
+    window.updateGlobalTaskWidget();
+    
+    globalTaskPollerInterval = setInterval(async () => {
+      try {
+        const { ideas: curIdeas, drafts: curDraftsList } = window.getActiveTasks();
+        let changed = false;
+        const now = new Date();
+        let fetchedIdeas = [];
+        
+        if (window.CandenceAPI && typeof window.CandenceAPI.request === "function") {
+          try {
+            fetchedIdeas = await window.CandenceAPI.request("/content/ideas/") || [];
+          } catch (apiErr) {
+            console.error("Error fetching active tasks from backend:", apiErr);
+          }
+          
+          const activeBackendIdeas = fetchedIdeas.filter(i => {
+            if (i.status === 'generating') {
+              const createdTime = new Date(i.created_at);
+              const elapsedSeconds = (now - createdTime) / 1000;
+              return elapsedSeconds < 300;
+            }
+            return false;
+          });
+
+          activeBackendIdeas.forEach(bi => {
+            if (!curIdeas.some(ci => String(ci.id) === String(bi.id))) {
+              curIdeas.push({ id: bi.id, title: bi.title });
+              changed = true;
+              
+              const progressContainer = document.getElementById("generationProgressContainer");
+              if (progressContainer && progressContainer.style.display !== "block") {
+                progressContainer.style.display = "block";
+                const progressBar = document.getElementById("generationProgressBar");
+                const progressPercent = document.getElementById("generationProgressPercent");
+                if (progressBar && progressPercent) {
+                  progressBar.style.width = "20%";
+                  progressPercent.textContent = "20%";
+                  let currentProgress = 20;
+                  if (window._genProgressInterval) {
+                    clearInterval(window._genProgressInterval);
+                  }
+                  window._genProgressInterval = setInterval(() => {
+                    if (currentProgress < 90) {
+                      currentProgress += Math.floor(Math.random() * 4) + 2;
+                      if (currentProgress > 90) currentProgress = 90;
+                      progressBar.style.width = `${currentProgress}%`;
+                      progressPercent.textContent = `${currentProgress}%`;
+                    }
+                  }, 1000);
+                }
+              }
+            }
+          });
+        }
+        
+        const remainingIdeas = [];
+        for (const idea of curIdeas) {
+          const updated = fetchedIdeas.find(i => String(i.id) === String(idea.id));
+          if (updated) {
+            const createdTime = new Date(updated.created_at);
+            const elapsedSeconds = (now - createdTime) / 1000;
+            
+            if (updated.status === 'done') {
+              toast({ type: "success", title: "Content Generated", desc: `"${idea.title}" draft is now ready!` });
+              changed = true;
+              
+              if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
+              await window.triggerPageRefresh();
+            } else if (updated.status === 'failed' || elapsedSeconds >= 300) {
+              const msg = elapsedSeconds >= 300 ? `Generation for "${idea.title}" timed out.` : `Failed to generate "${idea.title}".`;
+              toast({ type: "error", title: "Generation Failed", desc: msg });
+              changed = true;
+              
+              if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
+              await window.triggerPageRefresh();
+            } else {
+              remainingIdeas.push(idea);
+            }
+          } else {
+            changed = true;
+          }
+        }
+        
+        const remainingDrafts = [];
+        let currentDrafts = [];
+        
+        const curSiteId = new URLSearchParams(location.search).get("site");
+        if (curDraftsList.length > 0 && curSiteId && window.MOCK) {
+          try {
+            await window.MOCK.syncMockData(curSiteId);
+            currentDrafts = window.MOCK.content.filter(x => x.site === curSiteId);
+          } catch(e) {
+            console.error("Failed to sync mock data during global poll:", e);
+          }
+        }
+        
+        for (const d of curDraftsList) {
+          // Check for draft regeneration timeout (5 minutes)
+          const isStuck = d.timestamp ? (Date.now() - d.timestamp > 300000) : true;
+          if (isStuck) {
+            toast({ type: "error", title: "Regeneration Failed", desc: `Regeneration task for "${d.title}" timed out.` });
+            changed = true;
+            await window.triggerPageRefresh();
+            continue;
+          }
+
+          if (currentDrafts.length === 0) {
+            remainingDrafts.push(d);
+            continue;
+          }
+          
+          if (d.type === "image") {
+            const updated = currentDrafts.find(x => x.id === d.id);
+            if (updated && updated.cover_image !== d.oldCover) {
+              toast({ type: "success", title: "Cover Image Ready", desc: `Regenerated cover image for "${d.title}"` });
+              changed = true;
+              await window.triggerPageRefresh();
+            } else {
+              remainingDrafts.push(d);
+            }
+          } else {
+            const updatedOld = currentDrafts.find(x => x.id === d.id);
+            const hasNewDraft = currentDrafts.some(x => parseInt(x.id) > parseInt(d.id) && x.body && x.body !== "");
+            
+            if (hasNewDraft || (updatedOld && updatedOld.body && updatedOld.body !== "" && updatedOld.body !== d.oldBody)) {
+              toast({ type: "success", title: "Draft Regenerated", desc: `"${d.title}" content regenerated successfully!` });
+              changed = true;
+              await window.triggerPageRefresh();
+            } else {
+              remainingDrafts.push(d);
+            }
+          }
+        }
+        
+        if (changed || curIdeas.length !== remainingIdeas.length || curDraftsList.length !== remainingDrafts.length) {
+          window.saveActiveTasks(remainingIdeas, remainingDrafts);
+          window.updateGlobalTaskWidget();
+        }
+      } catch (globalErr) {
+        console.error("Error in global task poller tick:", globalErr);
+      }
+    }, 4000);
+  };
+
   function readFileAsText(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -487,6 +854,8 @@
     if (params.get("site")) {
       document.querySelectorAll(`.site-item[href*="site=${params.get("site")}"]`).forEach(a => a.classList.add("active"));
     }
+    // Start global polling
+    window.initGlobalTaskPoller();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

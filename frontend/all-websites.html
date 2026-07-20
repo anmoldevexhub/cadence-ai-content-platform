@@ -74,7 +74,6 @@
           <div><div class="v mono">${w.published}</div><div class="l">Published</div></div>
           <div><div class="v mono">${w.scheduled}</div><div class="l">Scheduled</div></div>
           <div><div class="v mono">${w.pending}</div><div class="l">Pending</div></div>
-          <div><div class="v mono" style="color:var(--success)">${w.engagement}</div><div class="l">Engagement</div></div>
         </div>
         <div class="aw-foot"><span class="user-row"><span class="avatar avatar-sm" style="background:var(--text-muted)">${w.owner.split(" ").map(n=>n[0]).join("")}</span><span class="tsm muted">${w.owner}</span></span>
           <span class="row gap2 tsm" style="color:var(--primary);font-weight:600">Open ${I("arrow-right","style='width:14px;height:14px'")}</span></div>
@@ -82,13 +81,12 @@
     }
 
     function tableHTML() {
-      return `<div class="table-wrap"><table class="tbl"><thead><tr><th>Website</th><th>Owner</th><th>Industry</th><th>Status</th><th>Published</th><th>Scheduled</th><th>Pending</th><th>Engagement</th></tr></thead><tbody>
+      return `<div class="table-wrap"><table class="tbl"><thead><tr><th>Website</th><th>Owner</th><th>Industry</th><th>Status</th><th>Published</th><th>Scheduled</th><th>Pending</th></tr></thead><tbody>
         ${list().map(w=>`<tr onclick="location.href='website-workspace.html?site=${w.id}'" style="cursor:pointer">
           <td><div class="user-row"><span class="favicon" style="width:28px;height:28px;border-radius:7px;font-size:12px;background:${w.color}">${w.short}</span><div><div class="nm">${w.name}</div><div class="em">${w.url}</div></div></div></td>
           <td class="cell-muted">${w.owner}</td><td class="cell-muted">${w.industry}</td>
           <td><span class="badge ${statusBadge[w.status]}"><span class="pip"></span> ${statusLabel[w.status]}</span></td>
-          <td class="mono">${w.published}</td><td class="mono">${w.scheduled}</td><td class="mono">${w.pending}</td>
-          <td class="mono" style="color:var(--success);font-weight:600">${w.engagement}</td></tr>`).join("")}
+          <td class="mono">${w.published}</td><td class="mono">${w.scheduled}</td><td class="mono">${w.pending}</td></tr>`).join("")}
         </tbody></table></div>`;
     }
 
@@ -120,7 +118,7 @@
     .aw-name { font-weight:650; font-size:var(--fs-lg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .aw-url { font-size:var(--fs-sm); color:var(--text-muted); }
     .aw-tags { display:flex; gap:6px; flex-wrap:wrap; }
-    .aw-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2); padding:var(--s4) 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .aw-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2); padding:var(--s4) 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
     .aw-stats .v { font-size:var(--fs-lg); font-weight:700; letter-spacing:-.02em; }
     .aw-stats .l { font-size:11px; color:var(--text-muted); }
     .aw-foot { display:flex; align-items:center; justify-content:space-between; }

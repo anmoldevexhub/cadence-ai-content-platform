@@ -78,12 +78,12 @@ def crawl_website_task(self, website_id: int):
             website.tone = analysis.get('tone', website.tone or 'Professional')
             website.topics = analysis.get('topics', website.topics)
             
-            # Prioritize real CSS colors from homepage, fall back to LLM suggestions
-            homepage_colors = result['pages'][0].get('brand_colors', []) if result.get('pages') else []
-            if homepage_colors:
-                website.brand_colors = homepage_colors
+            # Prioritize LLM-analyzed cohesive brand colors over raw CSS utility colors
+            llm_brand_colors = analysis.get('brand_colors', [])
+            if llm_brand_colors:
+                website.brand_colors = llm_brand_colors
             else:
-                website.brand_colors = analysis.get('brand_colors', website.brand_colors)
+                website.brand_colors = result['pages'][0].get('brand_colors', []) if result.get('pages') else website.brand_colors
                 
             website.avg_read_time = analysis.get('avg_read_time', website.avg_read_time)
         except Exception as e:

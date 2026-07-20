@@ -558,6 +558,7 @@
       const bar = document.getElementById("crawlBar");
       bar.style.width = "10%";
       let progress = 10;
+      let shownCrawling = false;
       
       pollInterval = setInterval(async () => {
         try {
@@ -570,7 +571,10 @@
           }
           
           if (status === "crawling") {
-            addLogMessage("Reading webpages & style references...", "loader-circle", true);
+            if (!shownCrawling) {
+              addLogMessage("Reading webpages & style references...", "loader-circle", true);
+              shownCrawling = true;
+            }
           } else if (status === "done") {
             clearInterval(pollInterval);
             bar.style.width = "100%";

@@ -27,6 +27,14 @@ class ContentIdeaListCreateView(generics.ListCreateAPIView):
         website_id = self.request.query_params.get('website')
         if website_id:
             qs = qs.filter(website_id=website_id)
+
+        # Auto-fail stuck generating ideas older than 5 minutes
+        from datetime import timedelta
+        stuck_cutoff = timezone.now() - timedelta(minutes=5)
+        stuck_ideas = ContentIdea.objects.filter(status='generating', created_at__lt=stuck_cutoff)
+        if stuck_ideas.exists():
+            stuck_ideas.update(status='failed')
+
         return qs
 
     def perform_create(self, serializer):

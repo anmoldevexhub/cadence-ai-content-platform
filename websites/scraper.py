@@ -23,7 +23,7 @@ SCRAPE_HEADERS = {
                    'AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36')
 }
 
-MAX_PAGES = 30   # Upgraded crawl limit: crawl up to 30 pages per website
+MAX_PAGES = 20   # Upgraded crawl limit: crawl up to 20 pages per website
 
 CTA_KEYWORDS = {
     'buy', 'order', 'sign up', 'join', 'get', 'subscribe', 'download', 'contact',
@@ -84,29 +84,58 @@ def scrape_website(url: str) -> dict:
     to_visit = [url]
     base_domain = normalize_domain(urlparse(url).netloc)
 
-    while to_visit and len(pages) < MAX_PAGES:
-        # Sort queue so higher priority URLs (priority value 1) are popped first
-        to_visit.sort(key=get_url_priority)
-        current_url = to_visit.pop(0)
-        
-        if current_url in visited:
-            continue
-        visited.add(current_url)
+    # Reusable browser context container to avoid launching browser repeatedly
+    browser_ctx = {'playwright': None, 'browser': None}
 
-        logger.info(f"Scraping page ({len(pages)+1}/{MAX_PAGES}): {current_url}")
-        page_data = _scrape_page(current_url)
-        if not page_data:
-            continue
+    ABS_MAX_PAGES = 25 # Absolute limit to prevent runaways on very large sites
+    
+    try:
+        while to_visit:
+            # Sort queue so higher priority URLs (priority value 1) are popped first
+            to_visit.sort(key=get_url_priority)
+            
+            # Check the next URL in queue
+            next_url = to_visit[0]
+            is_blog = get_url_priority(next_url) == 1
+            
+            # Stop if we hit the limit, unless the next page is a high-priority blog/article page
+            if len(pages) >= MAX_PAGES:
+                if not is_blog or len(pages) >= ABS_MAX_PAGES:
+                    break
+            
+            current_url = to_visit.pop(0)
+            
+            if current_url in visited:
+                continue
+            visited.add(current_url)
 
-        pages.append(page_data)
+            curr_limit = MAX_PAGES if (len(pages) < MAX_PAGES and not is_blog) else ABS_MAX_PAGES
+            logger.info(f"Scraping page ({len(pages)+1}/{curr_limit}): {current_url}")
+            page_data = _scrape_page(current_url, browser_ctx=browser_ctx)
+            if not page_data:
+                continue
 
-        # Discover internal links
-        for link in page_data.get('internal_links', []):
-            if link not in visited and normalize_domain(urlparse(link).netloc) == base_domain:
-                to_visit.append(link)
-                
-        # Deduplicate to_visit
-        to_visit = list(set(to_visit))
+            pages.append(page_data)
+
+            # Discover internal links
+            for link in page_data.get('internal_links', []):
+                if link not in visited and normalize_domain(urlparse(link).netloc) == base_domain:
+                    to_visit.append(link)
+                    
+            # Deduplicate to_visit
+            to_visit = list(set(to_visit))
+    finally:
+        # Guarantee browser resource cleanup
+        if browser_ctx['browser']:
+            try:
+                browser_ctx['browser'].close()
+            except Exception:
+                pass
+        if browser_ctx['playwright']:
+            try:
+                browser_ctx['playwright'].stop()
+            except Exception:
+                pass
 
     return {
         'pages': pages,
@@ -114,7 +143,7 @@ def scrape_website(url: str) -> dict:
     }
 
 
-def _scrape_page(url: str) -> Optional[dict]:
+def _scrape_page(url: str, browser_ctx: Optional[dict] = None) -> Optional[dict]:
     """Scrapes a page using requests with backoff retry, falling back to Playwright if needed."""
     retries = 3
     backoff = 2
@@ -137,7 +166,7 @@ def _scrape_page(url: str) -> Optional[dict]:
     if not resp_text:
         # Fall back to Playwright if static requests failed
         logger.info(f"Static request failed. Falling back to Playwright for {url}")
-        return _scrape_page_playwright(url)
+        return _scrape_page_playwright(url, browser_ctx)
 
     soup = BeautifulSoup(resp_text, 'html.parser')
     
@@ -145,29 +174,55 @@ def _scrape_page(url: str) -> Optional[dict]:
     body_text = soup.body.get_text(strip=True) if soup.body else ""
     if len(body_text) < 200:
         logger.info(f"Page body has minimal text ({len(body_text)} chars). Retrying with Playwright...")
-        pw_result = _scrape_page_playwright(url)
+        pw_result = _scrape_page_playwright(url, browser_ctx)
         if pw_result:
             return pw_result
 
     return _extract_from_soup(soup, url, resp_text)
 
 
-def _scrape_page_playwright(url: str) -> Optional[dict]:
+def _scrape_page_playwright(url: str, browser_ctx: Optional[dict] = None) -> Optional[dict]:
     """Fallback for JS-rendered websites using Playwright."""
+    browser = None
+    own_instance = False
+    p = None
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
+        if browser_ctx:
+            if not browser_ctx.get('playwright'):
+                from playwright.sync_api import sync_playwright
+                browser_ctx['playwright'] = sync_playwright().start()
+                browser_ctx['browser'] = browser_ctx['playwright'].chromium.launch(headless=True)
+            browser = browser_ctx['browser']
+        else:
+            from playwright.sync_api import sync_playwright
+            p = sync_playwright().start()
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, timeout=25000, wait_until='domcontentloaded')
-            page.wait_for_timeout(3000)
-            html = page.content()
+            own_instance = True
+
+        page = browser.new_page()
+        page.goto(url, timeout=25000, wait_until='domcontentloaded')
+        page.wait_for_timeout(3000)
+        html = page.content()
+        page.close() # Close page context but keep browser alive
+
+        if own_instance:
             browser.close()
+            p.stop()
         
         soup = BeautifulSoup(html, 'html.parser')
         return _extract_from_soup(soup, url, html)
     except Exception as e:
         logger.error(f"Playwright fallback failed for {url}: {e}")
+        if own_instance and browser:
+            try:
+                browser.close()
+            except Exception:
+                pass
+        if own_instance and p:
+            try:
+                p.stop()
+            except Exception:
+                pass
         return None
 
 

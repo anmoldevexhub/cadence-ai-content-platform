@@ -1445,6 +1445,8 @@ Return ONLY valid JSON in the following format:
 
 def generate_social_post(idea: ContentIdea, website: Website, platform: str) -> dict:
     """Generates platform-specific social media content using user-provided samples."""
+    import re
+    brand_hashtag = re.sub(r'[^a-zA-Z0-9]', '', website.name)
     system_prompt = build_system_prompt(website, platform)
     
     # Get user-uploaded samples for this platform
@@ -1730,7 +1732,7 @@ The company should feel credible because of the quality of its thinking—not be
 ================================================================================
 HASHTAGS
 ================================================================================
-Generate 3-5 highly relevant hashtags. Use only hashtags directly related to the topic. Avoid spammy or irrelevant hashtags.
+Generate 3-5 highly relevant hashtags. One of these hashtags MUST be the company/brand name itself: #{brand_hashtag}. Use only hashtags directly related to the topic. Avoid spammy or irrelevant hashtags.
 The hashtags inside the post body MUST exactly match the tags array.
 
 ================================================================================
@@ -1825,13 +1827,13 @@ Return ONLY valid JSON.
  ================================================================================
  WRITING INSTRUCTIONS
  ================================================================================
- 1. Study the reference samples to understand the style
- 2. Write a {platform.title()} post that matches the EXACT style
- 3. Follow the format rules
- 4. Ensure the body text ends with 3-5 relevant hashtags based on the content (e.g. #WebDevelopment #Devexhub).
+ 1. Study the reference samples to understand the style.
+ 2. Write a {platform.title()} post that matches the EXACT style.
+ 3. Follow the format rules.
+ 4. Ensure the body text ends with 3-5 relevant hashtags based on the content. One of these hashtags MUST be the company/brand name itself: #{brand_hashtag} (e.g. #WebDevelopment #{brand_hashtag}).
  5. Do NOT include any empty hashtags (like "#" or "# ") or malformed tags. Every hashtag must contain a real word.
- 6. The "tags" array in the JSON output must contain these same hashtags (without the leading "#" symbol, e.g. ["WebDevelopment", "Devexhub"]).
- 7. Return JSON with title, body, excerpt, tags
+ 6. The "tags" array in the JSON output must contain these same hashtags (without the leading "#" symbol, e.g. ["WebDevelopment", "{brand_hashtag}"]).
+ 7. Return JSON with title, body, excerpt, tags.
  
  ================================================================================
  OUTPUT FORMAT
@@ -3102,7 +3104,7 @@ def generate_for_idea(idea_id: int, generate_image: bool = True, include_infogra
             body=content_data.get('body', ''),
             excerpt=content_data.get('excerpt', ''),
             meta_description=content_data.get('meta_description', ''),
-            meta_title=content_data.get('meta_title', content_data.get('title', idea.title)),
+            meta_title=content_data.get('meta_title') or content_data.get('title') or idea.title,
             tags=content_data.get('tags', []),
             ai_model=content_data.get('ai_model', MODEL),
             generation_prompt=content_data.get('generation_prompt', ''),

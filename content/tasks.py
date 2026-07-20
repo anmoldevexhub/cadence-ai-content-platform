@@ -47,20 +47,22 @@ def regenerate_draft_task(self, draft_id: int, regenerate_type: str = 'all'):
             )
             
             if png_filename:
-                draft.cover_image = f"/static/media/{png_filename}"
-            elif svg_code:
                 media_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media')
-                os.makedirs(media_dir, exist_ok=True)
-                
-                filename = f"cover_{uuid.uuid4().hex}.svg"
-                filepath = os.path.join(media_dir, filename)
-                
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(svg_code)
-                    
-                draft.cover_image = f"/static/media/{filename}"
+                filepath = os.path.join(media_dir, png_filename)
+                public_url = ""
+                try:
+                    from .generator import _upload_bytes_to_imgbb
+                    with open(filepath, 'rb') as img_f:
+                        public_url = _upload_bytes_to_imgbb(img_f.read(), png_filename)
+                except Exception as upload_err:
+                    logger.warning(f"Failed to upload regenerated cover to ImgBB: {upload_err}")
+                draft.cover_image = public_url if public_url else f"/static/media/{png_filename}"
+            elif svg_code:
+                import base64
+                svg_base64 = base64.b64encode(svg_code.encode('utf-8')).decode('utf-8')
+                draft.cover_image = f"data:image/svg+xml;base64,{svg_base64}"
             
-            draft.cover_image_public_url = ""
+            draft.cover_image_public_url = draft.cover_image if draft.cover_image.startswith('http') else ""
             draft.save(update_fields=['cover_image', 'cover_image_public_url'])
             new_draft_id = draft.id
         elif regenerate_type == 'content':

@@ -702,6 +702,12 @@
       render();
     });
 
+    window.refreshCalendarView = async () => {
+      await M.syncMockData();
+      loadCards();
+      render();
+    };
+
     render();
     C.refreshIcons();
   })();

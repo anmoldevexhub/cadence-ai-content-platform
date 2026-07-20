@@ -458,6 +458,15 @@ def save_logo_from_base64(website, base64_data) -> str:
             
         data = base64.b64decode(encoded)
         
+        # Try uploading to ImgBB first for permanent hosting (especially for Heroku)
+        try:
+            from content.generator import _upload_bytes_to_imgbb
+            public_url = _upload_bytes_to_imgbb(data, f"logo_{website.id}.{ext}")
+            if public_url:
+                return public_url
+        except Exception as upload_err:
+            logger.warning(f"Failed to upload logo to ImgBB, falling back to local save: {upload_err}")
+        
         logos_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media', 'logos')
         os.makedirs(logos_dir, exist_ok=True)
         
@@ -506,6 +515,15 @@ def download_and_save_logo(website, logo_url) -> str:
                     ext = possible_ext
                     break
                     
+        # Try uploading to ImgBB first for permanent hosting (especially for Heroku)
+        try:
+            from content.generator import _upload_bytes_to_imgbb
+            public_url = _upload_bytes_to_imgbb(resp.content, f"logo_{website.id}.{ext}")
+            if public_url:
+                return public_url
+        except Exception as upload_err:
+            logger.warning(f"Failed to upload downloaded logo to ImgBB: {upload_err}")
+
         logos_dir = os.path.join(settings.BASE_DIR, 'frontend', 'media', 'logos')
         os.makedirs(logos_dir, exist_ok=True)
         filename = f"logo_{website.id}.{ext}"

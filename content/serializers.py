@@ -111,6 +111,41 @@ class ContentDraftSerializer(serializers.ModelSerializer):
                         logger = logging.getLogger(__name__)
                         logger.error(f"Image compression failed, using original file: {compression_err}")
                 
+            # If it's a video, try uploading to Cloudinary
+            if ext in ["mp4", "webm", "ogv", "mov"]:
+                try:
+                    from content.publisher import upload_video_to_cloudinary
+                    cloudinary_url = upload_video_to_cloudinary(filepath)
+                    if cloudinary_url:
+                        if os.path.exists(filepath):
+                            try:
+                                os.remove(filepath)
+                            except Exception:
+                                pass
+                        return cloudinary_url
+                except Exception as video_upload_err:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to upload video to Cloudinary: {video_upload_err}")
+            
+            # If it's an image, try uploading to ImgBB
+            elif ext in ["png", "jpg", "jpeg", "svg"]:
+                try:
+                    from content.generator import _upload_bytes_to_imgbb
+                    with open(filepath, 'rb') as img_f:
+                        public_url = _upload_bytes_to_imgbb(img_f.read(), filename)
+                    if public_url:
+                        if os.path.exists(filepath):
+                            try:
+                                os.remove(filepath)
+                            except Exception:
+                                pass
+                        return public_url
+                except Exception as img_upload_err:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Failed to upload image to ImgBB: {img_upload_err}")
+                
             return f"/static/media/covers/{filename}"
         except Exception as e:
             import logging

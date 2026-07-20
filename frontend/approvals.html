@@ -1752,6 +1752,12 @@
       C.refreshIcons();
     }
 
+    window.refreshApprovalsView = async () => {
+      await M.syncMockData();
+      renderList();
+      renderPreview();
+    };
+
     renderList(); renderPreview();
     C.refreshIcons();
   })();
