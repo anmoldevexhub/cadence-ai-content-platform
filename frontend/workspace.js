@@ -1120,26 +1120,28 @@
   // Edit Style Guide Button Action
   const editStyleGuideBtn = document.getElementById("editStyleGuideBtn");
   if (editStyleGuideBtn) {
-    editStyleGuideBtn.addEventListener("click", () => {
-      // Make fields editable
+    editStyleGuideBtn.addEventListener("click", async () => {
+      const isSaving = editStyleGuideBtn.classList.contains("btn-primary");
       const fields = ["styleHeadingFont", "styleTone", "styleVocabulary"];
-      fields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.removeAttribute("readonly");
-          el.style.background = "var(--surface)";
-          el.style.border = "1px solid var(--border)";
-        }
-      });
       
-      // Change button to Save
-      editStyleGuideBtn.innerHTML = `<i data-lucide="check"></i> Save Changes`;
-      editStyleGuideBtn.classList.remove("btn-secondary");
-      editStyleGuideBtn.classList.add("btn-primary");
-      C.refreshIcons();
-      
-      // Change button action to save
-      editStyleGuideBtn.onclick = async () => {
+      if (!isSaving) {
+        // Make fields editable
+        fields.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.removeAttribute("readonly");
+            el.style.background = "var(--surface)";
+            el.style.border = "1px solid var(--border)";
+          }
+        });
+        
+        // Change button to Save
+        editStyleGuideBtn.innerHTML = `<i data-lucide="check"></i> Save Changes`;
+        editStyleGuideBtn.classList.remove("btn-secondary");
+        editStyleGuideBtn.classList.add("btn-primary");
+        C.refreshIcons();
+      } else {
+        // Save mode
         editStyleGuideBtn.disabled = true;
         const originalText = editStyleGuideBtn.innerHTML;
         editStyleGuideBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Saving...`;
@@ -1187,7 +1189,7 @@
           C.refreshIcons();
           C.toast({ type: "error", title: "Save failed", desc: err.message });
         }
-      };
+      }
     });
   }
 
