@@ -28,12 +28,19 @@ class ContentIdeaListCreateView(generics.ListCreateAPIView):
         if website_id:
             qs = qs.filter(website_id=website_id)
 
-        # Auto-fail stuck generating ideas older than 5 minutes
+        # Auto-fail stuck generating ideas older than 5 minutes,
+        # scoped to this user's websites only, using updated_at so
+        # recently-triggered older ideas are not prematurely failed.
         from datetime import timedelta
         stuck_cutoff = timezone.now() - timedelta(minutes=5)
-        stuck_ideas = ContentIdea.objects.filter(status='generating', created_at__lt=stuck_cutoff)
-        if stuck_ideas.exists():
-            stuck_ideas.update(status='failed')
+        stuck_qs = ContentIdea.objects.filter(
+            status='generating',
+            updated_at__lt=stuck_cutoff
+        )
+        if user.role != 'super_admin':
+            stuck_qs = stuck_qs.filter(website__owner=user)
+        if stuck_qs.exists():
+            stuck_qs.update(status='failed')
 
         return qs
 
@@ -96,7 +103,9 @@ class GenerateContentView(APIView):
         include_infographics = request.data.get('include_infographics', True)
         include_cta = request.data.get('include_cta', True)
         idea.status = 'generating'
-        idea.save(update_fields=['status'])
+        # Touch updated_at so the stuck-idea timer starts from now,
+        # not from when the idea was originally created.
+        idea.save(update_fields=['status', 'updated_at'])
         run_task_async(generate_content_task, pk, include_infographics=include_infographics, include_cta=include_cta)
         return Response({'status': 'generating', 'idea_id': pk})
 

@@ -48,6 +48,16 @@
     return `<span class="favicon" style="background:${site.color}">${site.short}</span>`;
   }
 
+  // Safely escape HTML to prevent XSS when inserting user-controlled strings into innerHTML
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function buildSidebar(active) {
     const role = store.role;
     const sites = (window.MOCK?.websites || []).filter(s => !s.is_deleted);
@@ -61,11 +71,11 @@
     };
 
     const sitesHTML = sites.map(s => `
-      <a class="nav-item site-item ${active === "site-" + s.id ? "active" : ""}" href="website-workspace.html?site=${s.id}" title="${s.name} (${s.url})">
+      <a class="nav-item site-item ${active === "site-" + s.id ? "active" : ""}" href="website-workspace.html?site=${s.id}" title="${escapeHTML(s.name)} (${escapeHTML(s.url)})">
         ${faviconHTML(s)}
         <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
-          <span class="site-name" style="font-size: 13px; font-weight: 600; line-height: 1.2;">${s.name}</span>
-          <span class="site-url" style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; line-height: 1.1;">${s.url}</span>
+          <span class="site-name" style="font-size: 13px; font-weight: 600; line-height: 1.2;">${escapeHTML(s.name)}</span>
+          <span class="site-url" style="font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; line-height: 1.1;">${escapeHTML(s.url)}</span>
         </div>
         <span class="site-dot ${s.statusClass}"></span>
       </a>`).join("");
@@ -555,7 +565,9 @@
         widget.style.right = "auto";
       });
 
-      widget.addEventListener("mouseup", (e) => {
+      // mouseup on `window` (not `widget`) so we detect the mouse release
+      // even when the cursor has drifted outside the widget bounds during a drag.
+      window.addEventListener("mouseup", (e) => {
         if (!isDragging) return;
         isDragging = false;
         widget.style.cursor = "grab";
@@ -681,24 +693,36 @@
 
   let globalTaskPollerInterval = null;
   window.initGlobalTaskPoller = function() {
+    // Only start if not already running
     if (globalTaskPollerInterval) return;
     
     window.updateGlobalTaskWidget();
     
-    globalTaskPollerInterval = setInterval(async () => {
-      try {
+    function schedulePoll() {
+      globalTaskPollerInterval = setInterval(async () => {
+        // Stop the poller immediately if there are no active tasks — avoids
+        // burning CPU/network on every page indefinitely.
         const { ideas: curIdeas, drafts: curDraftsList } = window.getActiveTasks();
-        let changed = false;
-        const now = new Date();
-        let fetchedIdeas = [];
+        if (curIdeas.length === 0 && curDraftsList.length === 0) {
+          clearInterval(globalTaskPollerInterval);
+          globalTaskPollerInterval = null;
+          return;
+        }
         
-        if (window.CandenceAPI && typeof window.CandenceAPI.request === "function") {
-          try {
-            fetchedIdeas = await window.CandenceAPI.request("/content/ideas/") || [];
-          } catch (apiErr) {
-            console.error("Error fetching active tasks from backend:", apiErr);
-          }
+        try {
+          const now = new Date();
+          let fetchedIdeas = [];
+          let fetchSuccess = false;
           
+          if (window.CandenceAPI && typeof window.CandenceAPI.request === "function") {
+            try {
+              fetchedIdeas = await window.CandenceAPI.request("/content/ideas/") || [];
+              fetchSuccess = true;
+            } catch (apiErr) {
+              console.error("Error fetching active tasks from backend:", apiErr);
+              // Do NOT clear tasks on fetch failure — keep existing state.
+            }
+          }
           const activeBackendIdeas = fetchedIdeas.filter(i => {
             if (i.status === 'generating') {
               const createdTime = new Date(i.created_at);
@@ -739,32 +763,40 @@
           });
         }
         
+        // Only reconcile ideas when fetch actually succeeded; otherwise keep
+        // existing curIdeas so a single failed request doesn't silently discard tasks.
         const remainingIdeas = [];
-        for (const idea of curIdeas) {
-          const updated = fetchedIdeas.find(i => String(i.id) === String(idea.id));
-          if (updated) {
-            const createdTime = new Date(updated.created_at);
-            const elapsedSeconds = (now - createdTime) / 1000;
-            
-            if (updated.status === 'done') {
-              toast({ type: "success", title: "Content Generated", desc: `"${idea.title}" draft is now ready!` });
-              changed = true;
+        if (fetchSuccess) {
+          for (const idea of curIdeas) {
+            const updated = fetchedIdeas.find(i => String(i.id) === String(idea.id));
+            if (updated) {
+              const createdTime = new Date(updated.created_at);
+              const elapsedSeconds = (now - createdTime) / 1000;
               
-              if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
-              await window.triggerPageRefresh();
-            } else if (updated.status === 'failed' || elapsedSeconds >= 300) {
-              const msg = elapsedSeconds >= 300 ? `Generation for "${idea.title}" timed out.` : `Failed to generate "${idea.title}".`;
-              toast({ type: "error", title: "Generation Failed", desc: msg });
-              changed = true;
-              
-              if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
-              await window.triggerPageRefresh();
+              if (updated.status === 'done') {
+                toast({ type: "success", title: "Content Generated", desc: `"${idea.title}" draft is now ready!` });
+                changed = true;
+                
+                if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
+                await window.triggerPageRefresh();
+              } else if (updated.status === 'failed' || elapsedSeconds >= 300) {
+                const msg = elapsedSeconds >= 300 ? `Generation for "${idea.title}" timed out.` : `Failed to generate "${idea.title}".`;
+                toast({ type: "error", title: "Generation Failed", desc: msg });
+                changed = true;
+                
+                if (window.completeWorkspaceProgressBar) window.completeWorkspaceProgressBar();
+                await window.triggerPageRefresh();
+              } else {
+                remainingIdeas.push(idea);
+              }
             } else {
+              // Not found in backend response — keep in local tracking
               remainingIdeas.push(idea);
             }
-          } else {
-            changed = true;
           }
+        } else {
+          // Fetch failed — preserve all currently tracked ideas unchanged
+          remainingIdeas.push(...curIdeas);
         }
         
         const remainingDrafts = [];
@@ -826,6 +858,15 @@
         console.error("Error in global task poller tick:", globalErr);
       }
     }, 4000);
+    }
+    schedulePoll();
+  };
+
+  // Allow external code to (re)start the poller when new tasks are enqueued
+  window.ensureGlobalTaskPollerRunning = function() {
+    if (!globalTaskPollerInterval) {
+      window.initGlobalTaskPoller();
+    }
   };
 
   function readFileAsText(file) {

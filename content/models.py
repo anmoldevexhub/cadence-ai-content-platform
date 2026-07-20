@@ -27,6 +27,7 @@ class ContentIdea(models.Model):
         default='pending'
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)  # used for stuck-task detection
 
     class Meta:
         ordering = ['-created_at']
@@ -70,7 +71,7 @@ class ContentDraft(models.Model):
     # AI metadata
     ai_model = models.CharField(max_length=50, default='gpt-4o-mini')
     generation_prompt = models.TextField(blank=True)  # stored for debugging / regen
-    cover_image = models.CharField(max_length=500, blank=True)
+    cover_image = models.TextField(blank=True)  # may hold /static/media/... path or large base64 SVG
     cover_image_public_url = models.URLField(max_length=1000, blank=True, default="",
         help_text="Permanent public URL of cover image uploaded to imgbb. Used for social/blog publishing.")
     category = models.CharField(max_length=100, blank=True)

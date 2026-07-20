@@ -188,7 +188,18 @@ def _scrape_page_playwright(url: str, browser_ctx: Optional[dict] = None) -> Opt
     p = None
     try:
         if browser_ctx:
-            if not browser_ctx.get('playwright'):
+            # Verify BOTH playwright instance and browser are healthy.
+            # If either is missing (e.g. chromium.launch() failed last time),
+            # tear down the stale playwright and restart both cleanly.
+            pw = browser_ctx.get('playwright')
+            br = browser_ctx.get('browser')
+            if not pw or not br:
+                # Cleanup any partial state
+                if pw:
+                    try:
+                        pw.stop()
+                    except Exception:
+                        pass
                 from playwright.sync_api import sync_playwright
                 browser_ctx['playwright'] = sync_playwright().start()
                 browser_ctx['browser'] = browser_ctx['playwright'].chromium.launch(headless=True)

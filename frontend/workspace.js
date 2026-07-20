@@ -2566,7 +2566,7 @@
       };
       
       window.saveActiveTasks(existingIdeas, [...existingDrafts, newActiveDraft]);
-      window.initGlobalTaskPoller();
+      window.ensureGlobalTaskPollerRunning();
     } catch (err) {
       C.toast({ type: "error", title: "Regeneration failed", desc: err.message });
       renderDrafts();
@@ -2700,8 +2700,8 @@
       const { ideas: existingIdeas, drafts: existingDrafts } = window.getActiveTasks();
       window.saveActiveTasks([...existingIdeas, ...generatedIdeas], existingDrafts);
       
-      // Start global polling
-      window.initGlobalTaskPoller();
+      // Start global polling (restarts if it auto-stopped when queue was empty)
+      window.ensureGlobalTaskPollerRunning();
 
       document.getElementById("ideaTitle").value = "";
       if (document.getElementById("ideaNotes")) document.getElementById("ideaNotes").value = "";

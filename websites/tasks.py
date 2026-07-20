@@ -78,12 +78,15 @@ def crawl_website_task(self, website_id: int):
             website.tone = analysis.get('tone', website.tone or 'Professional')
             website.topics = analysis.get('topics', website.topics)
             
-            # Prioritize LLM-analyzed cohesive brand colors over raw CSS utility colors
+            # Prioritize LLM-analyzed cohesive brand colors over raw CSS utility colors.
+            # Never overwrite an existing palette with an empty list.
             llm_brand_colors = analysis.get('brand_colors', [])
             if llm_brand_colors:
                 website.brand_colors = llm_brand_colors
-            else:
-                website.brand_colors = result['pages'][0].get('brand_colors', []) if result.get('pages') else website.brand_colors
+            elif result.get('pages') and result['pages'][0].get('brand_colors'):
+                # Use first-page scraped colors only if non-empty
+                website.brand_colors = result['pages'][0]['brand_colors']
+            # else: keep existing website.brand_colors unchanged
                 
             website.avg_read_time = analysis.get('avg_read_time', website.avg_read_time)
         except Exception as e:

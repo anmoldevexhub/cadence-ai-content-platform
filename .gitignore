@@ -46,7 +46,11 @@ frontend/dist/
 
 # Celery
 celerybeat-schedule
+celerybeat-schedule.db
 celerybeat.pid
+
+# Scratch / debug scripts
+scratch/
 
 # Local settings
 local_settings.py
