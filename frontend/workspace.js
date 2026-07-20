@@ -1947,7 +1947,7 @@
           tags.map(t => {
             const parts = t.split(':');
             const name = parts[0];
-            const style = parts[1] || 'neutral';
+            const style = (parts[1] || 'neutral').toLowerCase();
             let styleClass = 'badge-neutral';
             if (style === 'primary') styleClass = 'badge-primary';
             else if (style === 'success') styleClass = 'badge-success';
@@ -2766,7 +2766,7 @@
     list.innerHTML = activeEditorTags.map((t, idx) => {
       const parts = t.split(':');
       const name = parts[0];
-      const style = parts[1] || 'neutral';
+      const style = (parts[1] || 'neutral').toLowerCase();
       
       let badgeClass = 'badge-neutral';
       if (style === 'primary') badgeClass = 'badge-primary';

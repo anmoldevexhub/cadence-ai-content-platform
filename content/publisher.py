@@ -248,7 +248,7 @@ def send_to_make(scheduled_post: ScheduledPost) -> dict:
         'excerpt': draft.excerpt,
         'meta_description': draft.meta_description,
         'meta_title': draft.meta_title or draft.title,
-        'tags': draft.tags,
+        'tags': [t.split(':')[0] for t in draft.tags] if isinstance(draft.tags, list) else [],
         'word_count': draft.word_count,
         'cover_image_url': public_image_url,   # permanent imgbb URL (no localhost)
         'category': draft.category,
@@ -374,7 +374,7 @@ def republish_to_custom_blog(draft, conn) -> dict:
 
     # ── Build payload (shared for update + fallback) ─────────────────────────
     def _make_form_payload(include_id=True):
-        tags_str = ", ".join(draft.tags) if isinstance(draft.tags, list) else (draft.tags or "")
+        tags_str = ", ".join([t.split(':')[0] for t in draft.tags]) if isinstance(draft.tags, list) else (draft.tags or "").split(':')[0]
         email_val = conn.website.contact_email or (conn.website.owner.email if conn.website.owner else "")
         meta_title = draft.meta_title or draft.title
         if len(meta_title) > 60:
@@ -417,7 +417,7 @@ def republish_to_custom_blog(draft, conn) -> dict:
             "read_time": read_time_display,
             "author_name": draft.author_name or "Candence Publisher",
             "cover_image_url": cover_image_url,
-            "tags": draft.tags or [],
+            "tags": [t.split(':')[0] for t in draft.tags] if isinstance(draft.tags, list) else [],
             "flow": "all",
         }
         if include_id and external_id:
@@ -600,7 +600,7 @@ def publish_to_custom_blog(draft, conn) -> dict:
                 img_filepath = os.path.join(settings.BASE_DIR, 'frontend', 'media', os.path.basename(rel_path))
 
         # Build form-data payload fields
-        tags_str = ", ".join(draft.tags) if isinstance(draft.tags, list) else (draft.tags or "")
+        tags_str = ", ".join([t.split(':')[0] for t in draft.tags]) if isinstance(draft.tags, list) else (draft.tags or "").split(':')[0]
         email_val = conn.website.contact_email or (conn.website.owner.email if conn.website.owner else "")
         
         # Safe truncation for meta SEO fields to avoid target DB constraints (usually VARCHAR(60) or VARCHAR(160))
@@ -689,7 +689,7 @@ def publish_to_custom_blog(draft, conn) -> dict:
             "read_time": read_time_display,
             "author_name": draft.author_name or "Candence Publisher",
             "cover_image_url": cover_image_url,
-            "tags": draft.tags or [],
+            "tags": [t.split(':')[0] for t in draft.tags] if isinstance(draft.tags, list) else [],
             "flow": "all"
         }
         if external_id:
