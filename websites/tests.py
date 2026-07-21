@@ -254,12 +254,14 @@ class CrawlerScraperTests(TestCase):
 
     def test_save_logo_from_base64(self):
         """Test base64 logo saving utility."""
+        from unittest.mock import patch
         from websites.crawler import save_logo_from_base64
         import os
         from django.conf import settings
         
         base64_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg=="
-        local_path = save_logo_from_base64(self.website, base64_data)
+        with patch('content.generator._upload_bytes_to_imgbb', return_value=None):
+            local_path = save_logo_from_base64(self.website, base64_data)
         
         self.assertTrue(local_path.startswith("/static/media/logos/logo_"))
         self.assertTrue(local_path.endswith(".png"))

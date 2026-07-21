@@ -23,7 +23,7 @@ SCRAPE_HEADERS = {
                    'AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36')
 }
 
-MAX_PAGES = 20   # Upgraded crawl limit: crawl up to 20 pages per website
+MAX_PAGES = 25   # Upgraded crawl limit: crawl up to 25 pages per website
 
 CTA_KEYWORDS = {
     'buy', 'order', 'sign up', 'join', 'get', 'subscribe', 'download', 'contact',
@@ -46,8 +46,14 @@ def get_url_priority(url: str) -> int:
     # Pagination patterns
     if 'page=' in url_lower or re.search(r'/page/\d+/?$', url_lower):
         return 3
-    # Blog / Article heuristics
-    if any(k in url_lower for k in ['/blog/', '/post/', '/article/', '/news/', '/stories/', '/posts/']):
+    # Blog / Article heuristics (both with and without trailing slashes, including plurals)
+    blog_indicators = [
+        '/blog/', '/blog', '/blogs/', '/blogs',
+        '/post/', '/post', '/posts/', '/posts',
+        '/article/', '/article', '/articles/', '/articles',
+        '/news/', '/news', '/stories/', '/stories'
+    ]
+    if any(k in url_lower for k in blog_indicators):
         return 1
     return 2
 
@@ -87,7 +93,7 @@ def scrape_website(url: str) -> dict:
     # Reusable browser context container to avoid launching browser repeatedly
     browser_ctx = {'playwright': None, 'browser': None}
 
-    ABS_MAX_PAGES = 25 # Absolute limit to prevent runaways on very large sites
+    ABS_MAX_PAGES = 30 # Absolute limit to prevent runaways on very large sites
     
     try:
         while to_visit:
@@ -354,42 +360,138 @@ def _classify_page_type_helper(url: str, soup, author: str, pub_date) -> str:
 def extract_colors_from_css(style_content: str) -> list:
     if not style_content:
         return []
+
+    # Helper to convert rgb to hex
+    def parse_rgb(match_groups):
+        try:
+            r, g, b = map(int, match_groups)
+            if 0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255:
+                return '#{:02x}{:02x}{:02x}'.format(r, g, b)
+        except Exception:
+            pass
+        return None
+
+    # Helper to convert hsl to hex
+    def parse_hsl(match_groups):
+        try:
+            h = int(match_groups[0])
+            s = int(match_groups[1])
+            l = int(match_groups[2])
+            if 0 <= h <= 360 and 0 <= s <= 100 and 0 <= l <= 100:
+                import colorsys
+                r, g, b = colorsys.hls_to_rgb(h / 360.0, l / 100.0, s / 100.0)
+                return '#{:02x}{:02x}{:02x}'.format(int(r * 255), int(g * 255), int(b * 255))
+        except Exception:
+            pass
+        return None
+
     # 1. Look for CSS variables representing primary/secondary/theme/accent colors
     var_colors = []
+    # Match --var-name: #hex or rgb(...) or hsl(...)
     var_matches = re.findall(
-        r'--(?:primary|secondary|accent|main|theme|color-primary|color-secondary)\s*:\s*([^;}\n]+)',
+        r'--(?:primary|secondary|accent|main|theme|color-primary|color-secondary|theme-meta-color)\s*:\s*([^;}\n]+)',
         style_content,
         re.I
     )
     for match in var_matches:
-        color = match.strip()
+        color = match.strip().lower()
+        # Try hex
         hex_match = re.search(r'#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}', color)
         if hex_match:
-            var_colors.append(hex_match.group(0).lower())
-            
-    # Deduplicate var colors
-    var_colors = list(dict.fromkeys(var_colors))
+            var_colors.append(hex_match.group(0))
+            continue
+        # Try rgb/rgba
+        rgb_match = re.search(r'rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})', color)
+        if rgb_match:
+            hex_val = parse_rgb(rgb_match.groups())
+            if hex_val:
+                var_colors.append(hex_val)
+                continue
+        # Try hsl/hsla
+        hsl_match = re.search(r'hsla?\(\s*(\d{1,3})[\s,]+(\d{1,3})%[\s,]+(\d{1,3})%', color)
+        if hsl_match:
+            hex_val = parse_hsl(hsl_match.groups())
+            if hex_val:
+                var_colors.append(hex_val)
+
+    # 2. Extract and count frequency of all hex and rgb/hsl colors in stylesheets/HTML
+    found_colors = []
     
-    # 2. Extract and count frequency of all hex colors in stylesheets
+    # Extract hex codes
     hex_codes = re.findall(r'#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b', style_content)
-    neutral_colors = {
-        '#ffffff', '#000000', '#fff', '#000', '#cccccc', '#ccc', '#eeeeee', '#eee', '#333333', '#333', 
-        '#6c757d', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#495057', '#343a40', '#212529'
-    }
-    valid_hexes = []
     for h in hex_codes:
         h_lower = h.lower()
         if len(h_lower) == 4:
             h_lower = '#' + ''.join(c*2 for c in h_lower[1:])
-        if h_lower not in neutral_colors:
-            valid_hexes.append(h_lower)
-            
-    from collections import Counter
-    common_hexes = [color for color, count in Counter(valid_hexes).most_common(8)]
+        found_colors.append(h_lower)
+
+    # Extract rgb/rgba values
+    rgb_matches = re.findall(r'rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})', style_content, re.I)
+    for groups in rgb_matches:
+        hex_val = parse_rgb(groups)
+        if hex_val:
+            found_colors.append(hex_val)
+
+    # Extract hsl/hsla values
+    hsl_matches = re.findall(r'hsla?\(\s*(\d{1,3})[\s,]+(\d{1,3})%[\s,]+(\d{1,3})%', style_content, re.I)
+    for groups in hsl_matches:
+        hex_val = parse_hsl(groups)
+        if hex_val:
+            found_colors.append(hex_val)
+
+    neutral_colors = {
+        '#ffffff', '#000000', '#cccccc', '#eeeeee', '#333333', '#6c757d', 
+        '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#495057', 
+        '#343a40', '#212529', '#1a1a1a', '#222222', '#f3f4f6', '#e5e7eb', 
+        '#d1d5db', '#9ca3af', '#6b7280', '#4b5563', '#374151', '#1f2937', '#111827'
+    }
     
-    # Combine prioritizing theme variables
-    combined = var_colors + [c for c in common_hexes if c not in var_colors]
-    return combined[:5]
+    framework_colors = {
+        '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', # Bootstrap defaults
+        '#3b82f6', '#10b981', '#ef4444', '#f59e0b', '#06b6d4', # Tailwind defaults
+        '#6366f1', '#4f46e5', '#f5f3ff', '#1f2937', '#a5b4fc',
+        '#4a5568', '#2d3748', '#1a202c' # Tailwind grays
+    }
+
+    non_neutral_found = []
+    neutral_found = []
+    framework_found = []
+    for col in found_colors:
+        if col in neutral_colors:
+            neutral_found.append(col)
+        elif col in framework_colors:
+            framework_found.append(col)
+        else:
+            non_neutral_found.append(col)
+
+    # Count frequencies
+    from collections import Counter
+    common_non_neutral = [color for color, count in Counter(non_neutral_found).most_common(10)]
+    common_neutral = [color for color, count in Counter(neutral_found).most_common(5)]
+    common_framework = [color for color, count in Counter(framework_found).most_common(5)]
+
+    # Combine prioritizing theme variables, then common non-neutrals, then common neutrals, then framework colors
+    combined = []
+    for c in var_colors:
+        c_lower = c.lower()
+        if len(c_lower) == 4:
+            c_lower = '#' + ''.join(x*2 for x in c_lower[1:])
+        if c_lower not in combined:
+            combined.append(c_lower)
+            
+    for c in common_non_neutral:
+        if c not in combined:
+            combined.append(c)
+
+    for c in common_neutral:
+        if c not in combined:
+            combined.append(c)
+
+    for c in common_framework:
+        if c not in combined:
+            combined.append(c)
+
+    return combined[:10]
 
 
 def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
@@ -553,8 +655,29 @@ def _extract_from_soup(soup: BeautifulSoup, url: str, raw_html: str) -> dict:
     heading_color = ""
     text_color = ""
     
+    # Discover theme colors from meta tags
+    meta_theme_colors = []
+    for meta_name in ['theme-color', 'msapplication-TileColor', 'msapplication-navbutton-color']:
+        meta_tag = soup.find('meta', attrs={'name': meta_name})
+        if meta_tag and meta_tag.get('content'):
+            val = meta_tag['content'].strip()
+            if val:
+                meta_theme_colors.append(f"--theme-meta-color: {val};")
+
     style_tags = soup.find_all('style')
-    style_content = "\n".join([t.get_text() for t in style_tags])
+    style_content = "\n".join(meta_theme_colors) + "\n" + "\n".join([t.get_text() for t in style_tags])
+    
+    # Extract inline style attributes
+    inline_styles = [el.get('style') for el in soup.find_all(style=True)]
+    if inline_styles:
+        style_content += "\n" + "\n".join(inline_styles)
+        
+    # Extract other color attributes (bgcolor, fill, stroke, color)
+    other_colors = []
+    for attr in ['bgcolor', 'fill', 'stroke', 'color']:
+        other_colors.extend([el.get(attr) for el in soup.find_all(attrs={attr: True})])
+    if other_colors:
+        style_content += "\n" + "\n".join([c for c in other_colors if c])
     
     # Check linked stylesheets (internal only to avoid external requests blocking)
     for link in soup.find_all('link', rel='stylesheet', href=True):

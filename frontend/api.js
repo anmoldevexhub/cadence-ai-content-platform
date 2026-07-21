@@ -570,6 +570,9 @@
             needs_crawl: w.needs_crawl,
             scrape_status: w.scrape_status,
             scrape_summary: w.scrape_summary || '',
+            contact_email: w.contact_email || '',
+            contact_phone: w.contact_phone || '',
+            logo_url: w.logo_url || '',
             pages: 10 + (w.id * 5),
             posts: 10 + (w.id * 8),
             scheduled: stats.scheduled,
@@ -620,6 +623,7 @@
           
           return {
             id: String(d.id),
+            idea: d.idea ? String(d.idea) : null,
             site: String(d.website),
             platform: ({ blog: 'Blog', linkedin: 'LinkedIn', youtube: 'YouTube', instagram: 'Instagram', facebook: 'Facebook' })[d.platform.toLowerCase()] || d.platform,
             chan: ({ blog: 'Blog', linkedin: 'LinkedIn', youtube: 'YouTube', instagram: 'Instagram', facebook: 'Facebook' })[d.platform.toLowerCase()] || d.platform,

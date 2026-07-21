@@ -643,3 +643,12 @@
 .draft-preview-foot button[data-act="schedule"]:active {
   transform: translateY(0);
 }
+
+.transparent-grid {
+  background-color: #ffffff !important;
+  background-image:
+    linear-gradient(45deg, #cccccc 25%, transparent 25%, transparent 75%, #cccccc 75%),
+    linear-gradient(45deg, #cccccc 25%, #ffffff 25%, #ffffff 75%, #cccccc 75%) !important;
+  background-size: 8px 8px !important;
+  background-position: 0 0, 4px 4px !important;
+}

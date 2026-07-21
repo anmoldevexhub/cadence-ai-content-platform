@@ -73,7 +73,15 @@ def crawl_website_task(self, website_id: int):
             )
         
         try:
-            analysis = analyze_website_context(result['structure_summary'])
+            # Extract and deduplicate all raw colors found across all scraped pages
+            all_colors = []
+            if result.get('pages'):
+                for p in result['pages']:
+                    if p.get('brand_colors'):
+                        all_colors.extend(p['brand_colors'])
+            all_colors = list(dict.fromkeys(all_colors))
+
+            analysis = analyze_website_context(result['structure_summary'], extracted_colors=all_colors)
             website.industry = analysis.get('industry', website.industry or 'General')
             website.tone = analysis.get('tone', website.tone or 'Professional')
             website.topics = analysis.get('topics', website.topics)

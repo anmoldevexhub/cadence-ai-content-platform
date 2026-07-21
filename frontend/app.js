@@ -698,71 +698,67 @@
     
     window.updateGlobalTaskWidget();
     
-    function schedulePoll() {
-      globalTaskPollerInterval = setInterval(async () => {
-        // Stop the poller immediately if there are no active tasks — avoids
-        // burning CPU/network on every page indefinitely.
-        const { ideas: curIdeas, drafts: curDraftsList } = window.getActiveTasks();
-        if (curIdeas.length === 0 && curDraftsList.length === 0) {
-          clearInterval(globalTaskPollerInterval);
-          globalTaskPollerInterval = null;
-          return;
-        }
+    async function tick() {
+      const { ideas: curIdeas, drafts: curDraftsList } = window.getActiveTasks();
+      if (curIdeas.length === 0 && curDraftsList.length === 0) {
+        globalTaskPollerInterval = null;
+        return;
+      }
+      
+      try {
+        const now = new Date();
+        let fetchedIdeas = [];
+        let fetchSuccess = false;
+        let changed = false;
+        let needsRefresh = false;
         
-        try {
-          const now = new Date();
-          let fetchedIdeas = [];
-          let fetchSuccess = false;
-          let changed = false;
-          let needsRefresh = false;
-          
-          if (window.CandenceAPI && typeof window.CandenceAPI.request === "function") {
-            try {
-              fetchedIdeas = await window.CandenceAPI.request("/content/ideas/") || [];
-              fetchSuccess = true;
-            } catch (apiErr) {
-              console.error("Error fetching active tasks from backend:", apiErr);
-              // Do NOT clear tasks on fetch failure — keep existing state.
-            }
+        if (window.CandenceAPI && typeof window.CandenceAPI.request === "function") {
+          try {
+            fetchedIdeas = await window.CandenceAPI.request("/content/ideas/") || [];
+            fetchSuccess = true;
+          } catch (apiErr) {
+            console.error("Error fetching active tasks from backend:", apiErr);
+            // Do NOT clear tasks on fetch failure — keep existing state.
           }
-          const activeBackendIdeas = fetchedIdeas.filter(i => {
-            if (i.status === 'generating') {
-              const createdTime = new Date(i.created_at);
-              const elapsedSeconds = (now - createdTime) / 1000;
-              return elapsedSeconds < 300;
-            }
-            return false;
-          });
+        }
+        const activeBackendIdeas = fetchedIdeas.filter(i => {
+          if (i.status === 'generating') {
+            const createdTime = new Date(i.created_at);
+            const elapsedSeconds = (now - createdTime) / 1000;
+            return elapsedSeconds < 300;
+          }
+          return false;
+        });
 
-          activeBackendIdeas.forEach(bi => {
-            if (!curIdeas.some(ci => String(ci.id) === String(bi.id))) {
-              curIdeas.push({ id: bi.id, title: bi.title });
-              changed = true;
-              
-              const progressContainer = document.getElementById("generationProgressContainer");
-              if (progressContainer && progressContainer.style.display !== "block") {
-                progressContainer.style.display = "block";
-                const progressBar = document.getElementById("generationProgressBar");
-                const progressPercent = document.getElementById("generationProgressPercent");
-                if (progressBar && progressPercent) {
-                  progressBar.style.width = "20%";
-                  progressPercent.textContent = "20%";
-                  let currentProgress = 20;
-                  if (window._genProgressInterval) {
-                    clearInterval(window._genProgressInterval);
-                  }
-                  window._genProgressInterval = setInterval(() => {
-                    if (currentProgress < 90) {
-                      currentProgress += Math.floor(Math.random() * 4) + 2;
-                      if (currentProgress > 90) currentProgress = 90;
-                      progressBar.style.width = `${currentProgress}%`;
-                      progressPercent.textContent = `${currentProgress}%`;
-                    }
-                  }, 1000);
+        activeBackendIdeas.forEach(bi => {
+          if (!curIdeas.some(ci => String(ci.id) === String(bi.id))) {
+            curIdeas.push({ id: bi.id, title: bi.title });
+            changed = true;
+            
+            const progressContainer = document.getElementById("generationProgressContainer");
+            if (progressContainer && progressContainer.style.display !== "block") {
+              progressContainer.style.display = "block";
+              const progressBar = document.getElementById("generationProgressBar");
+              const progressPercent = document.getElementById("generationProgressPercent");
+              if (progressBar && progressPercent) {
+                progressBar.style.width = "20%";
+                progressPercent.textContent = "20%";
+                let currentProgress = 20;
+                if (window._genProgressInterval) {
+                  clearInterval(window._genProgressInterval);
                 }
+                window._genProgressInterval = setInterval(() => {
+                  if (currentProgress < 90) {
+                    currentProgress += Math.floor(Math.random() * 4) + 2;
+                    if (currentProgress > 90) currentProgress = 90;
+                    progressBar.style.width = `${currentProgress}%`;
+                    progressPercent.textContent = `${currentProgress}%`;
+                  }
+                }, 1000);
               }
             }
-          });
+          }
+        });
         
         // Only reconcile ideas when fetch actually succeeded; otherwise keep
         // existing curIdeas so a single failed request doesn't silently discard tasks.
@@ -863,10 +859,16 @@
         }
       } catch (globalErr) {
         console.error("Error in global task poller tick:", globalErr);
+      } finally {
+        const { ideas: nextIdeas, drafts: nextDraftsList } = window.getActiveTasks();
+        if (nextIdeas.length > 0 || nextDraftsList.length > 0) {
+          globalTaskPollerInterval = setTimeout(tick, 4000);
+        } else {
+          globalTaskPollerInterval = null;
+        }
       }
-    }, 4000);
     }
-    schedulePoll();
+    globalTaskPollerInterval = setTimeout(tick, 4000);
   };
 
   // Allow external code to (re)start the poller when new tasks are enqueued

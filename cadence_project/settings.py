@@ -92,12 +92,16 @@ WSGI_APPLICATION = 'cadence_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+db_config = dj_database_url.config(
+    default=os.environ.get('DATABASE_URL'),
+    conn_max_age=600,
+)
+if db_config and db_config.get('ENGINE') != 'django.db.backends.sqlite3':
+    db_config['OPTIONS'] = db_config.get('OPTIONS', {})
+    db_config['OPTIONS']['sslmode'] = 'require'
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=True
-    )
+    'default': db_config
 }
 
 

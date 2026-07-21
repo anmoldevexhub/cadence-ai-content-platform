@@ -116,7 +116,7 @@ class ContentDraftListView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = ContentDraft.objects.select_related('website', 'reviewed_by')
+        qs = ContentDraft.objects.select_related('website', 'reviewed_by').filter(website__is_deleted=False)
         if user.role != 'super_admin':
             qs = qs.filter(website__owner=user)
         # Filters
@@ -344,7 +344,7 @@ class ScheduledPostListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = ScheduledPost.objects.select_related('draft__website')
+        qs = ScheduledPost.objects.select_related('draft__website').filter(draft__website__is_deleted=False)
         if user.role != 'super_admin':
             qs = qs.filter(draft__website__owner=user)
         website_id = self.request.query_params.get('website')
@@ -360,7 +360,7 @@ class ApprovalsQueueView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = ContentDraft.objects.filter(status='draft').select_related('website')
+        qs = ContentDraft.objects.filter(status='draft', website__is_deleted=False).select_related('website')
         if user.role != 'super_admin':
             qs = qs.filter(website__owner=user)
         return qs

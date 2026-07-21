@@ -145,7 +145,8 @@ def publish_scheduled_posts():
     due = ScheduledPost.objects.filter(
         scheduled_for__lte=now,
         is_published=False,
-        draft__status='scheduled'
+        draft__status='scheduled',
+        draft__website__is_deleted=False
     ).select_related('draft__website')
     
     for sp in due:

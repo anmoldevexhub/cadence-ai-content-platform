@@ -1,10 +1,18 @@
 /* ==========================================================================
    CADENCE — website workspace logic
    ========================================================================== */
-(function () {
+(async function () {
   const C = window.Candence, M = window.MOCK, I = C.icon;
   const params = new URLSearchParams(location.search);
+  
+  try {
+    await M.syncMockData(params.get("site"));
+  } catch (err) {
+    console.error("Failed to sync mock data on load:", err);
+  }
+
   let site = M.site(params.get("site")) || M.websites[0];
+  let siteContent = [];
 
   // Intercept relative domain links in content previews/editor to prevent local 404 redirects and force opening in a new tab
   document.addEventListener("click", (e) => {
@@ -22,82 +30,132 @@
     }
   });
 
-  /* ---------- hero ---------- */
-  document.getElementById("bcName").textContent = site.name;
-  document.getElementById("wsName").textContent = site.name;
-  document.getElementById("wsFav").textContent = site.short;
-  document.getElementById("wsFav").style.background = site.color;
-  const urlEl = document.getElementById("wsUrl");
-  urlEl.querySelector("span").textContent = site.url;
-  urlEl.href = "https://" + site.url;
-  const statusMap = { Active: ["badge-published", "circle-dot", "Active"], Paused: ["badge-scheduled", "pause", "Paused"], Draft: ["badge-draft", "circle-dashed", "Setup"] };
-  const [sc, si, st] = statusMap[site.status] || statusMap.Active;
-  document.getElementById("wsStatus").innerHTML = `<span class="badge ${sc}">${I(si)} ${st}</span>`;
-  document.getElementById("wsStats").innerHTML = [
-    ["Published", site.published], ["Scheduled", site.scheduled], ["Pending", site.pending], ["Pages", site.pages],
-  ].map(([l, v]) => `<div class="hs"><div class="v mono">${v}</div><div class="l">${l}</div></div>`).join("");
-  document.getElementById("visitBtn").addEventListener("click", () => window.open("https://" + site.url, "_blank"));
+  /* ---------- hero & overview render function ---------- */
+  function renderWorkspaceInfo() {
+    site = M.site(params.get("site")) || M.websites[0];
+    if (!site) return;
 
-  /* ---------- overview ---------- */
-  const siteContent = M.content.filter(c => c.site === site.id);
+    // Update settings values
+    const setNameInput = document.getElementById("setName");
+    if (setNameInput) setNameInput.value = site.name || "";
+    
+    const setIndustryInput = document.getElementById("setIndustry");
+    if (setIndustryInput) setIndustryInput.value = site.industry || "";
+    
+    const setTopicsInput = document.getElementById("setTopics");
+    if (setTopicsInput) setTopicsInput.value = site.topics ? site.topics.join(", ") : "";
 
-  // Calculate live stats from actual content
-  const publishedCount = siteContent.filter(c => c.status === "Published" || c.status === "published").length;
-  const scheduledCount = siteContent.filter(c => c.status === "Scheduled" || c.status === "scheduled").length;
-  const pendingCount = siteContent.filter(c => c.status === "Draft" || c.status === "draft").length;
-  const totalCount = siteContent.length;
+    const setLogoUrlInput = document.getElementById("setLogoUrl");
+    if (setLogoUrlInput) setLogoUrlInput.value = site.logo_url || "";
 
-  const ovStats = [
-    { l: "Posts published", v: publishedCount, d: "all time", icon: "send", tile: "blog" },
-    { l: "Scheduled", v: scheduledCount, d: "this week", icon: "calendar-clock", tile: "linkedin" },
-    { l: "Pending approval", v: pendingCount, d: "needs review", icon: "clock", tile: "youtube" },
-    { l: "Total posts", v: totalCount, d: "all time", icon: "layers", tile: "instagram" },
-  ];
-  document.getElementById("ovStats").innerHTML = ovStats.map(s => `
-    <div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div>
-      <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up muted" style="font-weight:500">${s.d}</div></div>`).join("");
-  // Sort by created_at descending
-  const sortedContent = [...siteContent].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-  const recentContent = sortedContent.slice(0, 5);
+    const setLogoPreview = document.getElementById("setLogoPreview");
+    if (setLogoPreview) {
+      if (site.logo_url) {
+        setLogoPreview.src = site.logo_url;
+        setLogoPreview.style.display = "block";
+      } else {
+        setLogoPreview.style.display = "none";
+      }
+    }
 
-  let pipelineHTML = recentContent.map(c => {
-    const p = M.platMeta(c.platform);
-    return `<div class="pipe-row" style="cursor: pointer; padding: 11px var(--s2); border-radius: var(--r-sm); transition: background 0.15s ease;" onclick="window.previewDraftFromWeekChip('${c.id}')" title="Click to view details">
-      <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
-      <span class="pr-t" style="margin-left: 4px;">${c.title}</span>
-      <span class="badge badge-${c.status.toLowerCase()}">${c.status}</span>
-    </div>`;
-  }).join("");
+    const setContactEmail = document.getElementById("setContactEmail");
+    if (setContactEmail) setContactEmail.value = site.contact_email || "";
 
-  if (siteContent.length > 5) {
-    pipelineHTML += `
-      <div style="padding: var(--s3) 0 var(--s1); text-align: center; border-top: 1px solid var(--border); margin-top: var(--s2);">
-        <button class="btn btn-soft btn-sm" data-tab="drafts" style="font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);">
-          View all ${siteContent.length} drafts
-        </button>
+    const setContactPhone = document.getElementById("setContactPhone");
+    if (setContactPhone) setContactPhone.value = site.contact_phone || "";
+
+    document.getElementById("bcName").textContent = site.name;
+    document.getElementById("wsName").textContent = site.name;
+    document.getElementById("wsFav").textContent = site.short;
+    document.getElementById("wsFav").style.background = site.color;
+    const urlEl = document.getElementById("wsUrl");
+    if (urlEl) {
+      urlEl.querySelector("span").textContent = site.url;
+      urlEl.href = "https://" + site.url;
+    }
+    const statusMap = { Active: ["badge-published", "circle-dot", "Active"], Paused: ["badge-scheduled", "pause", "Paused"], Draft: ["badge-draft", "circle-dashed", "Setup"] };
+    const [sc, si, st] = statusMap[site.status] || statusMap.Active;
+    const wsStatus = document.getElementById("wsStatus");
+    if (wsStatus) wsStatus.innerHTML = `<span class="badge ${sc}">${I(si)} ${st}</span>`;
+    
+    const wsStats = document.getElementById("wsStats");
+    if (wsStats) {
+      wsStats.innerHTML = [
+        ["Published", site.published], ["Scheduled", site.scheduled], ["Pending", site.pending], ["Pages", site.pages],
+      ].map(([l, v]) => `<div class="hs"><div class="v mono">${v}</div><div class="l">${l}</div></div>`).join("");
+    }
+
+    siteContent = M.content.filter(c => c.site === site.id);
+
+    // Calculate live stats from actual content
+    const publishedCount = siteContent.filter(c => c.status === "Published" || c.status === "published").length;
+    const scheduledCount = siteContent.filter(c => c.status === "Scheduled" || c.status === "scheduled").length;
+    const pendingCount = siteContent.filter(c => c.status === "Draft" || c.status === "draft").length;
+    const totalCount = siteContent.length;
+
+    const ovStats = [
+      { l: "Posts published", v: publishedCount, d: "all time", icon: "send", tile: "blog" },
+      { l: "Scheduled", v: scheduledCount, d: "this week", icon: "calendar-clock", tile: "linkedin" },
+      { l: "Pending approval", v: pendingCount, d: "needs review", icon: "clock", tile: "youtube" },
+      { l: "Total posts", v: totalCount, d: "all time", icon: "layers", tile: "instagram" },
+    ];
+    const ovStatsEl = document.getElementById("ovStats");
+    if (ovStatsEl) {
+      ovStatsEl.innerHTML = ovStats.map(s => `
+        <div class="stat"><div class="stat-top"><span class="stat-label">${s.l}</span><span class="stat-ic icon-tile tile-${s.tile}">${I(s.icon)}</span></div>
+          <div class="stat-val mono">${s.v}</div><div class="stat-delta delta-up muted" style="font-weight:500">${s.d}</div></div>`).join("");
+    }
+
+    // Sort by created_at descending
+    const sortedContent = [...siteContent].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    const recentContent = sortedContent.slice(0, 5);
+
+    let pipelineHTML = recentContent.map(c => {
+      const p = M.platMeta(c.platform);
+      return `<div class="pipe-row" style="cursor: pointer; padding: 11px var(--s2); border-radius: var(--r-sm); transition: background 0.15s ease;" onclick="window.previewDraftFromWeekChip('${c.id}')" title="Click to view details">
+        <span class="icon-tile tile-${p.tile}">${I(p.icon)}</span>
+        <span class="pr-t" style="margin-left: 4px;">${c.title}</span>
+        <span class="badge badge-${c.status.toLowerCase()}">${c.status}</span>
       </div>`;
+    }).join("");
+
+    if (siteContent.length > 5) {
+      pipelineHTML += `
+        <div style="padding: var(--s3) 0 var(--s1); text-align: center; border-top: 1px solid var(--border); margin-top: var(--s2);">
+          <button class="btn btn-soft btn-sm" data-tab="drafts" style="font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: var(--r-sm);">
+            View all ${siteContent.length} drafts
+          </button>
+        </div>`;
+    }
+
+    const ovPipeline = document.getElementById("ovPipeline");
+    if (ovPipeline) ovPipeline.innerHTML = pipelineHTML || `<div class="empty"><div class="empty-art">${I("file-plus")}</div><h3>No content yet</h3><p>Generate your first drafts to get started.</p></div>`;
+
+    const counts = { Blog: 0, LinkedIn: 0, YouTube: 0, Instagram: 0 };
+    siteContent.forEach(c => {
+      const platform = c.chan || c.platform;
+      if (counts[platform] !== undefined) {
+        counts[platform]++;
+      }
+    });
+
+    const chanData = [
+      ["Blog", "blog", counts.Blog, "var(--blog)"],
+      ["LinkedIn", "linkedin", counts.LinkedIn, "var(--linkedin)"],
+      ["YouTube", "youtube", counts.YouTube, "var(--youtube)"],
+      ["Instagram", "instagram", counts.Instagram, "var(--instagram)"]
+    ];
+    const chanMax = Math.max(...Object.values(counts), 1);
+    const ovChannels = document.getElementById("ovChannels");
+    if (ovChannels) {
+      ovChannels.innerHTML = chanData.map(([n,t,v,col]) => `
+        <div><div class="row-between mb2"><span class="row gap2"><span class="icon-tile tile-${t}" style="width:24px;height:24px;border-radius:6px">${I(M.platMeta(n).icon,"style='width:13px;height:13px'")}</span> ${n}</span><span class="fw6 mono">${v}</span></div>
+          <div class="chan-bar"><i style="width:${Math.round(v/chanMax*100)}%;background:${col}"></i></div></div>`).join("");
+    }
   }
 
-  document.getElementById("ovPipeline").innerHTML = pipelineHTML || `<div class="empty"><div class="empty-art">${I("file-plus")}</div><h3>No content yet</h3><p>Generate your first drafts to get started.</p></div>`;
-
-  const counts = { Blog: 0, LinkedIn: 0, YouTube: 0, Instagram: 0 };
-  siteContent.forEach(c => {
-    const platform = c.chan || c.platform;
-    if (counts[platform] !== undefined) {
-      counts[platform]++;
-    }
-  });
-
-  const chanData = [
-    ["Blog", "blog", counts.Blog, "var(--blog)"],
-    ["LinkedIn", "linkedin", counts.LinkedIn, "var(--linkedin)"],
-    ["YouTube", "youtube", counts.YouTube, "var(--youtube)"],
-    ["Instagram", "instagram", counts.Instagram, "var(--instagram)"]
-  ];
-  const chanMax = Math.max(...Object.values(counts), 1);
-  document.getElementById("ovChannels").innerHTML = chanData.map(([n,t,v,col]) => `
-    <div><div class="row-between mb2"><span class="row gap2"><span class="icon-tile tile-${t}" style="width:24px;height:24px;border-radius:6px">${I(M.platMeta(n).icon,"style='width:13px;height:13px'")}</span> ${n}</span><span class="fw6 mono">${v}</span></div>
-      <div class="chan-bar"><i style="width:${Math.round(v/chanMax*100)}%;background:${col}"></i></div></div>`).join("");
+  // Initial render
+  renderWorkspaceInfo();
 
   /* ---------- calendar week (full cal-board, mirrors global calendar) ---------- */
   const todayIndex = new Date().getDay();
@@ -584,8 +642,62 @@
     const preview = document.getElementById("logoPreview");
     if (!preview) return;
     if (url) {
-      preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain"/>`;
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = function () {
+        // Sample pixel brightness to detect very light (white) or very dark (black) logos
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          let totalBrightness = 0, sampleCount = 0;
+          for (let xi = 1; xi <= 4; xi++) {
+            for (let yi = 1; yi <= 4; yi++) {
+              const x = Math.floor((img.naturalWidth / 5) * xi);
+              const y = Math.floor((img.naturalHeight / 5) * yi);
+              const px = ctx.getImageData(x, y, 1, 1).data;
+              if (px[3] < 30) continue; // skip transparent pixels
+              const brightness = (0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]) / 255;
+              totalBrightness += brightness;
+              sampleCount++;
+            }
+          }
+          const avgBrightness = sampleCount > 0 ? (totalBrightness / sampleCount) : 0.5;
+          // Only apply special background for extreme cases (pure white or pure black logo)
+          if (avgBrightness > 0.88) {
+            // Very light/white logo — use dark background so it's visible
+            preview.style.background = "#2a2a3e";
+            preview.classList.remove("transparent-grid");
+          } else if (avgBrightness < 0.15) {
+            // Very dark/black logo — use light background so it's visible
+            preview.style.background = "#f0f0f0";
+            preview.classList.remove("transparent-grid");
+          } else {
+            // Normal colored logo — plain background, no special treatment
+            preview.style.background = "var(--bg-card)";
+            preview.classList.remove("transparent-grid");
+          }
+        } catch (e) {
+          // CORS blocked — just use plain background
+          preview.style.background = "var(--bg-card)";
+          preview.classList.remove("transparent-grid");
+        }
+        preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain"/>`;
+      };
+      img.onerror = function () {
+        preview.style.background = "var(--bg-card)";
+        preview.classList.remove("transparent-grid");
+        preview.innerHTML = `<i data-lucide="image-off" class="muted" style="width:24px;height:24px"></i>`;
+        if (window.lucide) lucide.createIcons({ nameList: ["image-off"] });
+      };
+      // Loading state while image is fetched
+      preview.innerHTML = `<i data-lucide="loader" class="muted" style="width:20px;height:20px"></i>`;
+      img.src = url;
     } else {
+      preview.style.background = "var(--bg-card)";
+      preview.classList.remove("transparent-grid");
       preview.innerHTML = `<i data-lucide="image" class="muted" style="width:24px;height:24px"></i>`;
       if (window.lucide) {
         window.lucide.createIcons({
@@ -892,15 +1004,10 @@
           C.toast({ type: "error", title: "Crawl failed", desc: "Unable to parse website content." });
         }
         
-        // Refresh local mock data in background
+        // Refresh local mock data and update the entire UI
         try {
-          await window.MOCK.syncMockData(site.id);
-          const updatedSite = window.MOCK.site(site.id);
-          if (updatedSite) {
-            site.style_guide = updatedSite.style_guide;
-            site.needs_crawl = updatedSite.needs_crawl;
-            site.scrape_status = updatedSite.scrape_status;
-            populateStyleGuideFields();
+          if (window.refreshWorkspaceViews) {
+            await window.refreshWorkspaceViews();
           }
         } catch (syncErr) {
           console.error("Failed to sync mock data in background:", syncErr);
@@ -1073,11 +1180,24 @@
             swatchContainer.after(inp);
             inp.focus();
             editBtn.style.display = "none";
-            inp.addEventListener("blur", () => {
+            inp.addEventListener("blur", async () => {
               // Parse and refresh swatches
-              site.brand_colors = inp.value.split(",").map(s => s.trim()).filter(Boolean);
+              const newColors = inp.value.split(",").map(s => s.trim()).filter(Boolean);
+              site.brand_colors = newColors;
               inp.remove();
               populateStyleGuideFields();
+              
+              // Persist changes to backend
+              try {
+                await CandenceAPI.updateWebsite(site.id, {
+                  brand_colors: newColors
+                });
+                await window.MOCK.syncMockData(site.id);
+                C.toast({ type: "success", title: "Brand colors saved", desc: "Successfully saved colors!" });
+              } catch (err) {
+                console.error("Failed to save brand colors:", err);
+                C.toast({ type: "error", title: "Failed to save colors", desc: err.message });
+              }
             });
           });
         }
@@ -2521,7 +2641,18 @@
   window.refreshWorkspaceViews = async () => {
     if (site?.id) {
       await window.MOCK.syncMockData(site.id);
+      site = window.MOCK.site(site.id);
       drafts = window.MOCK.content.filter(x => x.site === site.id);
+
+      // Auto-discover recently generated drafts in this session
+      drafts.forEach(d => {
+        if (d.idea && sessionGeneratedDrafts && !sessionGeneratedDrafts.includes(String(d.id))) {
+          sessionGeneratedDrafts.push(String(d.id));
+        }
+      });
+
+      renderWorkspaceInfo();
+      populateStyleGuideFields();
       renderDrafts();
       await loadIdeaQueue();
     }
@@ -3294,7 +3425,30 @@
         document.body.appendChild(imageDeleteBtn);
       }
 
+      // --- Floating Remove Block Widget ---
+      let blockDeleteBtn = document.getElementById("floatingBlockDeleteBtn");
+      if (!blockDeleteBtn) {
+        blockDeleteBtn = document.createElement("button");
+        blockDeleteBtn.id = "floatingBlockDeleteBtn";
+        blockDeleteBtn.type = "button";
+        blockDeleteBtn.style.position = "absolute";
+        blockDeleteBtn.style.zIndex = "10000";
+        blockDeleteBtn.style.display = "none";
+        blockDeleteBtn.style.background = "#ef4444";
+        blockDeleteBtn.style.color = "#ffffff";
+        blockDeleteBtn.style.border = "none";
+        blockDeleteBtn.style.padding = "6px 12px";
+        blockDeleteBtn.style.borderRadius = "4px";
+        blockDeleteBtn.style.fontSize = "12px";
+        blockDeleteBtn.style.fontWeight = "bold";
+        blockDeleteBtn.style.cursor = "pointer";
+        blockDeleteBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+        blockDeleteBtn.innerHTML = "🗑️ Remove Block";
+        document.body.appendChild(blockDeleteBtn);
+      }
+
       let activeEditImage = null;
+      let activeEditBlock = null;
 
       const hideImageDeleteBtn = () => {
         imageDeleteBtn.style.display = "none";
@@ -3304,9 +3458,18 @@
         }
       };
 
+      const hideBlockDeleteBtn = () => {
+        blockDeleteBtn.style.display = "none";
+        if (activeEditBlock) {
+          activeEditBlock.style.outline = "";
+          activeEditBlock = null;
+        }
+      };
+
       if (editBody) {
-        editBody.addEventListener("click", (e) => {
-          if (e.target.tagName === "IMG") {
+        document.addEventListener("click", (e) => {
+          if (e.target.tagName === "IMG" && editBody.contains(e.target)) {
+            hideBlockDeleteBtn();
             activeEditImage = e.target;
             const rect = activeEditImage.getBoundingClientRect();
             const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -3318,15 +3481,31 @@
 
             e.target.style.outline = "2px solid #ef4444";
             e.target.style.outlineOffset = "2px";
+          } else if (e.target.closest(".custom-block-wrapper") && editBody.contains(e.target.closest(".custom-block-wrapper"))) {
+            hideImageDeleteBtn();
+            activeEditBlock = e.target.closest(".custom-block-wrapper");
+            const rect = activeEditBlock.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+            blockDeleteBtn.style.top = `${rect.top + scrollTop + 8}px`;
+            blockDeleteBtn.style.left = `${rect.right + scrollLeft - 130}px`;
+            blockDeleteBtn.style.display = "block";
+
+            activeEditBlock.style.outline = "2px dashed #ef4444";
+            activeEditBlock.style.outlineOffset = "2px";
           } else {
             if (e.target !== imageDeleteBtn) {
               hideImageDeleteBtn();
             }
+            if (e.target !== blockDeleteBtn) {
+              hideBlockDeleteBtn();
+            }
           }
         });
 
-        editBody.addEventListener("keyup", hideImageDeleteBtn);
-        editBody.addEventListener("scroll", hideImageDeleteBtn);
+        editBody.addEventListener("keyup", () => { hideImageDeleteBtn(); hideBlockDeleteBtn(); });
+        editBody.addEventListener("scroll", () => { hideImageDeleteBtn(); hideBlockDeleteBtn(); });
 
         // Drag and drop helper for custom blocks (CTA, infographics, steps)
         let draggedNode = null;
@@ -3424,6 +3603,15 @@
         if (activeEditImage) {
           activeEditImage.remove();
           hideImageDeleteBtn();
+          updateStats();
+        }
+      });
+
+      blockDeleteBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (activeEditBlock) {
+          activeEditBlock.remove();
+          hideBlockDeleteBtn();
           updateStats();
         }
       });
@@ -3716,6 +3904,12 @@
 
   document.getElementById("saveEdit").addEventListener("click", async () => {
     if (editing) {
+      const saveBtn = document.getElementById("saveEdit");
+      const originalText = saveBtn.innerHTML;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Saving...`;
+      if (window.lucide) window.lucide.createIcons();
+
       const title = document.getElementById("editTitle").value.trim();
       const body = document.getElementById("editBodyRich").innerHTML;
       const cover_image = document.getElementById("editCoverUrl").value.trim();
@@ -3750,6 +3944,10 @@
         }
       } catch (err) {
         C.toast({ type: "error", title: "Save failed", desc: err.message });
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+        if (window.lucide) window.lucide.createIcons();
       }
     }
     C.closeModal("editModal");
@@ -3941,7 +4139,7 @@
         openImageLightbox(src);
       }
     }
-    else if (e.target.tagName === "IMG" && (e.target.closest("#editBodyRich") || e.target.closest(".draft__body"))) {
+    else if (e.target.tagName === "IMG" && e.target.closest(".draft__body")) {
       openImageLightbox(e.target.src);
     }
   });

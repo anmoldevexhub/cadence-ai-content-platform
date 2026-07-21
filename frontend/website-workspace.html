@@ -357,8 +357,11 @@
 
                 <!-- Card: Website Details -->
                 <div class="card card-pad">
-                  <h3 style="font-size:var(--fs-md);font-weight:700;margin-bottom:var(--s4);display:flex;align-items:center;gap:8px">
+                  <h3 style="font-size:var(--fs-md);font-weight:700;margin-bottom:var(--s4);display:flex;align-items:center;gap:8px;position:relative">
                     <i data-lucide="globe" style="width:16px;height:16px;color:var(--primary)"></i> Website Details
+                    <button type="button" class="icon-btn" onclick="Candence.openModal('helpColorsModal')" style="padding:0; margin-left:auto; cursor:pointer; color:var(--text-muted); background:none; border:none;" title="Branding &amp; AI Help">
+                      <i data-lucide="help-circle" style="width:18px;height:18px"></i>
+                    </button>
                   </h3>
                   <div class="field" style="margin-bottom:var(--s3)">
                     <label class="label">Display name</label>
@@ -383,7 +386,7 @@
                   <div class="field" style="margin-bottom:var(--s4)">
                     <label class="label">Company logo</label>
                     <div class="row gap3" style="align-items:center">
-                      <div id="logoPreview" style="width:48px;height:48px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg-card);overflow:hidden;flex-shrink:0">
+                      <div id="logoPreview" style="width:48px;height:48px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;background:var(--bg-card)">
                         <i data-lucide="image" class="muted" style="width:20px;height:20px"></i>
                       </div>
                       <div class="col gap1" style="flex:1;min-width:0">
@@ -401,6 +404,9 @@
                   <div class="row-between mb4">
                     <h3 style="font-size:var(--fs-md);font-weight:700;display:flex;align-items:center;gap:8px">
                       <i data-lucide="palette" style="width:16px;height:16px;color:var(--primary)"></i> Crawl Style
+                      <button type="button" class="icon-btn" onclick="Candence.openModal('helpColorsModal')" style="padding:0; margin-left:6px; cursor:pointer; color:var(--text-muted); background:none; border:none;" title="Branding &amp; AI Help">
+                        <i data-lucide="help-circle" style="width:14px;height:14px"></i>
+                      </button>
                     </h3>
                     <span id="crawlStatusBadge" class="badge badge-neutral"></span>
                   </div>
@@ -872,6 +878,38 @@
           <input class="input" type="url" id="inlineImageUrlInput" placeholder="https://example.com/image.jpg" style="width:100%; height:38px; padding:0 8px; border-radius:var(--r-sm); border:1px solid var(--border); background:var(--surface); color:var(--text);" />
           <button class="btn btn-primary btn-sm mt2" id="btnSubmitImageUrl" style="width:100%;">Insert Image URL</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Brand & Color Customization Help Modal -->
+  <div class="modal-overlay" id="helpColorsModal">
+    <div class="modal" style="max-width: 480px; width: 90vw;">
+      <div class="modal__head">
+        <div class="mtxt">
+          <h3>Branding &amp; Customization Help</h3>
+          <div class="sub">How brand details and colors drive your AI assets</div>
+        </div>
+        <button class="icon-btn" data-close-modal><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal__body" style="padding: var(--s5); display: flex; flex-direction: column; gap: var(--s4);">
+        <p class="tsm muted" style="line-height: 1.5; margin: 0;">
+          Welcome to the style settings dashboard! These options allow you to tailor how the AI represents your brand and generates creative assets:
+        </p>
+        <ul class="col gap3 tsm" style="padding-left: 18px; margin: 0; list-style-type: disc; line-height: 1.5; color: var(--text)">
+          <li><strong>Website Details &amp; Tone:</strong> The AI references the brand name, industry, and tone of voice when drafting articles and social media posts.</li>
+          <li><strong>Brand Color Palettes:</strong> We dynamically extract up to 10 color styles from your website CSS. White and black are automatically identified for minimalist sites.</li>
+          <li><strong>AI Image Dependency:</strong> Your Primary (index 0) and Secondary (index 1) colors directly drive DALL-E and SVG graphics. The primary color forms the full-bleed cover background, and the secondary forms the illustration accents and highlights.</li>
+        </ul>
+        <div style="background: rgba(99, 102, 241, 0.06); padding: var(--s4); border-radius: var(--r-sm); display: flex; gap: 12px; align-items: start; margin-top: 4px;">
+          <i data-lucide="info" style="width: 18px; height: 18px; color: var(--primary); flex-shrink: 0; margin-top: 2px"></i>
+          <span class="txs muted" style="line-height: 1.4; color: var(--text-muted)">
+            <strong>Tip:</strong> If you edit the website colors or details, click <strong>"Regen Image"</strong> or <strong>"Regen Content"</strong> on any draft in the queue to instantly re-generate that asset using your new brand styles!
+          </span>
+        </div>
+      </div>
+      <div class="modal__foot" style="display: flex; justify-content: flex-end; padding: var(--s4) var(--s5); border-top: 1px solid var(--border);">
+        <button class="btn btn-primary" data-close-modal>Got it</button>
       </div>
     </div>
   </div>

@@ -769,8 +769,22 @@
           const toneVal = document.getElementById("tone").value;
           const keywordChips = Array.from(document.querySelectorAll("#kwInput .chip")).map(c => c.childNodes[0].textContent.trim());
           
-          const site = await CandenceAPI.addWebsite(siteName, domain, urlStr, indVal, toneVal, keywordChips, true);
-          createdSiteId = site.id;
+          let site;
+          if (createdSiteId) {
+            site = await CandenceAPI.updateWebsite(createdSiteId, {
+              name: siteName,
+              domain: domain,
+              url: urlStr,
+              industry: indVal,
+              tone: toneVal,
+              topics: keywordChips,
+              needs_crawl: false,
+              scrape_status: 'done'
+            });
+          } else {
+            site = await CandenceAPI.addWebsite(siteName, domain, urlStr, indVal, toneVal, keywordChips, true);
+            createdSiteId = site.id;
+          }
           
           await saveConnectionsForSite(site.id);
           await handleSampleUpload(site.id);
@@ -819,8 +833,22 @@
           const toneVal = document.getElementById("tone").value;
           const keywordChips = Array.from(document.querySelectorAll("#kwInput .chip")).map(c => c.childNodes[0].textContent.trim());
           
-          const site = await CandenceAPI.addWebsite(siteName, domain, urlStr, indVal, toneVal, keywordChips, false);
-          createdSiteId = site.id;
+          let site;
+          if (createdSiteId) {
+            site = await CandenceAPI.updateWebsite(createdSiteId, {
+              name: siteName,
+              domain: domain,
+              url: urlStr,
+              industry: indVal,
+              tone: toneVal,
+              topics: keywordChips,
+              needs_crawl: true,
+              scrape_status: 'pending'
+            });
+          } else {
+            site = await CandenceAPI.addWebsite(siteName, domain, urlStr, indVal, toneVal, keywordChips, false);
+            createdSiteId = site.id;
+          }
           
           await saveConnectionsForSite(site.id);
           addLogMessage("Website record created. Initiating crawler...", "check-circle-2", false, "var(--success)");
@@ -1041,6 +1069,7 @@
 
     function clearFormState() {
       localStorage.removeItem("candence_add_website_form");
+      sessionStorage.removeItem("candence_add_website_session");
     }
 
     // Attach listeners to input fields for autosave
@@ -1052,7 +1081,15 @@
       }
     });
 
-    // Run restore on page load
+    // Only restore form state if user is still in the same browser tab session
+    // (e.g. they accidentally refreshed). Clear it for fresh navigations.
+    const sessionKey = "candence_add_website_session";
+    const isRefresh = sessionStorage.getItem(sessionKey) === "1";
+    if (!isRefresh) {
+      // Fresh navigation — wipe any stale form data from a previous session
+      clearFormState();
+    }
+    sessionStorage.setItem(sessionKey, "1");
     restoreFormState();
 
     C.refreshIcons();

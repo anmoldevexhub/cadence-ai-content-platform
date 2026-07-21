@@ -1571,15 +1571,8 @@ Write for intelligent professionals. Never oversimplify. Never overcomplicate.
 COMPANY PERSPECTIVE
 ================================================================================
 Always write from the company's perspective.
-Use:
-We...
-Our experience...
-Our team...
-Our observations...
-Our approach...
-We've found...
-One pattern we've consistently noticed...
-What we've learned...
+Naturally weave the company name ({website.name}) into the post narrative, particularly when stating the company's philosophy or operational approach. Mentioning the company name at least once makes the thought leadership feel custom and authentic.
+Use human, conversational phrases rather than rigid, template-like sentences. Formulate the company's input dynamically based on the post topic and title (for example, explaining what the team at {website.name} discovered, achieved, believes, or practices regarding the subject, using natural, conversational sentence structures).
 
 Never pretend to have completed projects that were not provided.
 Never invent statistics. Never invent customers. Never fabricate case studies.
@@ -1592,7 +1585,7 @@ Instead explain:
 WHY something matters.
 WHY companies fail.
 WHY common approaches don't work.
-WHAT experienced teams do differently.
+WHY experienced teams do differently.
 WHEN a certain approach should be used.
 WHAT trade-offs exist.
 WHAT businesses usually overlook.
@@ -1601,36 +1594,29 @@ WHAT practical lesson readers can apply.
 ================================================================================
 EVIDENCE OVER PROMOTION
 ================================================================================
-Demonstrate expertise through observations instead of promotional statements.
-Prefer:
-"We've consistently observed..."
-"One lesson we've learned..."
-"A common pattern we've noticed..."
-"Our experience suggests..."
+Demonstrate expertise through observations and qualitative insights instead of generic promotional statements.
+Write in a professional, direct, and conversational B2B tone. Avoid overly academic, passive, or boilerplate phrasing. Avoid all self-promotional boilerplate claiming expertise or specialization, and instead showcase knowledge directly through the quality of insights.
 
-Avoid:
-"We specialize in..."
-"We are experts..."
-"We deliver cutting-edge solutions..."
-"We help businesses succeed..."
+================================================================================
+PROHIBITED AI-ISMS & BOILERPLATE PHRASES
+================================================================================
+Do NOT use formulaic, repetitive, or academic AI transition phrases and summaries. Avoid repetitive transition templates that summarize findings, observations, or impacts. Instead, write directly and conversationally.
 
-Readers should trust the company because of the quality of its thinking—not because of self-promotional language.
+================================================================================
+CONCISENESS & REPETITION FILTER
+================================================================================
+Avoid saying the same thing in different ways across multiple paragraphs. If you have already explained a concept (e.g. environment consistency or process standardization), do not write another paragraph re-explaining it with slightly different wording. Keep the post tight, focused, and progressive. If the post feels repetitive, merge or delete the redundant paragraphs.
+
+================================================================================
+CONCRETE REAL-WORLD EXAMPLES
+================================================================================
+Do NOT speak only in abstract concepts. For any key benefit or feature you mention, illustrate it with specific, realistic components, processes, or operational elements relevant to the domain of the topic. Use your domain knowledge to write highly specific, realistic details instead of generalities or placeholders.
 
 ================================================================================
 FACTUAL INTEGRITY
 ================================================================================
-Never invent:
-- statistics
-- percentages
-- benchmarks
-- customer results
-- case studies
-- research findings
-- survey results
-- implementation outcomes
-
-If no evidence is provided, write qualitative insights instead.
-Use phrases like: "often", "typically", "in many implementations", "commonly", "our observations suggest", rather than unsupported numerical claims.
+Never invent fake quantitative statistics, percentages, benchmarks, customer results, case studies, or survey numbers.
+However, you MUST include concrete qualitative outcomes, real-world analogies, or practical examples to ground your explanation (such as specific benefits, operational improvements, or customer experience enhancements without fabricating numbers). Do not speak only in abstract generalities.
 
 ================================================================================
 ANTI-GENERIC WRITING RULES
@@ -1650,17 +1636,7 @@ These statements are too generic. Instead explain WHY, HOW, WHEN, UNDER WHAT CON
 ================================================================================
 SHOW EXPERTISE — DON'T CLAIM IT
 ================================================================================
-Avoid writing:
-"We are experts."
-"We provide innovative solutions."
-"We deliver excellence."
-"We help businesses succeed."
-
-Instead demonstrate expertise naturally.
-Good: "We've found that preprocessing often improves OCR accuracy more than replacing the OCR engine."
-Bad: "We provide industry-leading OCR services."
-
-Show expertise. Don't advertise expertise.
+Do not advertise or explicitly claim expertise. Instead, demonstrate it naturally by sharing concrete, practical insights, observations, and technical or operational solutions.
 
 ================================================================================
 THOUGHT LEADERSHIP
@@ -1682,16 +1658,17 @@ The goal is to make readers smarter.
 LINKEDIN WRITING STYLE & HUMAN FLOW
 ================================================================================
 The first TWO lines determine whether someone keeps reading.
-Start with one of these:
+Start with a highly engaging, scroll-stopping statement:
 • A surprising observation
-• A misconception
+• A misconception phrased punchily and directly
 • A controversial (but reasonable) statement
 • A business challenge
 • An unexpected lesson
 • A thought-provoking question
 • A market shift
 
-Avoid openings like: "In today's world...", "Technology is evolving...", "Did you know...", "As businesses continue...", "In the digital age...". These openings are overused.
+Avoid dry, passive, or overly academic openings. Make the hook immediate, punchy, and human.
+Avoid overused opening clichés referring to the digital age, technology changing rapidly, or asking generic rhetorical questions.
 
 Write like an experienced professional sharing genuine industry observations.
 Vary sentence lengths naturally. Mix short, medium, and longer sentences.
@@ -1712,12 +1689,9 @@ Do NOT force this structure if another flow is better.
 ================================================================================
 ENGAGEMENT OPTIMIZATION
 ================================================================================
-Encourage meaningful discussion. Avoid bait like "Agree?" or "Thoughts?".
-Instead ask questions that invite professionals to share experiences.
-Examples:
-"What has your team learned while implementing this?"
-"Where do you see the biggest challenge?"
-"How has your approach changed over time?"
+Structure the closing to reinforce the company's philosophy (incorporating {website.name}) before transitioning to the discussion-driving question.
+The discussion-driving question should be specific, inviting professionals to share their experiences, and ending with a conversational call to action requesting them to share their team's experience or perspective.
+Encourage meaningful discussion. Avoid bait questions.
 
 ================================================================================
 EDUCATE FIRST
@@ -1740,14 +1714,14 @@ OUTPUT REQUIREMENTS
 ================================================================================
 Platform: LinkedIn
 Length: 180–300 words. Prioritize quality over length. Never add filler to reach the target.
-Paragraphs only.
-No bullet points. No numbered lists.
-Blank line between paragraphs.
+Format: Paragraphs and lists. Use short, mobile-friendly paragraphs.
+Lists: You may use a short, bulleted list (maximum 3-4 bullet points) ONLY when highlighting concrete outcomes, benefits, or key takeaways. Keep the bullet points extremely brief and punchy. Otherwise, use paragraphs.
+Blank line between paragraphs/lists.
 Professional formatting.
 Minimal emojis (only when they improve readability).
 The final structure of the "body" string MUST be:
 1. Scroll-stopping hook (followed by a blank line).
-2. Content paragraphs.
+2. Content paragraphs or short bulleted lists.
 3. Discussion-driving question.
 4. A blank line.
 5. The 3-5 hashtags generated dynamically based on the content (separated by spaces).
@@ -2689,10 +2663,10 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
 
         raw_img_bytes = None
         if b64_data:
-            logger.info("gpt-image-1 returned base64 data. Decoding...")
+            logger.info("gpt-image-1-mini returned base64 data. Decoding...")
             raw_img_bytes = base64.b64decode(b64_data)
         elif generated_url:
-            logger.info("gpt-image-1 response received as URL. Downloading image...")
+            logger.info("gpt-image-1-mini response received as URL. Downloading image...")
             img_resp = requests.get(generated_url, timeout=15)
             if img_resp.status_code == 200:
                 raw_img_bytes = img_resp.content
@@ -2907,7 +2881,7 @@ def generate_svg_cover_via_gpt(title: str, category: str, excerpt: str = "", web
             logger.info(f"Successfully saved final composed JPEG to: {final_filepath}")
 
     except Exception as img_err:
-        logger.warning(f"gpt-image-1 generation failed: {img_err}. Falling back to standard SVG template planning.")
+        logger.warning(f"gpt-image-1-mini generation failed: {img_err}. Falling back to standard SVG template planning.")
 
     # 3. If generated successfully, wrap the final PNG base64 in a minimal SVG wrapper
     if b64_data:
@@ -3173,22 +3147,25 @@ def generate_for_idea(idea_id: int, generate_image: bool = True, include_infogra
             raise e
 
 
-def analyze_website_context(structure_text: str) -> dict:
+def analyze_website_context(structure_text: str, extracted_colors: list = None) -> dict:
     """
     Uses GPT to extract structured metadata (industry, tone, topics, brand_colors, avg_read_time)
     from the crawled structure text.
     """
-    prompt = f"""Analyze this website structure and content:
+    colors_str = ", ".join(extracted_colors) if extracted_colors else "None detected"
+    prompt = f"""Analyze this website structure, content, and extracted colors:
 {structure_text[:6000]}
+
+Raw CSS/HTML color codes detected on website: {colors_str}
 
 Extract the following details as a JSON object:
 1. "industry": A single professional industry name (e.g. "Food & Beverage", "Technology", "Fitness & Health", "Travel & Tourism", "Fashion & Apparel").
 2. "tone": A description of the writing tone (e.g. "Warm, artisanal", "Professional, technical", "Energetic, motivational", "Friendly, casual").
 3. "topics": A list of up to 10 specific core topics discussed on the site (e.g. ["Specialty coffee", "Latte art", "Brewing guides"]).
-4. "brand_colors": A list of 5 hex color codes representing the visual brand palette (suggested colors based on the website context if CSS is not present). Return EXACT hex codes (e.g. ["#b45309", "#78350f", "#f5e6d3", "#1c1917", "#d97706"]).
+4. "brand_colors": A list of 5 hex color codes representing the visual brand palette. You MUST assign the most dominant colors of the website as the Primary (index 0) and Secondary (index 1) colors, even if they are white or black. Standard framework utility colors (like Bootstrap default blue "#007bff", green "#28a745", red "#dc3545", etc.) should be ignored unless they are the true dominant colors. Return a cohesive brand palette of up to 5 colors with the most dominant brand colors at index 0 and index 1.
 5. "avg_read_time": Estimate the average read time of a typical article on the site (e.g. "4.5m").
 
-Return ONLY a valid JSON object with these keys. Do NOT include markdown code blocks."""
+Return ONLY a valid JSON object with these keys. Do NOT include markdown code blocks. """
 
     try:
         return call_llm(

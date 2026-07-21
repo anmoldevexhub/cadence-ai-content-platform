@@ -987,7 +987,30 @@
         document.body.appendChild(imageDeleteBtn);
       }
 
+      // --- Floating Remove Block Widget ---
+      let blockDeleteBtn = document.getElementById("floatingBlockDeleteBtn");
+      if (!blockDeleteBtn) {
+        blockDeleteBtn = document.createElement("button");
+        blockDeleteBtn.id = "floatingBlockDeleteBtn";
+        blockDeleteBtn.type = "button";
+        blockDeleteBtn.style.position = "absolute";
+        blockDeleteBtn.style.zIndex = "10000";
+        blockDeleteBtn.style.display = "none";
+        blockDeleteBtn.style.background = "#ef4444";
+        blockDeleteBtn.style.color = "#ffffff";
+        blockDeleteBtn.style.border = "none";
+        blockDeleteBtn.style.padding = "6px 12px";
+        blockDeleteBtn.style.borderRadius = "4px";
+        blockDeleteBtn.style.fontSize = "12px";
+        blockDeleteBtn.style.fontWeight = "bold";
+        blockDeleteBtn.style.cursor = "pointer";
+        blockDeleteBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+        blockDeleteBtn.innerHTML = "🗑️ Remove Block";
+        document.body.appendChild(blockDeleteBtn);
+      }
+
       let activeEditImage = null;
+      let activeEditBlock = null;
 
       const hideImageDeleteBtn = () => {
         imageDeleteBtn.style.display = "none";
@@ -997,9 +1020,18 @@
         }
       };
 
+      const hideBlockDeleteBtn = () => {
+        blockDeleteBtn.style.display = "none";
+        if (activeEditBlock) {
+          activeEditBlock.style.outline = "";
+          activeEditBlock = null;
+        }
+      };
+
       if (editBody) {
-        editBody.addEventListener("click", (e) => {
-          if (e.target.tagName === "IMG") {
+        document.addEventListener("click", (e) => {
+          if (e.target.tagName === "IMG" && editBody.contains(e.target)) {
+            hideBlockDeleteBtn();
             activeEditImage = e.target;
             const rect = activeEditImage.getBoundingClientRect();
             const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -1011,15 +1043,31 @@
 
             e.target.style.outline = "2px solid #ef4444";
             e.target.style.outlineOffset = "2px";
+          } else if (e.target.closest(".custom-block-wrapper") && editBody.contains(e.target.closest(".custom-block-wrapper"))) {
+            hideImageDeleteBtn();
+            activeEditBlock = e.target.closest(".custom-block-wrapper");
+            const rect = activeEditBlock.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+            blockDeleteBtn.style.top = `${rect.top + scrollTop + 8}px`;
+            blockDeleteBtn.style.left = `${rect.right + scrollLeft - 130}px`;
+            blockDeleteBtn.style.display = "block";
+
+            activeEditBlock.style.outline = "2px dashed #ef4444";
+            activeEditBlock.style.outlineOffset = "2px";
           } else {
             if (e.target !== imageDeleteBtn) {
               hideImageDeleteBtn();
             }
+            if (e.target !== blockDeleteBtn) {
+              hideBlockDeleteBtn();
+            }
           }
         });
 
-        editBody.addEventListener("keyup", hideImageDeleteBtn);
-        editBody.addEventListener("scroll", hideImageDeleteBtn);
+        editBody.addEventListener("keyup", () => { hideImageDeleteBtn(); hideBlockDeleteBtn(); });
+        editBody.addEventListener("scroll", () => { hideImageDeleteBtn(); hideBlockDeleteBtn(); });
 
         // Drag and drop helper for custom blocks (CTA, infographics, steps)
         let draggedNode = null;
@@ -1113,6 +1161,15 @@
         if (activeEditImage) {
           activeEditImage.remove();
           hideImageDeleteBtn();
+          updateStats();
+        }
+      });
+
+      blockDeleteBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (activeEditBlock) {
+          activeEditBlock.remove();
+          hideBlockDeleteBtn();
           updateStats();
         }
       });
@@ -1335,6 +1392,12 @@
   // Save Edit Modal
     document.getElementById("saveEdit").addEventListener("click", async () => {
       if (editingDraft) {
+        const saveBtn = document.getElementById("saveEdit");
+        const originalText = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;margin-right:6px"></i> Saving...`;
+        if (window.lucide) window.lucide.createIcons();
+
         const title = document.getElementById("editTitle").value.trim();
         const body = document.getElementById("editBodyRich").innerHTML;
         const cover_image = document.getElementById("editCoverUrl").value.trim();
@@ -1368,6 +1431,10 @@
           C.toast({ type: "success", title: "Changes saved" });
         } catch (err) {
           C.toast({ type: "error", title: "Save failed", desc: err.message });
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = originalText;
+          if (window.lucide) window.lucide.createIcons();
         }
       }
       C.closeModal("editModal");
