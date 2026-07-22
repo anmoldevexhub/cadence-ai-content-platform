@@ -37,7 +37,7 @@ class WebsiteListCreateView(generics.ListCreateAPIView):
             needs_crawl=needs_crawl
         )
         ActivityLog.objects.create(
-            actor=self.request.user, actor_name=self.request.user.get_full_name(),
+            actor=self.request.user, actor_name=self.request.user.get_full_name() or self.request.user.username,
             action='website_add', target_description=website.name,
             ip_address=ip
         )
@@ -86,7 +86,7 @@ class WebsiteDetailView(generics.RetrieveUpdateDestroyAPIView):
         if changes:
             ActivityLog.objects.create(
                 actor=self.request.user,
-                actor_name=self.request.user.get_full_name(),
+                actor_name=self.request.user.get_full_name() or self.request.user.username,
                 action='website_update',
                 target_description=website.name,
                 ip_address=ip,
@@ -98,7 +98,7 @@ class WebsiteDetailView(generics.RetrieveUpdateDestroyAPIView):
         hard = self.request.query_params.get('hard') == 'true'
         ActivityLog.objects.create(
             actor=self.request.user,
-            actor_name=self.request.user.get_full_name(),
+            actor_name=self.request.user.get_full_name() or self.request.user.username,
             action='website_delete_permanent' if hard else 'website_delete',
             target_description=instance.name,
             ip_address=ip
@@ -128,7 +128,7 @@ class TriggerCrawlView(APIView):
         
         ip, _ = get_client_ip(request)
         ActivityLog.objects.create(
-            actor=request.user, actor_name=request.user.get_full_name(),
+            actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
             action='crawl_start', target_description=website.name,
             ip_address=ip
         )
@@ -167,7 +167,7 @@ class SocialConnectionView(generics.ListCreateAPIView):
         else:
             conn = serializer.save(website=website)
         ActivityLog.objects.create(
-            actor=self.request.user, actor_name=self.request.user.get_full_name(),
+            actor=self.request.user, actor_name=self.request.user.get_full_name() or self.request.user.username,
             action='social_connected',
             target_description=f"{website.name} → {conn.platform}"
         )
@@ -277,7 +277,7 @@ class SampleContentView(generics.ListCreateAPIView):
         # Log activity
         ActivityLog.objects.create(
             actor=self.request.user,
-            actor_name=self.request.user.get_full_name(),
+            actor_name=self.request.user.get_full_name() or self.request.user.username,
             action='samples_uploaded',
             target_description=f"Uploaded {instance.platform} sample for {website.name}",
             ip_address=ip

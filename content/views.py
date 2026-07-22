@@ -48,7 +48,7 @@ class ContentIdeaListCreateView(generics.ListCreateAPIView):
         ip, _ = get_client_ip(self.request)
         idea = serializer.save(submitted_by=self.request.user)
         ActivityLog.objects.create(
-            actor=self.request.user, actor_name=self.request.user.get_full_name(),
+            actor=self.request.user, actor_name=self.request.user.get_full_name() or self.request.user.username,
             action='content_idea_submit',
             target_description=f"{idea.title} for {idea.website.name}",
             ip_address=ip
@@ -149,7 +149,7 @@ class ContentDraftDetailView(generics.RetrieveUpdateDestroyAPIView):
         hard = self.request.query_params.get('hard') == 'true'
         ActivityLog.objects.create(
             actor=self.request.user,
-            actor_name=self.request.user.get_full_name(),
+            actor_name=self.request.user.get_full_name() or self.request.user.username,
             action='content_delete_permanent' if hard else 'content_delete',
             target_description=instance.title,
             ip_address=ip
@@ -189,7 +189,7 @@ class ContentDraftDetailView(generics.RetrieveUpdateDestroyAPIView):
         if changes:
             ActivityLog.objects.create(
                 actor=self.request.user,
-                actor_name=self.request.user.get_full_name(),
+                actor_name=self.request.user.get_full_name() or self.request.user.username,
                 action='content_update',
                 target_description=draft.title,
                 ip_address=ip,
@@ -213,7 +213,7 @@ class ApproveDraftView(APIView):
         draft.save()
         ip, _ = get_client_ip(request)
         ActivityLog.objects.create(
-            actor=request.user, actor_name=request.user.get_full_name(),
+            actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
             action='content_approved', target_description=draft.title,
             ip_address=ip,
             metadata={'changes': {'status': {'old': old_status, 'new': 'approved'}}}
@@ -238,7 +238,7 @@ class RejectDraftView(APIView):
         draft.save()
         ip, _ = get_client_ip(request)
         ActivityLog.objects.create(
-            actor=request.user, actor_name=request.user.get_full_name(),
+            actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
             action='content_rejected', target_description=draft.title,
             ip_address=ip,
             metadata={'changes': {
@@ -284,7 +284,7 @@ class RegenerateDraftView(APIView):
             action_name = 'content_text_regenerated'
             
         ActivityLog.objects.create(
-            actor=request.user, actor_name=request.user.get_full_name(),
+            actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
             action=action_name, target_description=draft.title,
             ip_address=ip,
             metadata={'changes': {'status': {'old': old_status, 'new': 'draft'}}}
@@ -326,7 +326,7 @@ class ScheduleDraftView(APIView):
         draft.save()
         ip, _ = get_client_ip(request)
         ActivityLog.objects.create(
-            actor=request.user, actor_name=request.user.get_full_name(),
+            actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
             action='content_scheduled',
             target_description=f"{draft.title} @ {scheduled_for}",
             ip_address=ip,
@@ -382,7 +382,7 @@ class UnscheduleDraftView(APIView):
             draft.save(update_fields=['status'])
             ip, _ = get_client_ip(request)
             ActivityLog.objects.create(
-                actor=request.user, actor_name=request.user.get_full_name(),
+                actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
                 action='content_unscheduled',
                 target_description=draft.title,
                 ip_address=ip,

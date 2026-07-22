@@ -288,7 +288,7 @@ window.MOCK = (function () {
       else if (diffMin >= 1440) timeStr = `${Math.floor(diffMin / 1440)} days ago`;
 
       return {
-        who: log.actor_name || "AI Engine",
+        who: log.actor_name || "System",
         initials: actorInitials,
         color: "#095075",
         action: log.action.replace(/_/g, ' '),

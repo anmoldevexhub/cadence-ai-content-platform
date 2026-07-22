@@ -127,7 +127,7 @@ class LoginView(APIView):
             location_country=country, success=True
         )
         ActivityLog.objects.create(
-            actor=user, actor_name=user.get_full_name(),
+            actor=user, actor_name=user.get_full_name() or user.username,
             action='login', target_description='',
             ip_address=ip
         )
@@ -151,7 +151,7 @@ class LogoutView(APIView):
     def post(self, request):
         ip, _ = get_client_ip(request)
         ActivityLog.objects.create(
-            actor=request.user, actor_name=request.user.get_full_name(),
+            actor=request.user, actor_name=request.user.get_full_name() or request.user.username,
             action='logout', target_description='',
             ip_address=ip
         )
@@ -181,8 +181,8 @@ class UserListCreateView(generics.ListCreateAPIView):
         serializer.validated_data['password'] = raw_password
         user = serializer.save(created_by=self.request.user)
         ActivityLog.objects.create(
-            actor=self.request.user, actor_name=self.request.user.get_full_name(),
-            action='user_add', target_description=user.get_full_name(),
+            actor=self.request.user, actor_name=self.request.user.get_full_name() or self.request.user.username,
+            action='user_add', target_description=user.get_full_name() or user.username,
             ip_address=ip
         )
         # Send invite email (non-blocking, fail_silently=True)
@@ -236,9 +236,9 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         if changes:
             ActivityLog.objects.create(
                 actor=self.request.user,
-                actor_name=self.request.user.get_full_name(),
+                actor_name=self.request.user.get_full_name() or self.request.user.username,
                 action='user_update',
-                target_description=user.get_full_name(),
+                target_description=user.get_full_name() or user.username,
                 ip_address=ip,
                 metadata={'changes': changes}
             )
@@ -246,8 +246,8 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         ip, _ = get_client_ip(self.request)
         ActivityLog.objects.create(
-            actor=self.request.user, actor_name=self.request.user.get_full_name(),
-            action='user_delete', target_description=instance.get_full_name(),
+            actor=self.request.user, actor_name=self.request.user.get_full_name() or self.request.user.username,
+            action='user_delete', target_description=instance.get_full_name() or instance.username,
             ip_address=ip
         )
         # Soft‑delete: mark as trashed instead of hard delete
@@ -275,9 +275,9 @@ class UserRestoreView(APIView):
         user.save()
         ActivityLog.objects.create(
             actor=request.user,
-            actor_name=request.user.get_full_name(),
+            actor_name=request.user.get_full_name() or request.user.username,
             action='user_restore',
-            target_description=user.get_full_name(),
+            target_description=user.get_full_name() or user.username,
             ip_address=get_client_ip(request)[0]
         )
         return Response({'detail': 'User restored.'})
@@ -292,9 +292,9 @@ class UserPurgeView(APIView):
             return Response({'detail': 'User not found or not in trash.'}, status=404)
         ActivityLog.objects.create(
             actor=request.user,
-            actor_name=request.user.get_full_name(),
+            actor_name=request.user.get_full_name() or request.user.username,
             action='user_purge',
-            target_description=user.get_full_name(),
+            target_description=user.get_full_name() or user.username,
             ip_address=get_client_ip(request)[0]
         )
         user.delete()
@@ -336,7 +336,7 @@ class MeView(APIView):
         if changes:
             ActivityLog.objects.create(
                 actor=user,
-                actor_name=user.get_full_name(),
+                actor_name=user.get_full_name() or user.username,
                 action='user_update',
                 target_description=f"Self Profile ({user.username})",
                 ip_address=ip,
